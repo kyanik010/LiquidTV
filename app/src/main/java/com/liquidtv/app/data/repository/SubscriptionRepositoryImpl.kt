@@ -82,8 +82,8 @@ class SubscriptionRepositoryImpl @Inject constructor(
             try {
                 val cleanUser = username.trim()
                 val cleanPass = password.trim()
-                require(cleanUser.isNotEmpty()) { "Username is required" }
-                require(cleanPass.isNotEmpty()) { "Password is required" }
+                require(cleanUser.isNotEmpty()) { "اسم المستخدم مطلوب" }
+                require(cleanPass.isNotEmpty()) { "كلمة المرور مطلوبة" }
 
                 val normalizedUrl = xtreamApi.normalizeServerUrl(serverUrl)
                 val timeoutSec = prefs.userPreferences.first().connectionTimeout
@@ -93,7 +93,7 @@ class SubscriptionRepositoryImpl @Inject constructor(
                     name = displayName.ifBlank { normalizedUrl },
                     isLoading = true,
                     loadingProgress = 0.08f,
-                    statusMessage = "Connecting to Xtream server…",
+                    statusMessage = "جارٍ الاتصال بخادم Xtream...",
                 )
 
                 val authResponse = xtreamApi.authenticate(
@@ -169,15 +169,15 @@ class SubscriptionRepositoryImpl @Inject constructor(
         syncMutex.withLock {
             try {
                 val cleanUrl = playlistUrl.trim()
-                require(cleanUrl.isNotEmpty()) { "Playlist URL is required" }
+                require(cleanUrl.isNotEmpty()) { "رابط قائمة التشغيل مطلوب" }
                 require(
                     cleanUrl.startsWith("http://", ignoreCase = true) ||
                         cleanUrl.startsWith("https://", ignoreCase = true),
                 ) {
-                    "Playlist URL must start with http:// or https://"
+                    "يجب أن يبدأ رابط القائمة بـ http:// أو https://"
                 }
                 val parsedUrl = cleanUrl.toHttpUrlOrNull()
-                    ?: throw IllegalArgumentException("Invalid M3U playlist URL")
+                    ?: throw IllegalArgumentException("رابط قائمة M3U غير صالح")
 
                 val subId = existingId ?: UUID.randomUUID().toString()
                 val existing = existingId?.let { subscriptionDao.getSubscriptionById(it) }
@@ -189,7 +189,7 @@ class SubscriptionRepositoryImpl @Inject constructor(
                     name = finalName,
                     isLoading = true,
                     loadingProgress = 0.08f,
-                    statusMessage = "Downloading M3U playlist…",
+                    statusMessage = "جارٍ تنزيل قائمة M3U...",
                 )
 
                 val parseResult = downloadAndParseM3u(
@@ -264,7 +264,7 @@ class SubscriptionRepositoryImpl @Inject constructor(
                     name = sub.name,
                     isLoading = true,
                     loadingProgress = 0.05f,
-                    statusMessage = "Connecting to ${sub.name}…",
+                    statusMessage = "جارٍ الاتصال بـ ${sub.name}...",
                 )
 
                 when (sub.type) {
@@ -308,7 +308,9 @@ class SubscriptionRepositoryImpl @Inject constructor(
                 Result.success(Unit)
             } catch (e: Exception) {
                 val safeMsg = sanitizeError(e)
-                val status = if (safeMsg.contains("expired", ignoreCase = true)) {
+                val status = if (safeMsg.contains("expired", ignoreCase = true) ||
+                    safeMsg.contains("منتهي", ignoreCase = true)
+                ) {
                     SubscriptionStatus.EXPIRED.name
                 } else {
                     SubscriptionStatus.ERROR.name
@@ -324,13 +326,13 @@ class SubscriptionRepositoryImpl @Inject constructor(
 
     override suspend fun syncActiveSubscription(): Result<Unit> {
         val active = subscriptionDao.getActiveSubscriptionOnce()
-            ?: return Result.failure(IllegalStateException("No active IPTV subscription configured"))
+            ?: return Result.failure(IllegalStateException("لا يوجد اشتراك IPTV مفعّل"))
         return syncSubscription(active.id)
     }
 
     override suspend fun syncActiveEpg(): Result<Unit> = withContext(Dispatchers.IO) {
         val sub = subscriptionDao.getActiveSubscriptionOnce()
-            ?: return@withContext Result.failure(IllegalStateException("No active subscription"))
+            ?: return@withContext Result.failure(IllegalStateException("لا يوجد اشتراك مفعّل"))
         val xmltvUrl = sub.xmltvUrl?.takeIf { it.isNotBlank() }
             ?: return@withContext Result.success(Unit)
 
@@ -427,7 +429,7 @@ class SubscriptionRepositoryImpl @Inject constructor(
             val body = resp.body ?: throw IOException("Empty playlist response")
             val contentLength = body.contentLength()
             _syncInfo.update {
-                it.copy(loadingProgress = 0.25f, statusMessage = "Parsing channels…")
+                it.copy(loadingProgress = 0.25f, statusMessage = "جارٍ تحليل القنوات...")
             }
             val result = body.byteStream().use { stream ->
                 m3uParser.parseStream(
@@ -443,7 +445,7 @@ class SubscriptionRepositoryImpl @Inject constructor(
                 }
             }
             if (result.channels.isEmpty()) {
-                throw IllegalArgumentException("No valid playable channels found in this M3U playlist.")
+                throw IllegalArgumentException("لم يتم العثور على قنوات صالحة للتشغيل في قائمة M3U هذه.")
             }
             return result
         }
@@ -454,7 +456,7 @@ class SubscriptionRepositoryImpl @Inject constructor(
         parseResult: M3UParser.ParseResult,
     ) {
         _syncInfo.update {
-            it.copy(loadingProgress = 0.88f, statusMessage = "Saving ${parseResult.channels.size} channels…")
+            it.copy(loadingProgress = 0.88f, statusMessage = "جارٍ حفظ ${parseResult.channels.size} قناة...")
         }
 
         val preservedChannelState = channelDao.getPreservedUserState(subscription.id)
@@ -561,7 +563,7 @@ class SubscriptionRepositoryImpl @Inject constructor(
         val allowedFormats = authResponse.userInfo?.allowedOutputFormats.orEmpty()
 
         _syncInfo.update {
-            it.copy(loadingProgress = 0.25f, statusMessage = "Loading Live TV, Movies & Series…")
+            it.copy(loadingProgress = 0.25f, statusMessage = "جارٍ تحميل القنوات والأفلام والمسلسلات...")
         }
 
         val liveCatsDeferred = async { xtreamApi.fetchLiveCategories(serverUrl, username, password, timeoutSec) }
@@ -579,7 +581,7 @@ class SubscriptionRepositoryImpl @Inject constructor(
         val seriesDtos = seriesListDeferred.await()
 
         _syncInfo.update {
-            it.copy(loadingProgress = 0.72f, statusMessage = "Organizing catalog…")
+            it.copy(loadingProgress = 0.72f, statusMessage = "جارٍ تنظيم المحتوى...")
         }
 
         val liveCatMap = liveCats.associate { it.categoryId to it.categoryName }
@@ -738,7 +740,7 @@ class SubscriptionRepositoryImpl @Inject constructor(
     }
 
     private fun sanitizeError(e: Exception): String {
-        val raw = e.message ?: "Connection failed"
+        val raw = e.message ?: "فشل الاتصال بالخادم"
         return LogSanitizer.sanitizeUrl(raw)
     }
 
@@ -749,7 +751,7 @@ class SubscriptionRepositoryImpl @Inject constructor(
         serverUrl = serverUrl,
         username = username,
         maskedCredentialHint = when (type) {
-            SubscriptionType.XTREAM.name -> username?.let { "User: $it" }
+            SubscriptionType.XTREAM.name -> username?.let { "المستخدم: $it" }
             SubscriptionType.M3U.name -> serverUrl
             else -> null
         },

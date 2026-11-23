@@ -36,7 +36,7 @@ fun ParentalPinDialog(
     visible: Boolean,
     title: String,
     subtitle: String,
-    confirmLabel: String = "Confirm",
+    confirmLabel: String = "تأكيد",
     errorMessage: String? = null,
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit,
@@ -85,7 +85,7 @@ fun ParentalPinDialog(
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Lock,
-                        contentDescription = "Parental Control PIN",
+                        contentDescription = "رمز الرقابة الأبوية",
                         tint = LiquidColors.AccentBlueLight,
                         modifier = Modifier.size(40.dp),
                     )
@@ -108,7 +108,7 @@ fun ParentalPinDialog(
                             localError = null
                         },
                         singleLine = true,
-                        label = { Text("4–8 Digit PIN") },
+                        label = { Text("رمز مكوّن من 4 إلى 8 أرقام") },
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.NumberPassword,
@@ -117,7 +117,7 @@ fun ParentalPinDialog(
                         keyboardActions = KeyboardActions(
                             onDone = {
                                 if (pin.length < 4) {
-                                    localError = "Enter at least 4 digits"
+                                    localError = "أدخل 4 أرقام على الأقل"
                                 } else {
                                     onConfirm(pin)
                                 }
@@ -152,7 +152,7 @@ fun ParentalPinDialog(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         PinDialogButton(
-                            label = "Cancel",
+                            label = "إلغاء",
                             isPrimary = false,
                             onClick = onDismiss,
                             modifier = Modifier
@@ -164,7 +164,7 @@ fun ParentalPinDialog(
                             isPrimary = true,
                             onClick = {
                                 if (pin.length < 4) {
-                                    localError = "Enter at least 4 digits"
+                                    localError = "أدخل 4 أرقام على الأقل"
                                 } else {
                                     onConfirm(pin)
                                 }

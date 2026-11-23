@@ -114,7 +114,7 @@ fun GlassCategoryCard(
                         textAlign = TextAlign.Center,
                     )
                     Text(
-                        text = "${category.channelCount} channels",
+                        text = "${category.channelCount} قناة",
                         style = LiquidTypography.BodySmall,
                         color = LiquidColors.TextSecondary,
                         textAlign = TextAlign.Center,

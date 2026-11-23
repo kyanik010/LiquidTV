@@ -42,14 +42,13 @@ fun GlassSearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
     onFocusChange: (Boolean) -> Unit,
-    placeholder: String = "Search channels…",
+    placeholder: String = "ابحث عن قناة أو فيلم أو مسلسل...",
     modifier: Modifier = Modifier,
 ) {
     val focusRequester = remember { FocusRequester() }
     val interactionSource = remember { MutableInteractionSource() }
     var isFocused by remember { mutableStateOf(false) }
 
-    // Expand the bar width when focused
     val targetWidth = if (isFocused) 520.dp else 360.dp
     val barWidth by animateDpAsState(
         targetValue = targetWidth,
@@ -64,7 +63,7 @@ fun GlassSearchBar(
     )
 
     LiquidGlassSurface(
-        modifier = modifier.width(barWidth),
+        modifier = modifier.widthIn(max = barWidth).fillMaxWidth(),
         cornerRadius = 50.dp,
         borderColor = borderColor,
         onClick = { focusRequester.requestFocus() },
@@ -81,7 +80,7 @@ fun GlassSearchBar(
             // Search icon
             Icon(
                 imageVector = Icons.Default.Search,
-                contentDescription = "Search",
+                contentDescription = "بحث",
                 tint = if (isFocused) LiquidColors.AccentBlue else LiquidColors.TextSecondary,
                 modifier = Modifier.size(20.dp),
             )
@@ -130,7 +129,7 @@ fun GlassSearchBar(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Clear search",
+                        contentDescription = "مسح البحث",
                         tint = LiquidColors.TextSecondary,
                         modifier = Modifier.size(16.dp),
                     )

@@ -156,7 +156,8 @@ fun LiquidTVApp(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
-                    .padding(top = 12.dp),
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(top = 8.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 MirrorBubbleNavigation(

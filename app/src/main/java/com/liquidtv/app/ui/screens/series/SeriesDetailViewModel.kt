@@ -7,6 +7,8 @@ import com.liquidtv.app.domain.model.EpisodeItem
 import com.liquidtv.app.domain.model.SeasonGroup
 import com.liquidtv.app.domain.model.SeriesItem
 import com.liquidtv.app.domain.repository.ChannelRepository
+import com.liquidtv.app.ui.utils.findContinueWatchingEpisode
+import com.liquidtv.app.ui.utils.sortSeasons
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -16,6 +18,8 @@ data class SeriesDetailUiState(
     val series: SeriesItem? = null,
     val seasons: List<SeasonGroup> = emptyList(),
     val selectedSeason: Int = 1,
+    val totalEpisodesCount: Int = 0,
+    val continueWatchingEpisode: EpisodeItem? = null,
     val isLoading: Boolean = true,
     val error: String? = null,
 ) {
@@ -43,15 +47,17 @@ class SeriesDetailViewModel @Inject constructor(
         _isLoading,
         _error,
     ) { series, episodes, chosenSeason, loading, err ->
-        val grouped = episodes
-            .groupBy { it.seasonNumber }
-            .toSortedMap()
-            .map { (season, eps) ->
-                SeasonGroup(
-                    seasonNumber = season,
-                    episodes = eps.sortedBy { it.episodeNumber },
-                )
-            }
+        val grouped = sortSeasons(
+            episodes
+                .groupBy { it.seasonNumber }
+                .map { (season, eps) ->
+                    SeasonGroup(
+                        seasonNumber = season,
+                        episodes = eps.sortedBy { it.episodeNumber },
+                    )
+                }
+        )
+        val continueEp = findContinueWatchingEpisode(episodes)
         val activeSeason = chosenSeason
             ?.takeIf { s -> grouped.any { it.seasonNumber == s } }
             ?: grouped.firstOrNull()?.seasonNumber
@@ -61,6 +67,8 @@ class SeriesDetailViewModel @Inject constructor(
             series = series,
             seasons = grouped,
             selectedSeason = activeSeason,
+            totalEpisodesCount = episodes.size,
+            continueWatchingEpisode = continueEp,
             isLoading = loading && episodes.isEmpty(),
             error = err,
         )
@@ -83,7 +91,7 @@ class SeriesDetailViewModel @Inject constructor(
             _isLoading.value = true
             _error.value = null
             channelRepository.loadSeriesDetails(seriesId)
-                .onFailure { _error.value = it.message ?: "Unable to load episodes" }
+                .onFailure { _error.value = it.message ?: "تعذّر تحميل الحلقات" }
             _isLoading.value = false
         }
     }

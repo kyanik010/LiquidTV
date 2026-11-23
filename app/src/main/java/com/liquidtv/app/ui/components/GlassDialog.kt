@@ -46,7 +46,7 @@ fun GlassDialog(
     visible: Boolean,
     title: String,
     message: String,
-    confirmLabel: String = "OK",
+    confirmLabel: String = "حسناً",
     cancelLabel: String? = null,
     icon: ImageVector? = null,
     iconTint: Color = LiquidColors.AccentBlue,
@@ -169,7 +169,7 @@ fun GlassDialog(
 @Composable
 fun GlassLoadingDialog(
     visible: Boolean,
-    message: String = "Loading…",
+    message: String = "جارٍ التحميل...",
     onDismiss: () -> Unit = {},
     properties: DialogProperties = DialogProperties(
         dismissOnBackPress = false,

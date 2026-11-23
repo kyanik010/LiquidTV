@@ -85,7 +85,7 @@ fun GlassChannelCard(
             ) {
                 SubcomposeAsyncImage(
                     model = channel.logoUrl,
-                    contentDescription = "${channel.name} logo",
+                    contentDescription = "شعار ${channel.name}",
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize().padding(8.dp),
                     loading = {
@@ -135,16 +135,16 @@ fun GlassChannelCard(
                         .padding(8.dp),
                 )
 
-                // Favorite icon – top-right
+                // Favorite icon – top-end
                 IconButton(
                     onClick = onFavoriteToggle,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .size(36.dp),
+                        .size(48.dp),
                 ) {
                     Icon(
                         imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                        contentDescription = if (isFavorite) "إزالة من المفضلة" else "إضافة إلى المفضلة",
                         tint = if (isFavorite) LiquidColors.LiveRed else LiquidColors.TextSecondary,
                         modifier = Modifier.size(18.dp),
                     )
@@ -265,7 +265,7 @@ fun GlassChannelListItem(
             ) {
                 AsyncImage(
                     model = channel.logoUrl,
-                    contentDescription = "${channel.name} logo",
+                    contentDescription = "شعار ${channel.name}",
                     contentScale = ContentScale.Fit,
                     modifier = Modifier
                         .size(36.dp)
@@ -308,11 +308,11 @@ fun GlassChannelListItem(
             // Favorite icon
             IconButton(
                 onClick = onFavoriteToggle,
-                modifier = Modifier.size(36.dp),
+                modifier = Modifier.size(48.dp),
             ) {
                 Icon(
                     imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                    contentDescription = if (isFavorite) "إزالة من المفضلة" else "إضافة إلى المفضلة",
                     tint = if (isFavorite) LiquidColors.LiveRed else LiquidColors.TextSecondary,
                     modifier = Modifier.size(18.dp),
                 )

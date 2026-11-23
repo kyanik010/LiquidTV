@@ -21,7 +21,10 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.VideoLibrary
-import androidx.compose.material3.*
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,201 +64,212 @@ fun SearchScreen(
     }
 
     AppBackground(modifier = Modifier.fillMaxSize()) {
-        Column(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 88.dp, start = 36.dp, end = 36.dp),
+                .windowInsetsPadding(WindowInsets.statusBars),
         ) {
-            LiquidGlassSurface(
+            val isCompact = maxWidth < 600.dp
+            val hPad = if (isCompact) 16.dp else 36.dp
+
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp),
-                cornerRadius = 50.dp,
-                glassAlpha = 0.20f,
-                borderAlpha = 0.40f,
+                    .fillMaxSize()
+                    .padding(top = if (isCompact) 76.dp else 88.dp, start = hPad, end = hPad),
             ) {
-                Row(
+                LiquidGlassSurface(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 24.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    cornerRadius = 50.dp,
+                    glassAlpha = 0.20f,
+                    borderAlpha = 0.40f,
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Search,
-                        contentDescription = "Search",
-                        tint = LiquidColors.AccentBlue,
-                        modifier = Modifier.size(24.dp),
-                    )
-                    BasicTextField(
-                        value = uiState.query,
-                        onValueChange = { viewModel.setQuery(it) },
+                    Row(
                         modifier = Modifier
-                            .weight(1f)
-                            .focusRequester(searchFocusRequester),
-                        textStyle = LiquidTypography.BodyLarge.copy(color = LiquidColors.TextPrimary),
-                        cursorBrush = SolidColor(LiquidColors.AccentBlue),
-                        singleLine = true,
-                        decorationBox = { innerTextField ->
-                            if (uiState.query.isEmpty()) {
-                                Text(
-                                    text = "Search channels, movies, or series...",
-                                    style = LiquidTypography.BodyLarge,
-                                    color = LiquidColors.TextDisabled,
+                            .fillMaxSize()
+                            .padding(horizontal = 20.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Search,
+                            contentDescription = "بحث",
+                            tint = LiquidColors.AccentBlue,
+                            modifier = Modifier.size(24.dp),
+                        )
+                        BasicTextField(
+                            value = uiState.query,
+                            onValueChange = { viewModel.setQuery(it) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .focusRequester(searchFocusRequester),
+                            textStyle = LiquidTypography.BodyLarge.copy(color = LiquidColors.TextPrimary),
+                            cursorBrush = SolidColor(LiquidColors.AccentBlue),
+                            singleLine = true,
+                            decorationBox = { innerTextField ->
+                                if (uiState.query.isEmpty()) {
+                                    Text(
+                                        text = "ابحث عن قناة أو فيلم أو مسلسل…",
+                                        style = LiquidTypography.BodyLarge,
+                                        color = LiquidColors.TextDisabled,
+                                    )
+                                }
+                                innerTextField()
+                            },
+                        )
+                        if (uiState.query.isNotEmpty()) {
+                            IconButton(onClick = { viewModel.clearQuery() }) {
+                                Icon(
+                                    imageVector = Icons.Filled.Close,
+                                    contentDescription = "مسح",
+                                    tint = LiquidColors.TextSecondary,
+                                    modifier = Modifier.size(20.dp),
                                 )
                             }
-                            innerTextField()
-                        },
-                    )
-                    if (uiState.query.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.clearQuery() }) {
-                            Icon(
-                                imageVector = Icons.Filled.Close,
-                                contentDescription = "Clear",
-                                tint = LiquidColors.TextSecondary,
-                                modifier = Modifier.size(20.dp),
-                            )
                         }
                     }
                 }
-            }
 
-            Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(20.dp))
 
-            when {
-                uiState.query.isEmpty() -> {
-                    if (uiState.searchHistory.isNotEmpty()) {
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    "Recent Searches",
-                                    style = LiquidTypography.TitleSmall,
-                                    color = LiquidColors.TextSecondary,
-                                )
-                                Text(
-                                    "Clear All",
-                                    style = LiquidTypography.LabelSmall,
-                                    color = LiquidColors.AccentBlue,
-                                    modifier = Modifier.clickable { viewModel.clearHistory() },
-                                )
-                            }
-
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                items(uiState.searchHistory) { historyItem ->
-                                    val interactionSource = remember { MutableInteractionSource() }
-                                    val isFocused by interactionSource.collectIsFocusedAsState()
-
-                                    LiquidGlassSurface(
+                when {
+                    uiState.query.isEmpty() -> {
+                        if (uiState.searchHistory.isNotEmpty()) {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        "عمليات البحث الأخيرة",
+                                        style = LiquidTypography.TitleSmall,
+                                        color = LiquidColors.TextSecondary,
+                                    )
+                                    Text(
+                                        "مسح الكل",
+                                        style = LiquidTypography.LabelSmall,
+                                        color = LiquidColors.AccentBlue,
                                         modifier = Modifier
-                                            .clickable(interactionSource, null) { viewModel.setQuery(historyItem) }
-                                            .focusable(interactionSource = interactionSource),
-                                        cornerRadius = 20.dp,
-                                        glassAlpha = if (isFocused) 0.3f else 0.12f,
-                                        borderAlpha = if (isFocused) 0.6f else 0.18f,
-                                        isFocused = isFocused,
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            .clickable { viewModel.clearHistory() }
+                                            .padding(4.dp),
+                                    )
+                                }
+
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    items(uiState.searchHistory) { historyItem ->
+                                        val interactionSource = remember { MutableInteractionSource() }
+                                        val isFocused by interactionSource.collectIsFocusedAsState()
+
+                                        LiquidGlassSurface(
+                                            modifier = Modifier
+                                                .clickable(interactionSource, null) { viewModel.setQuery(historyItem) }
+                                                .focusable(interactionSource = interactionSource),
+                                            cornerRadius = 20.dp,
+                                            glassAlpha = if (isFocused) 0.3f else 0.12f,
+                                            borderAlpha = if (isFocused) 0.6f else 0.18f,
+                                            isFocused = isFocused,
                                         ) {
-                                            Icon(Icons.Filled.History, null, tint = LiquidColors.TextTertiary, modifier = Modifier.size(14.dp))
-                                            Text(historyItem, style = LiquidTypography.BodySmall, color = LiquidColors.TextPrimary)
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            ) {
+                                                Icon(Icons.Filled.History, null, tint = LiquidColors.TextTertiary, modifier = Modifier.size(14.dp))
+                                                Text(historyItem, style = LiquidTypography.BodySmall, color = LiquidColors.TextPrimary)
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
 
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            Icon(Icons.Filled.Search, null, tint = LiquidColors.TextDisabled, modifier = Modifier.size(56.dp))
-                            Text(
-                                "Search Live TV, Movies & Series",
-                                style = LiquidTypography.TitleMedium,
-                                color = LiquidColors.TextSecondary,
-                            )
-                            Text(
-                                "Type any name, category, country, or language",
-                                style = LiquidTypography.BodySmall,
-                                color = LiquidColors.TextTertiary,
-                            )
-                        }
-                    }
-                }
-                uiState.isSearching -> {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = LiquidColors.AccentBlue)
-                    }
-                }
-                !uiState.hasResults -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        LiquidGlassSurface(
-                            cornerRadius = 20.dp,
-                            glassAlpha = 0.15f,
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            contentAlignment = Alignment.Center,
                         ) {
                             Column(
-                                modifier = Modifier.padding(36.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
-                                Icon(Icons.Filled.Tv, null, tint = LiquidColors.TextTertiary, modifier = Modifier.size(48.dp))
+                                Icon(Icons.Filled.Search, null, tint = LiquidColors.TextDisabled, modifier = Modifier.size(56.dp))
                                 Text(
-                                    "No results found for \"${uiState.query}\"",
+                                    "ابحث في البث المباشر والأفلام والمسلسلات",
                                     style = LiquidTypography.TitleMedium,
-                                    color = LiquidColors.TextPrimary,
+                                    color = LiquidColors.TextSecondary,
                                 )
                                 Text(
-                                    "Check your spelling or try a broader search term",
+                                    "اكتب أي اسم أو تصنيف أو دولة أو لغة",
                                     style = LiquidTypography.BodySmall,
                                     color = LiquidColors.TextTertiary,
                                 )
                             }
                         }
                     }
-                }
-                else -> {
-                    val total = uiState.results.size + uiState.seriesResults.size
-                    Text(
-                        text = "$total matches found",
-                        style = LiquidTypography.LabelMedium,
-                        color = LiquidColors.TextSecondary,
-                        modifier = Modifier.padding(bottom = 12.dp),
-                    )
-                    LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 190.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        contentPadding = PaddingValues(bottom = 32.dp),
-                        modifier = Modifier.fillMaxSize(),
-                    ) {
-                        items(uiState.results, key = { "ch_${it.id}" }) { channel ->
-                            SearchResultGridCard(
-                                channel = channel,
-                                onClick = { onChannelClick(channel.id, channel.mediaType) },
-                            )
+                    uiState.isSearching -> {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = LiquidColors.AccentBlue)
                         }
-                        items(uiState.seriesResults, key = { "sr_${it.id}" }) { series ->
-                            SeriesSearchGridCard(
-                                series = series,
-                                onClick = { onSeriesClick(series.id) },
-                            )
+                    }
+                    !uiState.hasResults -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            LiquidGlassSurface(
+                                cornerRadius = 20.dp,
+                                glassAlpha = 0.15f,
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(32.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    Icon(Icons.Filled.Tv, null, tint = LiquidColors.TextTertiary, modifier = Modifier.size(48.dp))
+                                    Text(
+                                        "لا توجد نتائج مطابقة لـ \"${uiState.query}\"",
+                                        style = LiquidTypography.TitleMedium,
+                                        color = LiquidColors.TextPrimary,
+                                    )
+                                    Text(
+                                        "تأكد من كتابة الكلمة بشكل صحيح أو جرب كلمة بحث أعم",
+                                        style = LiquidTypography.BodySmall,
+                                        color = LiquidColors.TextTertiary,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    else -> {
+                        val total = uiState.results.size + uiState.seriesResults.size
+                        Text(
+                            text = "تم العثور على $total نتيجة",
+                            style = LiquidTypography.LabelMedium,
+                            color = LiquidColors.TextSecondary,
+                            modifier = Modifier.padding(bottom = 12.dp),
+                        )
+                        LazyVerticalGrid(
+                            columns = GridCells.Adaptive(minSize = if (isCompact) 155.dp else 190.dp),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp),
+                            contentPadding = PaddingValues(bottom = if (isCompact) 96.dp else 32.dp),
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
+                            items(uiState.results, key = { "ch_${it.id}" }) { channel ->
+                                SearchResultGridCard(
+                                    channel = channel,
+                                    onClick = { onChannelClick(channel.id, channel.mediaType) },
+                                )
+                            }
+                            items(uiState.seriesResults, key = { "sr_${it.id}" }) { series ->
+                                SeriesSearchGridCard(
+                                    series = series,
+                                    onClick = { onSeriesClick(series.id) },
+                                )
+                            }
                         }
                     }
                 }
@@ -300,24 +314,25 @@ private fun SearchResultGridCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(90.dp)
-                    .background(LiquidColors.GlassTertiary, RoundedCornerShape(10.dp)),
+                    .background(LiquidColors.GlassTertiary, RoundedCornerShape(10.dp))
+                    .padding(6.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                if (channel.logoUrl != null) {
+                if (!channel.logoUrl.isNullOrBlank()) {
                     AsyncImage(
                         model = channel.logoUrl,
                         contentDescription = channel.name,
-                        modifier = Modifier.size(70.dp),
+                        modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit,
                     )
                 } else {
                     Icon(Icons.Filled.Tv, null, tint = LiquidColors.TextTertiary, modifier = Modifier.size(32.dp))
                 }
-                Box(Modifier.fillMaxSize().padding(6.dp), contentAlignment = Alignment.TopEnd) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopEnd) {
                     if (channel.mediaType == MediaType.LIVE) {
                         LiveBadge()
                     } else {
-                        MediaKindBadge("MOVIE", LiquidColors.AccentViolet)
+                        MediaKindBadge("فيلم", LiquidColors.AccentViolet)
                     }
                 }
             }
@@ -331,7 +346,7 @@ private fun SearchResultGridCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = channel.groupTitle ?: channel.country ?: "General",
+                    text = channel.groupTitle ?: channel.country ?: "عام",
                     style = LiquidTypography.LabelSmall,
                     color = LiquidColors.TextTertiary,
                     maxLines = 1,
@@ -392,7 +407,7 @@ private fun SeriesSearchGridCard(
                     Icon(Icons.Filled.VideoLibrary, null, tint = LiquidColors.AccentVioletLight, modifier = Modifier.size(32.dp))
                 }
                 Box(Modifier.fillMaxSize().padding(6.dp), contentAlignment = Alignment.TopEnd) {
-                    MediaKindBadge("SERIES", LiquidColors.AccentCyan)
+                    MediaKindBadge("مسلسل", LiquidColors.AccentCyan)
                 }
             }
 
@@ -405,7 +420,7 @@ private fun SeriesSearchGridCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = series.categoryName ?: series.genre ?: "Series",
+                    text = series.categoryName ?: series.genre ?: "مسلسل",
                     style = LiquidTypography.LabelSmall,
                     color = LiquidColors.TextTertiary,
                     maxLines = 1,

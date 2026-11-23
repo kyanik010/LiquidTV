@@ -119,7 +119,7 @@ class LoginViewModel @Inject constructor(
                 it.copy(
                     isConnecting = true,
                     progress = 0.05f,
-                    statusMessage = "Connecting to server…",
+                    statusMessage = "جارٍ الاتصال بالخادم...",
                     errorMessage = null,
                     isSuccess = false,
                 )
@@ -149,7 +149,7 @@ class LoginViewModel @Inject constructor(
                     it.copy(
                         isConnecting = false,
                         progress = 1f,
-                        statusMessage = "Connected!",
+                        statusMessage = "تم الاتصال بنجاح",
                         errorMessage = null,
                         isSuccess = true,
                     )
@@ -160,7 +160,7 @@ class LoginViewModel @Inject constructor(
                         isConnecting = false,
                         progress = 0f,
                         statusMessage = null,
-                        errorMessage = throwable.message ?: "Unable to connect. Check your details and try again.",
+                        errorMessage = throwable.message ?: "تعذّر الاتصال. تأكد من صحة البيانات وحاول مجدداً.",
                         isSuccess = false,
                     )
                 }
@@ -173,20 +173,20 @@ class LoginViewModel @Inject constructor(
             SubscriptionType.XTREAM -> {
                 val url = state.serverUrl.trim()
                 when {
-                    url.isEmpty() -> "Please enter the Xtream server URL (http:// or https://)."
+                    url.isEmpty() -> "يرجى إدخال رابط خادم Xtream (يبدأ بـ http:// أو https://)."
                     !url.startsWith("http://", true) && !url.startsWith("https://", true) ->
-                        "Server URL must start with http:// or https://"
-                    state.username.isBlank() -> "Please enter your username."
-                    state.password.isBlank() -> "Please enter your password."
+                        "يجب أن يبدأ رابط الخادم بـ http:// أو https://"
+                    state.username.isBlank() -> "يرجى إدخال اسم المستخدم."
+                    state.password.isBlank() -> "يرجى إدخال كلمة المرور."
                     else -> null
                 }
             }
             SubscriptionType.M3U -> {
                 val url = state.m3uUrl.trim()
                 when {
-                    url.isEmpty() -> "Please enter the M3U playlist URL (http:// or https://)."
+                    url.isEmpty() -> "يرجى إدخال رابط قائمة M3U (يبدأ بـ http:// أو https://)."
                     !url.startsWith("http://", true) && !url.startsWith("https://", true) ->
-                        "Playlist URL must start with http:// or https://"
+                        "يجب أن يبدأ رابط القائمة بـ http:// أو https://"
                     else -> null
                 }
             }

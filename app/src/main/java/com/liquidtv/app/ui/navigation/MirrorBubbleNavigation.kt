@@ -1,7 +1,8 @@
 package com.liquidtv.app.ui.navigation
 
+import androidx.annotation.StringRes
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
@@ -30,8 +31,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.liquidtv.app.R
 import com.liquidtv.app.ui.theme.LiquidColors
 import com.liquidtv.app.ui.theme.LiquidTypography
 
@@ -39,17 +41,17 @@ import com.liquidtv.app.ui.theme.LiquidTypography
  * Navigation destinations mapped to the Mirror Bubble nav bar.
  */
 enum class NavDestination(
-    val label: String,
+    @StringRes val labelRes: Int,
     val icon: ImageVector,
 ) {
-    Home("Home", Icons.Default.Home),
-    LiveTV("Live TV", Icons.Default.LiveTv),
-    Movies("Movies", Icons.Default.Movie),
-    Series("Series", Icons.Default.VideoLibrary),
-    Categories("Categories", Icons.Default.GridView),
-    Favorites("Favorites", Icons.Default.Favorite),
-    Search("Search", Icons.Default.Search),
-    Settings("Settings", Icons.Default.Settings),
+    Home(R.string.nav_home, Icons.Default.Home),
+    LiveTV(R.string.nav_live_tv, Icons.Default.LiveTv),
+    Movies(R.string.nav_movies, Icons.Default.Movie),
+    Series(R.string.nav_series, Icons.Default.VideoLibrary),
+    Categories(R.string.nav_categories, Icons.Default.GridView),
+    Favorites(R.string.nav_favorites, Icons.Default.Favorite),
+    Search(R.string.nav_search, Icons.Default.Search),
+    Settings(R.string.nav_settings, Icons.Default.Settings),
 }
 
 private val NAV_ITEMS = NavDestination.entries
@@ -70,7 +72,7 @@ fun MirrorBubbleNavigation(
         modifier = modifier
             .padding(horizontal = 12.dp)
             .wrapContentWidth()
-            .height(64.dp)
+            .height(60.dp)
             .drawBehind {
                 val w = size.width
                 val h = size.height
@@ -114,6 +116,7 @@ fun MirrorBubbleNavigation(
                 .horizontalScroll(scrollState)
                 .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             NAV_ITEMS.forEach { destination ->
                 NavTab(
@@ -134,17 +137,12 @@ private fun NavTab(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
+    val labelText = stringResource(destination.labelRes)
 
     val iconScale by animateFloatAsState(
-        targetValue = if (isSelected) 1.18f else if (isFocused) 1.1f else 1f,
+        targetValue = if (isSelected) 1.15f else if (isFocused) 1.08f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "iconScale_${destination.name}",
-    )
-
-    val tabWidth: Dp by animateDpAsState(
-        targetValue = if (isSelected) 114.dp else if (isFocused) 72.dp else 56.dp,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
-        label = "tabWidth_${destination.name}",
     )
 
     val bubbleAlpha by animateFloatAsState(
@@ -161,7 +159,13 @@ private fun NavTab(
 
     Box(
         modifier = Modifier
-            .width(tabWidth)
+            .animateContentSize(
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMediumLow,
+                ),
+            )
+            .widthIn(min = if (isSelected) 112.dp else if (isFocused) 64.dp else 50.dp)
             .height(48.dp)
             .drawBehind {
                 if (bubbleAlpha > 0.01f) {
@@ -212,25 +216,26 @@ private fun NavTab(
                 onClick = onSelected,
             )
             .focusable(interactionSource = interactionSource)
+            .padding(horizontal = if (isSelected) 14.dp else 10.dp)
             .testTag("nav_tab_${destination.name.lowercase()}"),
         contentAlignment = Alignment.Center,
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Icon(
                 imageVector = destination.icon,
-                contentDescription = destination.label,
+                contentDescription = labelText,
                 tint = if (isSelected) Color.White else if (isFocused) LiquidColors.AccentBlueLight else LiquidColors.IconInactive,
                 modifier = Modifier
                     .size(20.dp)
                     .scale(iconScale),
             )
-            if (labelAlpha > 0.01f) {
+            if (isSelected && labelAlpha > 0.01f) {
                 Text(
-                    text = destination.label,
-                    style = LiquidTypography.LabelSmall,
+                    text = labelText,
+                    style = LiquidTypography.NavLabel,
                     color = Color.White.copy(alpha = labelAlpha),
                     maxLines = 1,
                 )

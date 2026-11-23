@@ -37,79 +37,92 @@ fun CountriesScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     AppBackground(modifier = Modifier.fillMaxSize()) {
-        Column(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 88.dp, start = 36.dp, end = 36.dp),
+                .windowInsetsPadding(WindowInsets.statusBars),
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column {
-                    Text(
-                        text = "Browse by Country",
-                        style = LiquidTypography.HeadlineMedium.copy(
-                            brush = Brush.linearGradient(
-                                listOf(LiquidColors.TextPrimary, LiquidColors.AccentBlueLight)
-                            )
-                        ),
-                    )
-                    Text(
-                        text = if (uiState.isLoading) (uiState.loadingMessage ?: "Loading broadcast countries...") else "${uiState.countries.size} countries & territories",
-                        style = LiquidTypography.BodySmall,
-                        color = LiquidColors.TextTertiary,
-                    )
-                }
-            }
+            val isCompact = maxWidth < 600.dp
+            val hPad = if (isCompact) 16.dp else 36.dp
 
-            if (uiState.isLoading && uiState.countries.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        CircularProgressIndicator(color = LiquidColors.AccentBlue)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = if (isCompact) 76.dp else 88.dp, start = hPad, end = hPad),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column {
                         Text(
-                            text = uiState.loadingMessage ?: "Fetching & indexing countries...",
-                            style = LiquidTypography.BodyMedium,
-                            color = LiquidColors.TextSecondary,
+                            text = "تصفح حسب الدولة",
+                            style = LiquidTypography.HeadlineMedium.copy(
+                                brush = Brush.linearGradient(
+                                    listOf(LiquidColors.TextPrimary, LiquidColors.AccentBlueLight)
+                                )
+                            ),
+                        )
+                        Text(
+                            text = if (uiState.isLoading) {
+                                uiState.loadingMessage ?: "جارٍ تحميل الدول…"
+                            } else {
+                                "${uiState.countries.size} دولة وإقليم"
+                            },
+                            style = LiquidTypography.BodySmall,
+                            color = LiquidColors.TextTertiary,
                         )
                     }
                 }
-            } else if (uiState.countries.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Text(
-                            text = "No country tags found in active playlist",
-                            style = LiquidTypography.HeadlineSmall,
-                            color = LiquidColors.TextSecondary,
-                        )
-                        LiquidGlassSurface(
-                            modifier = Modifier
-                                .clickable { viewModel.refresh() }
-                                .padding(horizontal = 24.dp, vertical = 12.dp),
-                            cornerRadius = 14.dp,
-                            glassAlpha = 0.25f,
-                            borderColor = LiquidColors.AccentBlue,
-                        ) {
-                            Text("Refresh Playlist", style = LiquidTypography.LabelLarge, color = LiquidColors.AccentBlue)
+
+                if (uiState.isLoading && uiState.countries.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            CircularProgressIndicator(color = LiquidColors.AccentBlue)
+                            Text(
+                                text = uiState.loadingMessage ?: "جارٍ جلب وفهرسة الدول…",
+                                style = LiquidTypography.BodyMedium,
+                                color = LiquidColors.TextSecondary,
+                            )
                         }
                     }
-                }
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 230.dp),
-                    contentPadding = PaddingValues(bottom = 32.dp, top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    items(uiState.countries, key = { it.name }) { country ->
-                        CountryGridTile(
-                            country = country,
-                            onClick = { onCountryClick(country.name) },
-                        )
+                } else if (uiState.countries.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Text(
+                                text = "لا توجد وسوم دول في القائمة النشطة",
+                                style = LiquidTypography.HeadlineSmall,
+                                color = LiquidColors.TextSecondary,
+                            )
+                            LiquidGlassSurface(
+                                modifier = Modifier
+                                    .clickable { viewModel.refresh() }
+                                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                                cornerRadius = 14.dp,
+                                glassAlpha = 0.25f,
+                                borderColor = LiquidColors.AccentBlue,
+                            ) {
+                                Text("تحديث القائمة", style = LiquidTypography.LabelLarge, color = LiquidColors.AccentBlue)
+                            }
+                        }
+                    }
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = if (isCompact) 160.dp else 230.dp),
+                        contentPadding = PaddingValues(bottom = if (isCompact) 96.dp else 32.dp, top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        items(uiState.countries, key = { it.name }) { country ->
+                            CountryGridTile(
+                                country = country,
+                                onClick = { onCountryClick(country.name) },
+                            )
+                        }
                     }
                 }
             }
@@ -125,7 +138,6 @@ private fun CountryGridTile(
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
-    // Seed a subtle accent color from country name hash for variety
     val accentSeed = remember(country.name) {
         val h = country.name.hashCode()
         listOf(
@@ -137,7 +149,7 @@ private fun CountryGridTile(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(120.dp)
+            .height(116.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(
                 Brush.linearGradient(
@@ -155,7 +167,6 @@ private fun CountryGridTile(
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
     ) {
-        // Specular top highlight
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -167,7 +178,6 @@ private fun CountryGridTile(
                 ),
         )
 
-        // Watermark globe icon in background at low alpha
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.CenterEnd,
@@ -187,10 +197,9 @@ private fun CountryGridTile(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            // Flag circle — larger when focused
             Box(
                 modifier = Modifier
-                    .size(if (isFocused) 58.dp else 52.dp)
+                    .size(if (isFocused) 56.dp else 50.dp)
                     .background(
                         Brush.radialGradient(
                             listOf(accentSeed.copy(alpha = 0.3f), Color.Black.copy(alpha = 0.2f))
@@ -219,9 +228,9 @@ private fun CountryGridTile(
                 )
                 Spacer(Modifier.height(3.dp))
                 Text(
-                    text = "${country.channelCount} channels",
+                    text = "${country.channelCount} قناة",
                     style = LiquidTypography.LabelSmall,
-                    color = if (isFocused) accentSeed.copy(alpha = 0.8f) else LiquidColors.TextTertiary,
+                    color = if (isFocused) accentSeed.copy(alpha = 0.85f) else LiquidColors.TextTertiary,
                 )
             }
         }

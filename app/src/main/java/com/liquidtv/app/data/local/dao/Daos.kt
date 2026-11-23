@@ -178,6 +178,9 @@ interface SeriesDao {
     @Query("SELECT * FROM series WHERE id = :seriesId LIMIT 1")
     suspend fun getSeriesById(seriesId: String): SeriesEntity?
 
+    @Query("SELECT * FROM series WHERE id = :seriesId LIMIT 1")
+    fun observeSeriesById(seriesId: String): Flow<SeriesEntity?>
+
     @Query("SELECT id, isFavorite, lastWatchedAt FROM series WHERE subscriptionId = :subscriptionId AND (isFavorite = 1 OR lastWatchedAt IS NOT NULL)")
     suspend fun getPreservedSeriesState(subscriptionId: String): List<SeriesUserStateTuple>
 

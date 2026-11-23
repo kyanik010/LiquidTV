@@ -101,7 +101,7 @@ object PlayerMediaHelper {
                 .setMimeType(detectSubtitleMimeType(externalSubtitleUrl))
                 .setLanguage(externalSubtitleLang)
                 .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
-                .setLabel("External Subtitle")
+                .setLabel("ترجمة خارجية")
                 .build()
             builder.setSubtitleConfigurations(listOf(subtitleConfig))
         }
@@ -132,9 +132,9 @@ object PlayerMediaHelper {
                 val lang = format.language?.takeIf { it.isNotBlank() && it != "und" }
                 val baseLabel = format.label?.takeIf { it.isNotBlank() }
                     ?: lang?.uppercase()
-                    ?: if (trackType == C.TRACK_TYPE_AUDIO) "Audio ${result.size + 1}" else "Subtitle ${result.size + 1}"
+                    ?: if (trackType == C.TRACK_TYPE_AUDIO) "صوت ${result.size + 1}" else "ترجمة ${result.size + 1}"
                 val channelInfo = if (trackType == C.TRACK_TYPE_AUDIO && format.channelCount > 0) {
-                    " (${format.channelCount}ch)"
+                    " (${format.channelCount} قناة)"
                 } else ""
                 result.add(
                     TrackInfo(
@@ -174,21 +174,21 @@ object PlayerMediaHelper {
         return when {
             cause is HttpDataSource.InvalidResponseCodeException -> {
                 when (cause.responseCode) {
-                    401, 403 -> "Stream access denied (HTTP ${cause.responseCode}). Verify your subscription or active connections."
-                    404, 410 -> "Stream not found on server (HTTP ${cause.responseCode})."
-                    else -> "Server returned HTTP ${cause.responseCode} (${error.errorCodeName})."
+                    401, 403 -> "تم رفض الوصول للبث (HTTP ${cause.responseCode}). تحقق من اشتراكك أو عدد الأجهزة المتصلة."
+                    404, 410 -> "البث غير متوفر على الخادم (HTTP ${cause.responseCode})."
+                    else -> "أرجع الخادم خطأ HTTP ${cause.responseCode} (${error.errorCodeName})."
                 }
             }
             error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ->
-                "Unable to reach stream server. Check network or subscription URL."
+                "تعذّر الوصول إلى خادم البث. تحقق من اتصال الإنترنت أو رابط الاشتراك."
             error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ->
-                "Connection timed out while loading stream."
+                "انتهت مهلة الاتصال أثناء تحميل البث."
             error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW ->
-                "Live buffer fell behind; resynchronizing stream."
+                "تأخر البث المباشر؛ جارٍ إعادة المزامنة."
             error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED ||
                 error.errorCode == PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED ->
-                "Unsupported stream format or invalid playlist response."
-            else -> error.localizedMessage ?: "Stream temporarily unavailable (${error.errorCodeName})."
+                "صيغة البث غير مدعومة أو استجابة غير صالحة."
+            else -> error.localizedMessage ?: "البث غير متاح مؤقتاً (${error.errorCodeName})."
         }
     }
 

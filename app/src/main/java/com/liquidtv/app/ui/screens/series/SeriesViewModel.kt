@@ -16,7 +16,11 @@ data class SeriesUiState(
     val series: List<SeriesItem> = emptyList(),
     val categories: List<Category> = emptyList(),
     val selectedCategory: String? = null,
+    val favoritesOnly: Boolean = false,
+    val totalCount: Int = 0,
+    val favoritesCount: Int = 0,
     val isLoading: Boolean = true,
+    val error: String? = null,
 )
 
 @HiltViewModel
@@ -26,19 +30,23 @@ class SeriesViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _selectedCategory = MutableStateFlow<String?>(null)
+    private val _favoritesOnly = MutableStateFlow(false)
 
     val uiState: StateFlow<SeriesUiState> = combine(
         channelRepository.getSeries(),
         channelRepository.getAllCategories(MediaType.SERIES_EPISODE),
         channelRepository.getLockedCategoryNames(),
         userPreferencesRepository.userPreferences,
-        _selectedCategory,
-    ) { seriesList, categories, lockedCats, prefs, selectedCat ->
+        combine(_selectedCategory, _favoritesOnly) { cat, favOnly -> cat to favOnly },
+    ) { seriesList, categories, lockedCats, prefs, (selectedCat, favOnly) ->
         val enforceLock = prefs.parentalControlEnabled && prefs.hasParentalPin && lockedCats.isNotEmpty()
-        val visibleSeries = seriesList.filter { item ->
-            val matchesLock = !enforceLock || (item.categoryName?.trim()?.lowercase() !in lockedCats)
+        val unlockedSeries = seriesList.filter { item ->
+            !enforceLock || (item.categoryName?.trim()?.lowercase() !in lockedCats)
+        }
+        val visibleSeries = unlockedSeries.filter { item ->
             val matchesCat = selectedCat == null || item.categoryName.equals(selectedCat, ignoreCase = true)
-            matchesLock && matchesCat
+            val matchesFav = !favOnly || item.isFavorite
+            matchesCat && matchesFav
         }
         val visibleCategories = if (enforceLock) {
             categories.filter { it.name.trim().lowercase() !in lockedCats }
@@ -49,7 +57,18 @@ class SeriesViewModel @Inject constructor(
             series = visibleSeries,
             categories = visibleCategories,
             selectedCategory = selectedCat,
+            favoritesOnly = favOnly,
+            totalCount = unlockedSeries.size,
+            favoritesCount = unlockedSeries.count { it.isFavorite },
             isLoading = false,
+            error = null,
+        )
+    }.catch { throwable ->
+        emit(
+            SeriesUiState(
+                isLoading = false,
+                error = throwable.message ?: "تعذّر تحميل المسلسلات",
+            )
         )
     }.stateIn(
         scope = viewModelScope,
@@ -58,12 +77,24 @@ class SeriesViewModel @Inject constructor(
     )
 
     fun selectCategory(category: String?) {
-        _selectedCategory.value = if (_selectedCategory.value == category) null else category
+        _favoritesOnly.value = false
+        _selectedCategory.value = category
+    }
+
+    fun selectFavoritesOnly() {
+        _selectedCategory.value = null
+        _favoritesOnly.value = true
     }
 
     fun toggleFavorite(seriesId: String) {
         viewModelScope.launch {
             channelRepository.toggleSeriesFavorite(seriesId)
+        }
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            channelRepository.refreshPlaylists()
         }
     }
 }

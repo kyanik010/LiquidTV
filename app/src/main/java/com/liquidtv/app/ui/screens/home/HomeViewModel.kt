@@ -114,7 +114,7 @@ class HomeViewModel @Inject constructor(
                     clockVisible = prefs.clockVisible,
                     isLoading = playlistInfo.isLoading,
                     loadingProgress = playlistInfo.loadingProgress,
-                    loadingMessage = playlistInfo.statusMessage ?: if (playlistInfo.isLoading) "Syncing IPTV subscription…" else null,
+                    loadingMessage = playlistInfo.statusMessage ?: if (playlistInfo.isLoading) "جارٍ مزامنة الاشتراك..." else null,
                     playlistInfo = playlistInfo,
                     error = _manualError.value ?: playlistInfo.error ?: subscription?.lastError,
                 )
@@ -133,7 +133,7 @@ class HomeViewModel @Inject constructor(
                 }
                 .catch { throwable ->
                     _uiState.update {
-                        it.copy(isLoading = false, error = throwable.message ?: "Unknown error")
+                        it.copy(isLoading = false, error = throwable.message ?: "حدث خطأ غير متوقع")
                     }
                 }
                 .collect { state ->
@@ -154,7 +154,7 @@ class HomeViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, error = null) }
             val result = channelRepository.refreshPlaylists()
             result.onFailure { throwable ->
-                val message = throwable.message ?: "Failed to refresh subscription"
+                val message = throwable.message ?: "فشل تحديث الاشتراك"
                 _manualError.value = message
                 _uiState.update {
                     it.copy(isLoading = false, error = message)

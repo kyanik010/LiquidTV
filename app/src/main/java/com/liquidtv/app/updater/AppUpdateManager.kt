@@ -39,7 +39,7 @@ class AppUpdateManager @Inject constructor(
             val repo = sanitizeRepo(rawRepo)
 
             if (!isValidRepoFormat(repo)) {
-                return@withContext Result.failure(IllegalArgumentException("Please specify a valid GitHub repository as 'owner/repo'"))
+                return@withContext Result.failure(IllegalArgumentException("يرجى تحديد مستودع GitHub صحيح بصيغة 'owner/repo'"))
             }
 
             val releaseResult = checkGithubReleaseApi(repo)
@@ -64,7 +64,7 @@ class AppUpdateManager @Inject constructor(
             }
 
             if (releaseResult.isFailure && jsonResult.isFailure) {
-                return@withContext Result.failure(releaseResult.exceptionOrNull() ?: Exception("Failed to check for updates"))
+                return@withContext Result.failure(releaseResult.exceptionOrNull() ?: Exception("تعذّر التحقق من وجود تحديثات"))
             }
 
             Result.success(null)
@@ -327,7 +327,7 @@ class AppUpdateManager @Inject constructor(
     fun installUpdate(apkFile: File): Result<Unit> {
         return try {
             if (!apkFile.exists()) {
-                return Result.failure(Exception("Update file not found on disk"))
+                return Result.failure(Exception("ملف التحديث غير موجود على الجهاز"))
             }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
@@ -338,7 +338,7 @@ class AppUpdateManager @Inject constructor(
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }
                 context.startActivity(settingsIntent)
-                return Result.failure(IllegalStateException("Allow 'Install unknown apps' permission for LIQUID TV and tap Install again."))
+                return Result.failure(IllegalStateException("يرجى السماح بصلاحية تثبيت التطبيقات من مصادر غير معروفة لتطبيق LIQUID TV ثم اضغط تثبيت مجدداً."))
             }
 
             val apkUri: Uri = FileProvider.getUriForFile(

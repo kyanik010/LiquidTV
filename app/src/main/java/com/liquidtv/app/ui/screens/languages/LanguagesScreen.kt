@@ -1,7 +1,5 @@
 package com.liquidtv.app.ui.screens.languages
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,7 +21,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
@@ -43,79 +40,92 @@ fun LanguagesScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     AppBackground(modifier = Modifier.fillMaxSize()) {
-        Column(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 88.dp, start = 36.dp, end = 36.dp),
+                .windowInsetsPadding(WindowInsets.statusBars),
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column {
-                    Text(
-                        text = "Browse by Language",
-                        style = LiquidTypography.HeadlineMedium.copy(
-                            brush = Brush.linearGradient(
-                                listOf(LiquidColors.TextPrimary, LiquidColors.AccentCyan)
-                            )
-                        ),
-                    )
-                    Text(
-                        text = if (uiState.isLoading) (uiState.loadingMessage ?: "Loading broadcast languages...") else "${uiState.languages.size} languages found",
-                        style = LiquidTypography.BodySmall,
-                        color = LiquidColors.TextTertiary,
-                    )
-                }
-            }
+            val isCompact = maxWidth < 600.dp
+            val hPad = if (isCompact) 16.dp else 36.dp
 
-            if (uiState.isLoading && uiState.languages.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        CircularProgressIndicator(color = LiquidColors.AccentBlue)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = if (isCompact) 76.dp else 88.dp, start = hPad, end = hPad),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column {
                         Text(
-                            text = uiState.loadingMessage ?: "Fetching & indexing languages...",
-                            style = LiquidTypography.BodyMedium,
-                            color = LiquidColors.TextSecondary,
+                            text = "تصفح حسب اللغة",
+                            style = LiquidTypography.HeadlineMedium.copy(
+                                brush = Brush.linearGradient(
+                                    listOf(LiquidColors.TextPrimary, LiquidColors.AccentCyan)
+                                )
+                            ),
+                        )
+                        Text(
+                            text = if (uiState.isLoading) {
+                                uiState.loadingMessage ?: "جارٍ تحميل اللغات…"
+                            } else {
+                                "${uiState.languages.size} لغة متاحة"
+                            },
+                            style = LiquidTypography.BodySmall,
+                            color = LiquidColors.TextTertiary,
                         )
                     }
                 }
-            } else if (uiState.languages.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Text(
-                            text = "No language tags found in active playlist",
-                            style = LiquidTypography.HeadlineSmall,
-                            color = LiquidColors.TextSecondary,
-                        )
-                        LiquidGlassSurface(
-                            modifier = Modifier
-                                .clickable { viewModel.refresh() }
-                                .padding(horizontal = 24.dp, vertical = 12.dp),
-                            cornerRadius = 14.dp,
-                            glassAlpha = 0.25f,
-                            borderColor = LiquidColors.AccentBlue,
-                        ) {
-                            Text("Refresh Playlist", style = LiquidTypography.LabelLarge, color = LiquidColors.AccentBlue)
+
+                if (uiState.isLoading && uiState.languages.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            CircularProgressIndicator(color = LiquidColors.AccentBlue)
+                            Text(
+                                text = uiState.loadingMessage ?: "جارٍ جلب وفهرسة اللغات…",
+                                style = LiquidTypography.BodyMedium,
+                                color = LiquidColors.TextSecondary,
+                            )
                         }
                     }
-                }
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 230.dp),
-                    contentPadding = PaddingValues(bottom = 32.dp, top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    items(uiState.languages, key = { it.name }) { lang ->
-                        LanguageGridTile(
-                            language = lang,
-                            onClick = { onLanguageClick(lang.name) },
-                        )
+                } else if (uiState.languages.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Text(
+                                text = "لا توجد وسوم لغات في القائمة النشطة",
+                                style = LiquidTypography.HeadlineSmall,
+                                color = LiquidColors.TextSecondary,
+                            )
+                            LiquidGlassSurface(
+                                modifier = Modifier
+                                    .clickable { viewModel.refresh() }
+                                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                                cornerRadius = 14.dp,
+                                glassAlpha = 0.25f,
+                                borderColor = LiquidColors.AccentBlue,
+                            ) {
+                                Text("تحديث القائمة", style = LiquidTypography.LabelLarge, color = LiquidColors.AccentBlue)
+                            }
+                        }
+                    }
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = if (isCompact) 160.dp else 230.dp),
+                        contentPadding = PaddingValues(bottom = if (isCompact) 96.dp else 32.dp, top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        items(uiState.languages, key = { it.name }) { lang ->
+                            LanguageGridTile(
+                                language = lang,
+                                onClick = { onLanguageClick(lang.name) },
+                            )
+                        }
                     }
                 }
             }
@@ -131,7 +141,6 @@ private fun LanguageGridTile(
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
-    // Hash-based accent color for each language — visual variety
     val accentColor = remember(language.name) {
         val h = language.name.hashCode()
         listOf(
@@ -144,7 +153,7 @@ private fun LanguageGridTile(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(120.dp)
+            .height(116.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(
                 Brush.linearGradient(
@@ -162,7 +171,6 @@ private fun LanguageGridTile(
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
     ) {
-        // Specular highlight
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -179,12 +187,11 @@ private fun LanguageGridTile(
                 .fillMaxSize()
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            // Icon circle with accent color
             Box(
                 modifier = Modifier
-                    .size(52.dp)
+                    .size(50.dp)
                     .background(
                         Brush.radialGradient(
                             listOf(accentColor.copy(alpha = 0.35f), Color.Black.copy(alpha = 0.2f))
@@ -215,12 +222,11 @@ private fun LanguageGridTile(
                 )
                 Spacer(Modifier.height(3.dp))
                 Text(
-                    text = "${language.channelCount} channels",
+                    text = "${language.channelCount} قناة",
                     style = LiquidTypography.LabelSmall,
-                    color = if (isFocused) accentColor.copy(alpha = 0.8f) else LiquidColors.TextTertiary,
+                    color = if (isFocused) accentColor.copy(alpha = 0.85f) else LiquidColors.TextTertiary,
                 )
             }
         }
     }
 }
-

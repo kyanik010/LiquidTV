@@ -14,6 +14,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Label
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,6 +33,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.liquidtv.app.domain.model.SubscriptionType
@@ -79,96 +82,95 @@ fun LoginScreen(
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.safeDrawing)
                 .verticalScroll(scrollState)
-                .padding(horizontal = 24.dp, vertical = 28.dp),
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             contentAlignment = Alignment.Center,
         ) {
             LiquidGlassSurface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .widthIn(max = 580.dp),
-                cornerRadius = 28.dp,
-                glassAlpha = 0.20f,
-                borderAlpha = 0.35f,
+                    .widthIn(max = 400.dp),
+                cornerRadius = 24.dp,
+                glassAlpha = 0.22f,
+                borderAlpha = 0.36f,
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 28.dp, vertical = 26.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    // Header
+                    // Compact Header
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        ) {
-                            if (allowBack) {
-                                IconButton(
-                                    onClick = { if (!state.isConnecting) onBack() },
-                                    modifier = Modifier
-                                        .size(48.dp)
-                                        .clip(CircleShape)
-                                        .background(Color.White.copy(alpha = 0.10f)),
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                        contentDescription = "Back",
-                                        tint = Color.White,
-                                    )
-                                }
-                            }
-                            Box(
+                        if (allowBack) {
+                            IconButton(
+                                onClick = { if (!state.isConnecting) onBack() },
                                 modifier = Modifier
                                     .size(48.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(
-                                        Brush.linearGradient(
-                                            listOf(LiquidColors.AccentBlue, LiquidColors.AccentViolet),
-                                        ),
-                                    ),
-                                contentAlignment = Alignment.Center,
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.10f)),
                             ) {
                                 Icon(
-                                    imageVector = Icons.Filled.LiveTv,
-                                    contentDescription = "LIQUID TV",
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "رجوع",
                                     tint = Color.White,
-                                    modifier = Modifier.size(28.dp),
-                                )
-                            }
-                            Column {
-                                Text(
-                                    text = if (editingSubscriptionId != null) "Edit Subscription" else "LIQUID TV",
-                                    style = LiquidTypography.HeadlineMedium.copy(
-                                        brush = Brush.linearGradient(
-                                            listOf(LiquidColors.TextPrimary, LiquidColors.AccentBlueLight),
-                                        ),
-                                    ),
-                                )
-                                Text(
-                                    text = "Sign in with Xtream Codes or M3U Playlist",
-                                    style = LiquidTypography.BodySmall,
-                                    color = LiquidColors.TextSecondary,
                                 )
                             }
                         }
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(LiquidColors.AccentBlue, LiquidColors.AccentViolet),
+                                    ),
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.LiveTv,
+                                contentDescription = "LIQUID TV",
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (editingSubscriptionId != null) "تعديل الاشتراك" else "LIQUID TV",
+                                style = LiquidTypography.TitleLarge.copy(
+                                    brush = Brush.linearGradient(
+                                        listOf(LiquidColors.TextPrimary, LiquidColors.AccentBlueLight),
+                                    ),
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = "تسجيل الدخول عبر Xtream أو M3U",
+                                style = LiquidTypography.BodySmall,
+                                color = LiquidColors.TextSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
 
-                    // Method selector tabs (Liquid Glass segmented pills)
+                    // Compact segmented method pills
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(50))
                             .background(Color.White.copy(alpha = 0.08f))
                             .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(50))
-                            .padding(4.dp),
+                            .padding(3.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         LoginModeTab(
-                            title = "Xtream Codes",
+                            title = "Xtream",
                             icon = Icons.Filled.Dns,
                             selected = state.selectedType == SubscriptionType.XTREAM,
                             enabled = !state.isConnecting,
@@ -178,8 +180,8 @@ fun LoginScreen(
                                 .testTag("tab_xtream"),
                         )
                         LoginModeTab(
-                            title = "M3U Playlist",
-                            icon = Icons.Filled.PlaylistPlay,
+                            title = "M3U",
+                            icon = Icons.AutoMirrored.Filled.PlaylistPlay,
                             selected = state.selectedType == SubscriptionType.M3U,
                             enabled = !state.isConnecting,
                             onClick = { viewModel.selectType(SubscriptionType.M3U) },
@@ -190,23 +192,23 @@ fun LoginScreen(
                     }
 
                     // Optional display name
-                    GlassTextField(
+                    CompactGlassTextField(
                         value = state.displayName,
                         onValueChange = viewModel::setDisplayName,
-                        label = "Playlist / Account Name (Optional)",
-                        placeholder = "e.g. Living Room TV",
-                        leadingIcon = Icons.Filled.Label,
+                        label = "اسم الاشتراك (اختياري)",
+                        placeholder = "مثال: اشتراك المنزل",
+                        leadingIcon = Icons.AutoMirrored.Filled.Label,
                         enabled = !state.isConnecting,
                         imeAction = ImeAction.Next,
                         modifier = Modifier.testTag("input_subscription_name"),
                     )
 
                     if (state.selectedType == SubscriptionType.XTREAM) {
-                        GlassTextField(
+                        CompactGlassTextField(
                             value = state.serverUrl,
                             onValueChange = viewModel::setServerUrl,
-                            label = "Server URL (HTTP or HTTPS)",
-                            placeholder = "http://provider.example.com:8080",
+                            label = "رابط الخادم",
+                            placeholder = "http://example.com:8080",
                             leadingIcon = Icons.Filled.Language,
                             enabled = !state.isConnecting,
                             keyboardType = KeyboardType.Uri,
@@ -216,50 +218,105 @@ fun LoginScreen(
                                 .testTag("input_xtream_url"),
                         )
 
-                        GlassTextField(
-                            value = state.username,
-                            onValueChange = viewModel::setUsername,
-                            label = "Username",
-                            placeholder = "Enter username",
-                            leadingIcon = Icons.Filled.Person,
-                            enabled = !state.isConnecting,
-                            imeAction = ImeAction.Next,
-                            modifier = Modifier.testTag("input_xtream_username"),
-                        )
-
-                        GlassTextField(
-                            value = state.password,
-                            onValueChange = viewModel::setPassword,
-                            label = "Password",
-                            placeholder = "Enter password",
-                            leadingIcon = Icons.Filled.Lock,
-                            enabled = !state.isConnecting,
-                            visualTransformation = if (state.showPassword) VisualTransformation.None else PasswordVisualTransformation(),
-                            keyboardType = KeyboardType.Password,
-                            imeAction = ImeAction.Done,
-                            onDone = { viewModel.connect() },
-                            trailingContent = {
-                                IconButton(
-                                    onClick = viewModel::togglePasswordVisibility,
-                                    modifier = Modifier
-                                        .size(48.dp)
-                                        .testTag("toggle_password_visibility"),
+                        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                            val sideBySide = maxWidth >= 310.dp
+                            if (sideBySide) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
-                                    Icon(
-                                        imageVector = if (state.showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                        contentDescription = if (state.showPassword) "Hide password" else "Show password",
-                                        tint = LiquidColors.TextSecondary,
+                                    CompactGlassTextField(
+                                        value = state.username,
+                                        onValueChange = viewModel::setUsername,
+                                        label = "اسم المستخدم",
+                                        placeholder = "المستخدم",
+                                        leadingIcon = Icons.Filled.Person,
+                                        enabled = !state.isConnecting,
+                                        imeAction = ImeAction.Next,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("input_xtream_username"),
+                                    )
+                                    CompactGlassTextField(
+                                        value = state.password,
+                                        onValueChange = viewModel::setPassword,
+                                        label = "كلمة المرور",
+                                        placeholder = "كلمة المرور",
+                                        leadingIcon = Icons.Filled.Lock,
+                                        enabled = !state.isConnecting,
+                                        visualTransformation = if (state.showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                                        keyboardType = KeyboardType.Password,
+                                        imeAction = ImeAction.Done,
+                                        onDone = { viewModel.connect() },
+                                        trailingContent = {
+                                            IconButton(
+                                                onClick = viewModel::togglePasswordVisibility,
+                                                modifier = Modifier
+                                                    .size(40.dp)
+                                                    .testTag("toggle_password_visibility"),
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (state.showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                                    contentDescription = if (state.showPassword) "إخفاء كلمة المرور" else "إظهار كلمة المرور",
+                                                    tint = LiquidColors.TextSecondary,
+                                                    modifier = Modifier.size(18.dp),
+                                                )
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("input_xtream_password"),
                                     )
                                 }
-                            },
-                            modifier = Modifier.testTag("input_xtream_password"),
-                        )
+                            } else {
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    CompactGlassTextField(
+                                        value = state.username,
+                                        onValueChange = viewModel::setUsername,
+                                        label = "اسم المستخدم",
+                                        placeholder = "المستخدم",
+                                        leadingIcon = Icons.Filled.Person,
+                                        enabled = !state.isConnecting,
+                                        imeAction = ImeAction.Next,
+                                        modifier = Modifier.testTag("input_xtream_username"),
+                                    )
+                                    CompactGlassTextField(
+                                        value = state.password,
+                                        onValueChange = viewModel::setPassword,
+                                        label = "كلمة المرور",
+                                        placeholder = "كلمة المرور",
+                                        leadingIcon = Icons.Filled.Lock,
+                                        enabled = !state.isConnecting,
+                                        visualTransformation = if (state.showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                                        keyboardType = KeyboardType.Password,
+                                        imeAction = ImeAction.Done,
+                                        onDone = { viewModel.connect() },
+                                        trailingContent = {
+                                            IconButton(
+                                                onClick = viewModel::togglePasswordVisibility,
+                                                modifier = Modifier
+                                                    .size(40.dp)
+                                                    .testTag("toggle_password_visibility"),
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (state.showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                                    contentDescription = if (state.showPassword) "إخفاء كلمة المرور" else "إظهار كلمة المرور",
+                                                    tint = LiquidColors.TextSecondary,
+                                                    modifier = Modifier.size(18.dp),
+                                                )
+                                            }
+                                        },
+                                        modifier = Modifier.testTag("input_xtream_password"),
+                                    )
+                                }
+                            }
+                        }
                     } else {
-                        GlassTextField(
+                        CompactGlassTextField(
                             value = state.m3uUrl,
                             onValueChange = viewModel::setM3uUrl,
-                            label = "M3U / M3U8 Playlist URL",
-                            placeholder = "http://provider.example.com/get.php?...",
+                            label = "رابط قائمة M3U / M3U8",
+                            placeholder = "http://example.com/get.php?...",
                             leadingIcon = Icons.Filled.Link,
                             enabled = !state.isConnecting,
                             keyboardType = KeyboardType.Uri,
@@ -270,45 +327,46 @@ fun LoginScreen(
                                 .testTag("input_m3u_url"),
                         )
 
-                        // Optional HTTP Headers toggle for M3U
+                        // Optional collapsible HTTP headers for M3U
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(RoundedCornerShape(10.dp))
                                 .clickable(enabled = !state.isConnecting) { viewModel.toggleAdvancedHeaders() }
                                 .focusable()
-                                .padding(vertical = 8.dp, horizontal = 4.dp),
+                                .padding(vertical = 4.dp, horizontal = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
                             Text(
-                                text = "HTTP Headers (User-Agent / Referer)",
-                                style = LiquidTypography.LabelLarge,
+                                text = "ترويسات HTTP إضافية (اختياري)",
+                                style = LiquidTypography.LabelMedium,
                                 color = LiquidColors.AccentBlueLight,
                             )
                             Icon(
                                 imageVector = if (state.showAdvancedHeaders) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                                contentDescription = "Toggle HTTP headers",
+                                contentDescription = "تبديل خيارات الترويسات",
                                 tint = LiquidColors.AccentBlueLight,
+                                modifier = Modifier.size(18.dp),
                             )
                         }
 
                         AnimatedVisibility(visible = state.showAdvancedHeaders) {
-                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                GlassTextField(
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                CompactGlassTextField(
                                     value = state.userAgent,
                                     onValueChange = viewModel::setUserAgent,
-                                    label = "Custom User-Agent (Optional)",
-                                    placeholder = "LiquidTV/1.1 (Android TV)",
+                                    label = "معرّف المستخدم (User-Agent)",
+                                    placeholder = "LiquidTV/1.0",
                                     leadingIcon = Icons.Filled.Devices,
                                     enabled = !state.isConnecting,
                                     imeAction = ImeAction.Next,
                                     modifier = Modifier.testTag("input_m3u_user_agent"),
                                 )
-                                GlassTextField(
+                                CompactGlassTextField(
                                     value = state.referer,
                                     onValueChange = viewModel::setReferer,
-                                    label = "Referer Header (Optional)",
+                                    label = "المرجع (Referer)",
                                     placeholder = "http://example.com/",
                                     leadingIcon = Icons.Filled.Http,
                                     enabled = !state.isConnecting,
@@ -324,7 +382,7 @@ fun LoginScreen(
                     // Connection status / progress
                     AnimatedVisibility(visible = state.isConnecting) {
                         LiquidGlassSurface(
-                            cornerRadius = 16.dp,
+                            cornerRadius = 14.dp,
                             glassAlpha = 0.16f,
                             borderAlpha = 0.3f,
                             glassColor = LiquidColors.AccentBlue,
@@ -332,20 +390,20 @@ fun LoginScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(14.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    .padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
                                     CircularProgressIndicator(
                                         color = LiquidColors.AccentBlueLight,
-                                        strokeWidth = 2.5.dp,
-                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp,
+                                        modifier = Modifier.size(18.dp),
                                     )
                                     Text(
-                                        text = state.statusMessage ?: "Connecting…",
+                                        text = state.statusMessage ?: "جارٍ الاتصال...",
                                         style = LiquidTypography.BodySmall,
                                         color = LiquidColors.TextPrimary,
                                     )
@@ -356,7 +414,7 @@ fun LoginScreen(
                                     trackColor = Color.White.copy(alpha = 0.15f),
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(6.dp)
+                                        .height(5.dp)
                                         .clip(RoundedCornerShape(3.dp)),
                                 )
                             }
@@ -367,7 +425,7 @@ fun LoginScreen(
                     AnimatedVisibility(visible = !state.errorMessage.isNullOrBlank()) {
                         LiquidGlassSurface(
                             modifier = Modifier.testTag("login_error_banner"),
-                            cornerRadius = 14.dp,
+                            cornerRadius = 12.dp,
                             glassAlpha = 0.25f,
                             borderAlpha = 0.55f,
                             glassColor = LiquidColors.ErrorRed,
@@ -376,14 +434,15 @@ fun LoginScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(14.dp),
+                                    .padding(10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.ErrorOutline,
-                                    contentDescription = "Error",
+                                    contentDescription = "خطأ",
                                     tint = LiquidColors.ErrorRed,
+                                    modifier = Modifier.size(18.dp),
                                 )
                                 Text(
                                     text = state.errorMessage.orEmpty(),
@@ -407,7 +466,7 @@ fun LoginScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(54.dp)
+                            .height(48.dp)
                             .scale(connectScale)
                             .clip(RoundedCornerShape(50))
                             .background(
@@ -438,7 +497,13 @@ fun LoginScreen(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = if (state.isConnecting) "Connecting…" else if (editingSubscriptionId != null) "Save & Reconnect" else "Connect & Sync",
+                            text = if (state.isConnecting) {
+                                "جارٍ الاتصال..."
+                            } else if (editingSubscriptionId != null) {
+                                "حفظ وإعادة الاتصال"
+                            } else {
+                                "اتصال ومزامنة"
+                            },
                             style = LiquidTypography.TitleSmall.copy(fontWeight = FontWeight.Bold),
                             color = Color.White,
                         )
@@ -462,7 +527,7 @@ private fun LoginModeTab(
     val isFocused by interactionSource.collectIsFocusedAsState()
     Box(
         modifier = modifier
-            .height(48.dp)
+            .height(42.dp)
             .clip(RoundedCornerShape(50))
             .background(
                 when {
@@ -491,17 +556,17 @@ private fun LoginModeTab(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = title,
                 tint = if (selected) Color.White else LiquidColors.TextSecondary,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(16.dp),
             )
             Text(
                 text = title,
-                style = LiquidTypography.LabelLarge,
+                style = LiquidTypography.LabelMedium,
                 color = if (selected) Color.White else LiquidColors.TextSecondary,
             )
         }
@@ -509,7 +574,7 @@ private fun LoginModeTab(
 }
 
 @Composable
-private fun GlassTextField(
+private fun CompactGlassTextField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
@@ -528,13 +593,30 @@ private fun GlassTextField(
         onValueChange = onValueChange,
         enabled = enabled,
         singleLine = true,
-        label = { Text(label, style = LiquidTypography.LabelMedium) },
-        placeholder = { Text(placeholder, color = LiquidColors.TextDisabled) },
+        textStyle = LiquidTypography.BodySmall.copy(color = LiquidColors.TextPrimary),
+        label = {
+            Text(
+                text = label,
+                style = LiquidTypography.LabelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        placeholder = {
+            Text(
+                text = placeholder,
+                style = LiquidTypography.BodySmall,
+                color = LiquidColors.TextDisabled,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
         leadingIcon = {
             Icon(
                 imageVector = leadingIcon,
                 contentDescription = null,
                 tint = LiquidColors.AccentBlueLight,
+                modifier = Modifier.size(18.dp),
             )
         },
         trailingIcon = trailingContent,
@@ -546,7 +628,7 @@ private fun GlassTextField(
         keyboardActions = KeyboardActions(
             onDone = { onDone?.invoke() },
         ),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(13.dp),
         colors = OutlinedTextFieldDefaults.colors(
             focusedTextColor = LiquidColors.TextPrimary,
             unfocusedTextColor = LiquidColors.TextPrimary,

@@ -3,12 +3,16 @@ package com.liquidtv.app.ui.screens.livetv
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.liquidtv.app.domain.model.Category
 import com.liquidtv.app.domain.model.Channel
+import com.liquidtv.app.domain.model.ChannelEpgSummary
 import com.liquidtv.app.domain.model.ChannelFilter
+import com.liquidtv.app.domain.model.MediaType
 import com.liquidtv.app.domain.model.SortOrder
 import com.liquidtv.app.domain.repository.ChannelRepository
 import com.liquidtv.app.domain.repository.UserPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -17,11 +21,18 @@ enum class ViewMode { GRID, LIST }
 
 data class LiveTVUiState(
     val channels: List<Channel> = emptyList(),
+    val categories: List<Category> = emptyList(),
+    val totalChannelsCount: Int = 0,
+    val favoritesCount: Int = 0,
+    val selectedChannel: Channel? = null,
+    val selectedEpg: ChannelEpgSummary = ChannelEpgSummary(),
     val filter: ChannelFilter = ChannelFilter(),
     val isLoading: Boolean = true,
-    val viewMode: ViewMode = ViewMode.GRID,
+    val viewMode: ViewMode = ViewMode.LIST,
+    val error: String? = null,
 )
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class LiveTVViewModel @Inject constructor(
     private val channelRepository: ChannelRepository,
@@ -41,21 +52,28 @@ class LiveTVViewModel @Inject constructor(
         )
     )
 
-    private val _viewMode = MutableStateFlow(ViewMode.GRID)
+    private val _viewMode = MutableStateFlow(ViewMode.LIST)
+    private val _selectedChannelId = MutableStateFlow<String?>(null)
+    private val _shortEpgOverride = MutableStateFlow<Pair<String, ChannelEpgSummary>?>(null)
 
-    val uiState: StateFlow<LiveTVUiState> = combine(
+    private val baseStateFlow: Flow<LiveTVUiState> = combine(
         channelRepository.getAllChannels(),
+        channelRepository.getAllCategories(MediaType.LIVE),
         _filter,
         _viewMode,
-        channelRepository.getLockedCategoryNames(),
-        userPreferencesRepository.userPreferences,
-    ) { allChannels, filter, viewMode, lockedCategories, prefs ->
-        val protectCategories = prefs.parentalControlEnabled &&
+        combine(
+            channelRepository.getLockedCategoryNames(),
+            userPreferencesRepository.userPreferences,
+            _selectedChannelId,
+        ) { locked, prefs, selectedId -> Triple(locked, prefs, selectedId) },
+    ) { allChannels, allCategories, filter, viewMode, (lockedCategories, prefs, selectedId) ->
+        val enforceLock = prefs.parentalControlEnabled &&
             prefs.hasParentalPin &&
-            filter.category.isNullOrBlank() &&
             lockedCategories.isNotEmpty()
 
-        val base = if (protectCategories) {
+        val protectAllMode = enforceLock && filter.category.isNullOrBlank()
+
+        val unlockedChannels = if (protectAllMode) {
             allChannels.filter { ch ->
                 val cat = ch.groupTitle?.trim()?.lowercase()
                 cat == null || cat !in lockedCategories
@@ -64,25 +82,90 @@ class LiveTVViewModel @Inject constructor(
             allChannels
         }
 
-        val filtered = applyFilter(base, filter)
+        val visibleCategories = if (enforceLock) {
+            allCategories.filter { it.name.trim().lowercase() !in lockedCategories }
+        } else {
+            allCategories
+        }
+
+        val filtered = applyFilter(unlockedChannels, filter)
+        val activeChannel = filtered.firstOrNull { it.id == selectedId } ?: filtered.firstOrNull()
+
         LiveTVUiState(
             channels = filtered,
+            categories = visibleCategories,
+            totalChannelsCount = unlockedChannels.size,
+            favoritesCount = unlockedChannels.count { it.isFavorite },
+            selectedChannel = activeChannel,
             filter = filter,
             isLoading = false,
             viewMode = viewMode,
         )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = LiveTVUiState(
-            filter = ChannelFilter(
-                category = filterCategory,
-                language = filterLanguage,
-                country = filterCountry,
+    }
+
+    val uiState: StateFlow<LiveTVUiState> = baseStateFlow
+        .flatMapLatest { base ->
+            val selected = base.selectedChannel
+            if (selected == null) {
+                flowOf(base)
+            } else {
+                combine(
+                    channelRepository.observeChannelEpg(selected),
+                    _shortEpgOverride,
+                ) { dbEpg, quick ->
+                    val resolved = if (dbEpg.current != null || dbEpg.next != null) {
+                        dbEpg
+                    } else if (quick != null && quick.first == selected.id) {
+                        quick.second
+                    } else {
+                        dbEpg
+                    }
+                    base.copy(selectedEpg = resolved)
+                }
+            }
+        }
+        .catch { throwable ->
+            emit(
+                LiveTVUiState(
+                    filter = _filter.value,
+                    isLoading = false,
+                    error = throwable.message ?: "تعذّر تحميل القنوات",
+                )
+            )
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = LiveTVUiState(
+                filter = ChannelFilter(
+                    category = filterCategory,
+                    language = filterLanguage,
+                    country = filterCountry,
+                ),
+                isLoading = true,
             ),
-            isLoading = true,
-        ),
-    )
+        )
+
+    private var lastFetchedEpgChannelId: String? = null
+
+    init {
+        viewModelScope.launch {
+            uiState
+                .mapNotNull { it.selectedChannel }
+                .distinctUntilChangedBy { it.id }
+                .collect { ch ->
+                    if (lastFetchedEpgChannelId != ch.id) {
+                        lastFetchedEpgChannelId = ch.id
+                        runCatching {
+                            val summary = channelRepository.fetchShortEpgIfNeeded(ch)
+                            if (summary.current != null || summary.next != null) {
+                                _shortEpgOverride.value = ch.id to summary
+                            }
+                        }
+                    }
+                }
+        }
+    }
 
     private fun applyFilter(channels: List<Channel>, filter: ChannelFilter): List<Channel> {
         var result = channels
@@ -133,6 +216,18 @@ class LiveTVViewModel @Inject constructor(
         return result
     }
 
+    fun selectCategory(category: String?) {
+        _filter.update { it.copy(category = category, showFavoritesOnly = false) }
+    }
+
+    fun selectFavoritesFilter() {
+        _filter.update { it.copy(category = null, showFavoritesOnly = true) }
+    }
+
+    fun selectChannelForPreview(channel: Channel) {
+        _selectedChannelId.value = channel.id
+    }
+
     fun setFilter(filter: ChannelFilter) {
         _filter.value = filter
     }
@@ -148,6 +243,12 @@ class LiveTVViewModel @Inject constructor(
     fun toggleFavorite(channelId: String) {
         viewModelScope.launch {
             channelRepository.toggleFavorite(channelId)
+        }
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            channelRepository.refreshPlaylists()
         }
     }
 }

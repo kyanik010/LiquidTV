@@ -9,8 +9,11 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -30,18 +33,23 @@ import com.liquidtv.app.ui.components.LiquidGlassSurface
 import com.liquidtv.app.ui.components.ParentalPinDialog
 import com.liquidtv.app.ui.theme.LiquidColors
 import com.liquidtv.app.ui.theme.LiquidTypography
+import com.liquidtv.app.ui.utils.localizedQualityAr
+import com.liquidtv.app.ui.utils.localizedSubscriptionStatusAr
+import com.liquidtv.app.ui.utils.localizedSubscriptionTypeAr
+import com.liquidtv.app.ui.utils.localizedSubtitleLangAr
+import com.liquidtv.app.ui.utils.localizedThemeAr
 import com.liquidtv.app.updater.AppUpdateViewModel
 import com.liquidtv.app.updater.UpdateState
 import kotlinx.coroutines.launch
 
 private enum class SettingsSection(val title: String, val icon: ImageVector) {
-    Subscriptions("Subscriptions & Sync", Icons.Filled.Subscriptions),
-    Playback("Playback", Icons.Filled.PlayCircle),
-    Parental("Parental Control", Icons.Filled.Lock),
-    Appearance("Appearance", Icons.Filled.Palette),
-    Ambient("Ambient Mode", Icons.Filled.NightlightRound),
-    Updates("Updates & GitHub", Icons.Filled.SystemUpdate),
-    About("About", Icons.Filled.Info),
+    Subscriptions("الاشتراكات والمزامنة", Icons.Filled.Subscriptions),
+    Playback("التشغيل والبث", Icons.Filled.PlayCircle),
+    Parental("الرقابة الأبوية", Icons.Filled.Lock),
+    Appearance("المظهر", Icons.Filled.Palette),
+    Ambient("وضع التوقف", Icons.Filled.NightlightRound),
+    Updates("التحديثات", Icons.Filled.SystemUpdate),
+    About("حول التطبيق", Icons.Filled.Info),
 }
 
 private enum class PinDialogAction {
@@ -71,563 +79,166 @@ fun SettingsScreen(
     var showLockedCategoriesDialog by remember { mutableStateOf(false) }
 
     AppBackground(modifier = Modifier.fillMaxSize()) {
-        Column(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 88.dp, start = 36.dp, end = 36.dp),
+                .windowInsetsPadding(WindowInsets.statusBars),
         ) {
-            Text(
-                text = "Settings",
-                style = LiquidTypography.HeadlineMedium.copy(
-                    brush = Brush.linearGradient(
-                        listOf(LiquidColors.TextPrimary, LiquidColors.AccentBlueLight)
-                    )
-                ),
-                color = LiquidColors.TextPrimary,
-                modifier = Modifier.padding(vertical = 12.dp),
-            )
+            val isWide = maxWidth >= 760.dp
+            val horizontalPad = if (isWide) 32.dp else 16.dp
+            val topNavClearance = if (isWide) 84.dp else 76.dp
 
-            uiState.successMessage?.let { msg ->
-                LiquidGlassSurface(
-                    cornerRadius = 12.dp,
-                    glassAlpha = 0.22f,
-                    glassColor = LiquidColors.SuccessGreen,
-                    borderColor = LiquidColors.SuccessGreen,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(msg, style = LiquidTypography.BodySmall, color = Color.White, modifier = Modifier.weight(1f))
-                        TextButton(onClick = viewModel::dismissSuccess) {
-                            Text("OK", color = Color.White)
-                        }
-                    }
-                }
-            }
-
-            uiState.error?.let { err ->
-                LiquidGlassSurface(
-                    cornerRadius = 12.dp,
-                    glassAlpha = 0.25f,
-                    glassColor = LiquidColors.ErrorRed,
-                    borderColor = LiquidColors.ErrorRed,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(err, style = LiquidTypography.BodySmall, color = Color.White, modifier = Modifier.weight(1f))
-                        TextButton(onClick = viewModel::dismissError) {
-                            Text("Dismiss", color = Color.White)
-                        }
-                    }
-                }
-            }
-
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 8.dp, bottom = 32.dp),
-                horizontalArrangement = Arrangement.spacedBy(28.dp),
+                    .padding(top = topNavClearance, start = horizontalPad, end = horizontalPad),
             ) {
-                Column(
-                    modifier = Modifier
-                        .width(240.dp)
-                        .fillMaxHeight(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    SettingsSection.entries.forEach { section ->
-                        val isSelected = selectedSection == section
-                        val interactionSource = remember { MutableInteractionSource() }
-                        val isFocused by interactionSource.collectIsFocusedAsState()
+                Text(
+                    text = "الإعدادات",
+                    style = LiquidTypography.HeadlineMedium.copy(
+                        brush = Brush.linearGradient(
+                            listOf(LiquidColors.TextPrimary, LiquidColors.AccentBlueLight),
+                        ),
+                    ),
+                    color = LiquidColors.TextPrimary,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
 
-                        LiquidGlassSurface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp)
-                                .clickable(interactionSource, null) { selectedSection = section }
-                                .focusable(interactionSource = interactionSource)
-                                .testTag("settings_section_${section.name.lowercase()}"),
-                            cornerRadius = 14.dp,
-                            glassAlpha = if (isSelected) 0.35f else if (isFocused) 0.22f else 0.10f,
-                            borderAlpha = if (isFocused) 0.7f else if (isSelected) 0.4f else 0.16f,
-                            borderColor = if (isSelected) LiquidColors.AccentBlue else Color.White,
-                            isFocused = isFocused,
+                uiState.successMessage?.let { msg ->
+                    LiquidGlassSurface(
+                        cornerRadius = 12.dp,
+                        glassAlpha = 0.22f,
+                        glassColor = LiquidColors.SuccessGreen,
+                        borderColor = LiquidColors.SuccessGreen,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(horizontal = 16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                Icon(
-                                    imageVector = section.icon,
-                                    contentDescription = section.title,
-                                    tint = if (isSelected) LiquidColors.AccentBlue else LiquidColors.TextSecondary,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                                Text(
-                                    text = section.title,
-                                    style = LiquidTypography.TitleSmall,
-                                    color = if (isSelected) LiquidColors.TextPrimary else LiquidColors.TextSecondary,
-                                )
+                            Text(msg, style = LiquidTypography.BodySmall, color = Color.White, modifier = Modifier.weight(1f))
+                            TextButton(onClick = viewModel::dismissSuccess) {
+                                Text("حسناً", color = Color.White)
                             }
                         }
                     }
                 }
 
-                LiquidGlassSurface(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
-                    cornerRadius = 24.dp,
-                    glassAlpha = 0.14f,
-                    borderAlpha = 0.22f,
-                ) {
-                    LazyColumn(
+                uiState.error?.let { err ->
+                    LiquidGlassSurface(
+                        cornerRadius = 12.dp,
+                        glassAlpha = 0.25f,
+                        glassColor = LiquidColors.ErrorRed,
+                        borderColor = LiquidColors.ErrorRed,
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(28.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
                     ) {
-                        when (selectedSection) {
-                            SettingsSection.Subscriptions -> {
-                                item {
-                                    SettingHeader("IPTV Subscriptions & Sync", "Manage active Xtream/M3U accounts, schedule, and EPG")
-                                }
-                                item {
-                                    val sub = uiState.activeSubscription
-                                    SettingItemTile(
-                                        title = "Manage Subscriptions",
-                                        subtitle = if (sub != null) {
-                                            "Active: ${sub.name} (${sub.type.name}) • ${sub.connectionStatus.name}"
-                                        } else {
-                                            "Add, edit, or switch IPTV accounts"
-                                        },
-                                        action = {
-                                            Icon(Icons.Filled.ManageAccounts, null, tint = LiquidColors.AccentBlueLight)
-                                        },
-                                        onClick = onManageSubscriptions,
-                                        testTag = "setting_manage_subscriptions",
-                                    )
-                                }
-                                item {
-                                    SettingItemTile(
-                                        title = "Refresh Active Playlist",
-                                        subtitle = if (uiState.isRefreshing) "Syncing channels & VOD…" else "Sync channels, categories, movies, and series now",
-                                        action = {
-                                            if (uiState.isRefreshing) {
-                                                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = LiquidColors.AccentBlue)
-                                            } else {
-                                                Icon(Icons.Filled.Refresh, null, tint = LiquidColors.AccentBlue)
-                                            }
-                                        },
-                                        onClick = { viewModel.refreshPlaylists() },
-                                    )
-                                }
-                                item {
-                                    SettingItemTile(
-                                        title = "Sync EPG Program Guide",
-                                        subtitle = "Download latest XMLTV schedule for active subscription",
-                                        action = {
-                                            Icon(Icons.Filled.Schedule, null, tint = LiquidColors.AccentCyan)
-                                        },
-                                        onClick = { viewModel.refreshEpg() },
-                                    )
-                                }
-                                item {
-                                    SettingItemTile(
-                                        title = "Auto-Refresh Playlist",
-                                        subtitle = if (uiState.autoRefreshEnabled) {
-                                            "Background sync enabled every ${uiState.autoRefreshInterval}h"
-                                        } else {
-                                            "Manual playlist sync only"
-                                        },
-                                        action = {
-                                            Switch(
-                                                checked = uiState.autoRefreshEnabled,
-                                                onCheckedChange = { viewModel.setAutoRefreshEnabled(it) },
-                                                colors = SwitchDefaults.colors(
-                                                    checkedThumbColor = LiquidColors.AccentBlue,
-                                                    checkedTrackColor = LiquidColors.AccentBlueDark,
-                                                ),
-                                            )
-                                        },
-                                        onClick = { viewModel.setAutoRefreshEnabled(!uiState.autoRefreshEnabled) },
-                                        testTag = "setting_auto_refresh_toggle",
-                                    )
-                                }
-                                item {
-                                    SettingItemTile(
-                                        title = "Auto-Refresh Interval",
-                                        subtitle = "Periodic sync frequency: every ${uiState.autoRefreshInterval} hours",
-                                        action = {
-                                            Text("${uiState.autoRefreshInterval}h", style = LiquidTypography.LabelLarge, color = LiquidColors.AccentBlue)
-                                        },
-                                        onClick = {
-                                            val intervals = listOf(6, 12, 24, 48)
-                                            val next = (intervals.indexOf(uiState.autoRefreshInterval) + 1) % intervals.size
-                                            viewModel.setAutoRefreshInterval(intervals[next])
-                                        },
-                                    )
-                                }
-                                item {
-                                    SettingItemTile(
-                                        title = "Clear Watch History & Search Cache",
-                                        subtitle = "Delete recent watch history and search suggestions",
-                                        action = {
-                                            Icon(Icons.Filled.Delete, null, tint = LiquidColors.LiveRed)
-                                        },
-                                        onClick = { viewModel.clearCache() },
-                                    )
-                                }
-                            }
-                            SettingsSection.Playback -> {
-                                item {
-                                    SettingHeader("Playback & Streaming", "Media3 track selection, timeouts, and stream recovery")
-                                }
-                                item {
-                                    SettingItemTile(
-                                        title = "Default Video Quality",
-                                        subtitle = "Preferred maximum resolution constraint: ${uiState.defaultQuality}",
-                                        action = {
-                                            Text(uiState.defaultQuality, style = LiquidTypography.LabelLarge, color = LiquidColors.AccentBlue)
-                                        },
-                                        onClick = {
-                                            val qualities = listOf("Auto", "1080p", "720p", "480p", "Data Saver")
-                                            val next = (qualities.indexOf(uiState.defaultQuality) + 1) % qualities.size
-                                            viewModel.setDefaultQuality(qualities[next])
-                                        },
-                                        testTag = "setting_default_quality",
-                                    )
-                                }
-                                item {
-                                    SettingItemTile(
-                                        title = "Auto-Play Next",
-                                        subtitle = "Automatically play next episode or channel when playback completes",
-                                        action = {
-                                            Switch(
-                                                checked = uiState.autoPlay,
-                                                onCheckedChange = { viewModel.setAutoPlay(it) },
-                                                colors = SwitchDefaults.colors(
-                                                    checkedThumbColor = LiquidColors.AccentBlue,
-                                                    checkedTrackColor = LiquidColors.AccentBlueDark,
-                                                ),
-                                            )
-                                        },
-                                        onClick = { viewModel.setAutoPlay(!uiState.autoPlay) },
-                                    )
-                                }
-                                item {
-                                    SettingItemTile(
-                                        title = "Enable Subtitles by Default",
-                                        subtitle = "Automatically select preferred text tracks when present",
-                                        action = {
-                                            Switch(
-                                                checked = uiState.subtitlesEnabled,
-                                                onCheckedChange = { viewModel.setSubtitlesEnabled(it) },
-                                                colors = SwitchDefaults.colors(
-                                                    checkedThumbColor = LiquidColors.AccentBlue,
-                                                    checkedTrackColor = LiquidColors.AccentBlueDark,
-                                                ),
-                                            )
-                                        },
-                                        onClick = { viewModel.setSubtitlesEnabled(!uiState.subtitlesEnabled) },
-                                    )
-                                }
-                                item {
-                                    SettingItemTile(
-                                        title = "Preferred Subtitle Language",
-                                        subtitle = "ISO language code for subtitles: ${uiState.preferredSubtitleLanguage.uppercase()}",
-                                        action = {
-                                            Text(uiState.preferredSubtitleLanguage.uppercase(), style = LiquidTypography.LabelLarge, color = LiquidColors.AccentBlue)
-                                        },
-                                        onClick = {
-                                            val langs = listOf("en", "ar", "fr", "es", "de", "tr")
-                                            val next = (langs.indexOf(uiState.preferredSubtitleLanguage) + 1) % langs.size
-                                            viewModel.setPreferredSubtitleLanguage(langs[next])
-                                        },
-                                    )
-                                }
-                                item {
-                                    SettingItemTile(
-                                        title = "Connection Timeout",
-                                        subtitle = "Timeout duration for IPTV network & stream connections: ${uiState.connectionTimeout}s",
-                                        action = {
-                                            Text("${uiState.connectionTimeout}s", style = LiquidTypography.LabelLarge, color = LiquidColors.AccentBlue)
-                                        },
-                                        onClick = {
-                                            val timeouts = listOf(10, 15, 20, 30)
-                                            val nextIndex = (timeouts.indexOf(uiState.connectionTimeout) + 1) % timeouts.size
-                                            viewModel.setConnectionTimeout(timeouts[nextIndex])
-                                        },
-                                    )
-                                }
-                                item {
-                                    SettingItemTile(
-                                        title = "Retry Attempts",
-                                        subtitle = "Automatic exponential-backoff reconnects on transient drop: ${uiState.maxRetries}",
-                                        action = {
-                                            Text("${uiState.maxRetries}", style = LiquidTypography.LabelLarge, color = LiquidColors.AccentBlue)
-                                        },
-                                        onClick = {
-                                            val retries = listOf(0, 1, 2, 3, 5)
-                                            val nextIndex = (retries.indexOf(uiState.maxRetries) + 1) % retries.size
-                                            viewModel.setMaxRetries(retries[nextIndex])
-                                        },
-                                    )
-                                }
-                            }
-                            SettingsSection.Parental -> {
-                                item {
-                                    SettingHeader("Parental Controls", "Protect locked categories with a PIN code")
-                                }
-                                item {
-                                    SettingItemTile(
-                                        title = "Enable Parental Control",
-                                        subtitle = if (uiState.parentalControlEnabled && uiState.hasParentalPin) {
-                                            "Protected categories require PIN verification"
-                                        } else {
-                                            "Lock sensitive categories with a 4–8 digit PIN"
-                                        },
-                                        action = {
-                                            Switch(
-                                                checked = uiState.parentalControlEnabled,
-                                                onCheckedChange = {
-                                                    pinError = null
-                                                    pinAction = if (!uiState.parentalControlEnabled) {
-                                                        PinDialogAction.SETUP_ENABLE
-                                                    } else {
-                                                        PinDialogAction.VERIFY_DISABLE
-                                                    }
-                                                },
-                                                colors = SwitchDefaults.colors(
-                                                    checkedThumbColor = LiquidColors.AccentBlue,
-                                                    checkedTrackColor = LiquidColors.AccentBlueDark,
-                                                ),
-                                            )
-                                        },
-                                        onClick = {
-                                            pinError = null
-                                            pinAction = if (!uiState.parentalControlEnabled) {
-                                                PinDialogAction.SETUP_ENABLE
-                                            } else {
-                                                PinDialogAction.VERIFY_DISABLE
-                                            }
-                                        },
-                                        testTag = "setting_parental_toggle",
-                                    )
-                                }
-                                if (uiState.hasParentalPin) {
-                                    item {
-                                        SettingItemTile(
-                                            title = "Change Parental PIN",
-                                            subtitle = "Update the PIN used for locked categories",
-                                            action = {
-                                                Icon(Icons.Filled.Key, null, tint = LiquidColors.AccentBlueLight)
-                                            },
-                                            onClick = {
-                                                pinError = null
-                                                pinAction = PinDialogAction.CHANGE_PIN
-                                            },
-                                        )
-                                    }
-                                }
-                                item {
-                                    SettingItemTile(
-                                        title = "Locked Categories",
-                                        subtitle = "${uiState.categories.count { it.isLocked }} of ${uiState.categories.size} categories locked",
-                                        action = {
-                                            Icon(Icons.Filled.Shield, null, tint = LiquidColors.AccentVioletLight)
-                                        },
-                                        onClick = {
-                                            if (uiState.parentalControlEnabled && uiState.hasParentalPin) {
-                                                pinError = null
-                                                pinAction = PinDialogAction.VERIFY_LOCK_CATEGORIES
-                                            } else {
-                                                showLockedCategoriesDialog = true
-                                            }
-                                        },
-                                        testTag = "setting_locked_categories",
-                                    )
-                                }
-                            }
-                            SettingsSection.Appearance -> {
-                                item {
-                                    SettingHeader("Visual & Glass Experience", "Configure Liquid Glass theme and header display")
-                                }
-                                item {
-                                    SettingItemTile(
-                                        title = "Ambient Theme",
-                                        subtitle = "Theme styling for background and screensaver",
-                                        action = {
-                                            Text(
-                                                text = uiState.theme.replaceFirstChar { it.uppercase() },
-                                                style = LiquidTypography.LabelLarge,
-                                                color = LiquidColors.AccentBlue,
-                                            )
-                                        },
-                                        onClick = {
-                                            val themes = listOf("midnight_glass", "aurora", "ocean", "cosmic", "minimal")
-                                            val nextIndex = (themes.indexOf(uiState.theme) + 1) % themes.size
-                                            viewModel.setTheme(themes[nextIndex])
-                                        },
-                                    )
-                                }
-                                item {
-                                    SettingItemTile(
-                                        title = "Clock Display",
-                                        subtitle = "Show clock in ambient mode and home header",
-                                        action = {
-                                            Switch(
-                                                checked = uiState.clockVisible,
-                                                onCheckedChange = { viewModel.setClockVisible(it) },
-                                                colors = SwitchDefaults.colors(
-                                                    checkedThumbColor = LiquidColors.AccentBlue,
-                                                    checkedTrackColor = LiquidColors.AccentBlueDark,
-                                                ),
-                                            )
-                                        },
-                                        onClick = { viewModel.setClockVisible(!uiState.clockVisible) },
-                                    )
-                                }
-                            }
-                            SettingsSection.Ambient -> {
-                                item {
-                                    SettingHeader("Ambient Screensaver", "Cinematic Liquid Glass idle display")
-                                }
-                                item {
-                                    SettingItemTile(
-                                        title = "Enable Ambient Screensaver",
-                                        subtitle = if (uiState.ambientEnabled) "Activates automatically after inactivity" else "Disabled",
-                                        action = {
-                                            Switch(
-                                                checked = uiState.ambientEnabled,
-                                                onCheckedChange = { viewModel.setAmbientEnabled(it) },
-                                                colors = SwitchDefaults.colors(
-                                                    checkedThumbColor = LiquidColors.AccentBlue,
-                                                    checkedTrackColor = LiquidColors.AccentBlueDark,
-                                                ),
-                                            )
-                                        },
-                                        onClick = { viewModel.setAmbientEnabled(!uiState.ambientEnabled) },
-                                    )
-                                }
-                                item {
-                                    SettingItemTile(
-                                        title = "Screensaver Timeout",
-                                        subtitle = "Start screensaver after inactivity: ${uiState.screenSaverTimeout} min",
-                                        action = {
-                                            Text("${uiState.screenSaverTimeout} min", style = LiquidTypography.LabelLarge, color = LiquidColors.AccentBlue)
-                                        },
-                                        onClick = {
-                                            val durations = listOf(2, 5, 10, 15)
-                                            val nextIndex = (durations.indexOf(uiState.screenSaverTimeout) + 1) % durations.size
-                                            viewModel.setScreenSaverTimeout(durations[nextIndex])
-                                        },
-                                    )
-                                }
-                            }
-                            SettingsSection.Updates -> {
-                                item {
-                                    SettingHeader("App Updates & GitHub", "Verify and install signed releases from GitHub")
-                                }
-                                item {
-                                    SettingItemTile(
-                                        title = "Check for Updates",
-                                        subtitle = when (updateState) {
-                                            is UpdateState.Checking -> "Checking GitHub for newer releases..."
-                                            is UpdateState.UpToDate -> "You're on the latest version! (v${BuildConfig.VERSION_NAME})"
-                                            is UpdateState.Available -> "Update Available: v${(updateState as UpdateState.Available).info.versionName} • Click to View"
-                                            is UpdateState.Error -> "Check failed: ${(updateState as UpdateState.Error).message}"
-                                            else -> "Installed: v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})"
-                                        },
-                                        action = {
-                                            if (updateState is UpdateState.Checking) {
-                                                CircularProgressIndicator(
-                                                    color = LiquidColors.AccentBlue,
-                                                    modifier = Modifier.size(24.dp),
-                                                    strokeWidth = 2.dp,
-                                                )
-                                            } else {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .background(
-                                                            Brush.linearGradient(
-                                                                listOf(LiquidColors.AccentBlue, LiquidColors.AccentViolet)
-                                                            ),
-                                                            RoundedCornerShape(50),
-                                                        )
-                                                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                                                ) {
-                                                    Text("Check Now", style = LiquidTypography.LabelMedium, color = Color.White)
-                                                }
-                                            }
-                                        },
-                                        onClick = { updateViewModel.checkForUpdate(uiState.githubRepo) },
-                                    )
-                                }
-                                item {
-                                    SettingItemTile(
-                                        title = "GitHub Repository",
-                                        subtitle = uiState.githubRepo.ifBlank { "Click to set repository (owner/repo)" },
-                                        action = {
-                                            Icon(Icons.Filled.Edit, null, tint = LiquidColors.AccentBlue)
-                                        },
-                                        onClick = {
-                                            repoInput = uiState.githubRepo
-                                            showRepoDialog = true
-                                        },
-                                    )
-                                }
-                                item {
-                                    SettingItemTile(
-                                        title = "Auto-Check on App Launch",
-                                        subtitle = if (uiState.autoCheckUpdates) "Checks GitHub in the background when the app opens" else "Manual updates only",
-                                        action = {
-                                            Switch(
-                                                checked = uiState.autoCheckUpdates,
-                                                onCheckedChange = { viewModel.setAutoCheckUpdates(it) },
-                                                colors = SwitchDefaults.colors(
-                                                    checkedThumbColor = Color.White,
-                                                    checkedTrackColor = LiquidColors.AccentBlue,
-                                                ),
-                                            )
-                                        },
-                                        onClick = { viewModel.setAutoCheckUpdates(!uiState.autoCheckUpdates) },
-                                    )
-                                }
-                            }
-                            SettingsSection.About -> {
-                                item {
-                                    SettingHeader("About LIQUID TV", "Architected for Android TV, Google TV, Phones & Tablets")
-                                }
-                                item {
-                                    SettingItemTile(
-                                        title = "Application Version",
-                                        subtitle = "v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE}) • Liquid Glass Edition",
-                                        action = {},
-                                        onClick = {},
-                                    )
-                                }
-                                item {
-                                    SettingItemTile(
-                                        title = "Player & IPTV Engine",
-                                        subtitle = "Unified AndroidX Media3 playback service supporting Xtream Codes & M3U over HTTP/HTTPS with XMLTV EPG.",
-                                        action = {
-                                            Icon(Icons.Filled.LiveTv, null, tint = LiquidColors.AccentBlueLight)
-                                        },
-                                        onClick = {},
-                                    )
-                                }
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(err, style = LiquidTypography.BodySmall, color = Color.White, modifier = Modifier.weight(1f))
+                            TextButton(onClick = viewModel::dismissError) {
+                                Text("إغلاق", color = Color.White)
                             }
                         }
+                    }
+                }
+
+                if (isWide) {
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .padding(top = 6.dp, bottom = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .width(240.dp)
+                                .fillMaxHeight()
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            SettingsSection.entries.forEach { section ->
+                                SettingsSectionTab(
+                                    section = section,
+                                    isSelected = selectedSection == section,
+                                    onClick = { selectedSection = section },
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        }
+
+                        SettingsDetailPane(
+                            selectedSection = selectedSection,
+                            uiState = uiState,
+                            updateState = updateState,
+                            viewModel = viewModel,
+                            updateViewModel = updateViewModel,
+                            onManageSubscriptions = onManageSubscriptions,
+                            onEditRepo = {
+                                repoInput = uiState.githubRepo
+                                showRepoDialog = true
+                            },
+                            onRequestPinAction = { action ->
+                                pinError = null
+                                pinAction = action
+                            },
+                            onOpenLockedCategories = { showLockedCategoriesDialog = true },
+                            contentPadding = PaddingValues(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 40.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                        )
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(vertical = 2.dp),
+                        ) {
+                            items(SettingsSection.entries) { section ->
+                                SettingsSectionPill(
+                                    section = section,
+                                    isSelected = selectedSection == section,
+                                    onClick = { selectedSection = section },
+                                )
+                            }
+                        }
+
+                        SettingsDetailPane(
+                            selectedSection = selectedSection,
+                            uiState = uiState,
+                            updateState = updateState,
+                            viewModel = viewModel,
+                            updateViewModel = updateViewModel,
+                            onManageSubscriptions = onManageSubscriptions,
+                            onEditRepo = {
+                                repoInput = uiState.githubRepo
+                                showRepoDialog = true
+                            },
+                            onRequestPinAction = { action ->
+                                pinError = null
+                                pinAction = action
+                            },
+                            onOpenLockedCategories = { showLockedCategoriesDialog = true },
+                            contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 96.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .navigationBarsPadding(),
+                        )
                     }
                 }
             }
@@ -636,11 +247,11 @@ fun SettingsScreen(
         if (showRepoDialog) {
             AlertDialog(
                 onDismissRequest = { showRepoDialog = false },
-                title = { Text("GitHub Repository", color = Color.White) },
+                title = { Text("مستودع GitHub", color = Color.White) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            "Enter your GitHub repository as 'owner/repo' (for example: kyanik010/LiquidTV):",
+                            "أدخل اسم مستودع GitHub بصيغة 'owner/repo' (مثال: kyanik010/LiquidTV):",
                             style = LiquidTypography.BodySmall,
                             color = LiquidColors.TextSecondary,
                         )
@@ -669,12 +280,12 @@ fun SettingsScreen(
                         viewModel.setGithubRepo(sanitized)
                         showRepoDialog = false
                     }) {
-                        Text("Save", color = LiquidColors.AccentBlue)
+                        Text("حفظ", color = LiquidColors.AccentBlueLight)
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showRepoDialog = false }) {
-                        Text("Cancel", color = LiquidColors.TextTertiary)
+                        Text("إلغاء", color = LiquidColors.TextTertiary)
                     }
                 },
                 containerColor = LiquidColors.DeepSurface,
@@ -684,10 +295,10 @@ fun SettingsScreen(
         if (showLockedCategoriesDialog) {
             AlertDialog(
                 onDismissRequest = { showLockedCategoriesDialog = false },
-                title = { Text("Locked Categories", color = Color.White) },
+                title = { Text("التصنيفات المقفلة", color = Color.White) },
                 text = {
                     if (uiState.categories.isEmpty()) {
-                        Text("No categories loaded in the active subscription.", color = LiquidColors.TextSecondary)
+                        Text("لا توجد تصنيفات محمّلة في الاشتراك الحالي.", color = LiquidColors.TextSecondary)
                     } else {
                         LazyColumn(
                             modifier = Modifier.heightIn(max = 360.dp),
@@ -714,7 +325,7 @@ fun SettingsScreen(
                 },
                 confirmButton = {
                     TextButton(onClick = { showLockedCategoriesDialog = false }) {
-                        Text("Done", color = LiquidColors.AccentBlueLight)
+                        Text("تم", color = LiquidColors.AccentBlueLight)
                     }
                 },
                 containerColor = LiquidColors.DeepSurface,
@@ -724,20 +335,20 @@ fun SettingsScreen(
         ParentalPinDialog(
             visible = pinAction != PinDialogAction.NONE,
             title = when (pinAction) {
-                PinDialogAction.SETUP_ENABLE -> "Set Parental PIN"
-                PinDialogAction.VERIFY_DISABLE -> "Disable Parental Control"
-                PinDialogAction.CHANGE_PIN -> "Enter New Parental PIN"
-                PinDialogAction.VERIFY_LOCK_CATEGORIES -> "Verify Parental PIN"
+                PinDialogAction.SETUP_ENABLE -> "تعيين رمز الحماية"
+                PinDialogAction.VERIFY_DISABLE -> "إيقاف الرقابة الأبوية"
+                PinDialogAction.CHANGE_PIN -> "إدخال رمز حماية جديد"
+                PinDialogAction.VERIFY_LOCK_CATEGORIES -> "التحقق من رمز الحماية"
                 PinDialogAction.NONE -> ""
             },
             subtitle = when (pinAction) {
-                PinDialogAction.SETUP_ENABLE -> "Choose a 4–8 digit PIN to protect locked categories."
-                PinDialogAction.VERIFY_DISABLE -> "Enter your current PIN to disable Parental Control."
-                PinDialogAction.CHANGE_PIN -> "Enter a new 4–8 digit PIN."
-                PinDialogAction.VERIFY_LOCK_CATEGORIES -> "Enter your current PIN to manage locked categories."
+                PinDialogAction.SETUP_ENABLE -> "اختر رمزاً من 4 إلى 8 أرقام لحماية التصنيفات المقفلة."
+                PinDialogAction.VERIFY_DISABLE -> "أدخل الرمز الحالي لإيقاف الرقابة الأبوية."
+                PinDialogAction.CHANGE_PIN -> "أدخل رمزاً جديداً مكوّناً من 4 إلى 8 أرقام."
+                PinDialogAction.VERIFY_LOCK_CATEGORIES -> "أدخل الرمز الحالي لإدارة التصنيفات المقفلة."
                 PinDialogAction.NONE -> ""
             },
-            confirmLabel = "Confirm",
+            confirmLabel = "تأكيد",
             errorMessage = pinError,
             onConfirm = { entered ->
                 when (pinAction) {
@@ -758,7 +369,7 @@ fun SettingsScreen(
                                 pinAction = PinDialogAction.NONE
                                 pinError = null
                             } else {
-                                pinError = "Incorrect PIN"
+                                pinError = "رمز الحماية غير صحيح"
                             }
                         }
                     }
@@ -769,7 +380,7 @@ fun SettingsScreen(
                                 pinError = null
                                 showLockedCategoriesDialog = true
                             } else {
-                                pinError = "Incorrect PIN"
+                                pinError = "رمز الحماية غير صحيح"
                             }
                         }
                     }
@@ -785,8 +396,547 @@ fun SettingsScreen(
 }
 
 @Composable
+private fun SettingsSectionTab(
+    section: SettingsSection,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
+    LiquidGlassSurface(
+        modifier = modifier
+            .height(52.dp)
+            .clickable(interactionSource, null, onClick = onClick)
+            .focusable(interactionSource = interactionSource)
+            .testTag("settings_section_${section.name.lowercase()}"),
+        cornerRadius = 14.dp,
+        glassAlpha = if (isSelected) 0.35f else if (isFocused) 0.22f else 0.10f,
+        borderAlpha = if (isFocused) 0.7f else if (isSelected) 0.45f else 0.16f,
+        borderColor = if (isSelected) LiquidColors.AccentBlue else Color.White,
+        isFocused = isFocused,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                imageVector = section.icon,
+                contentDescription = section.title,
+                tint = if (isSelected) LiquidColors.AccentBlueLight else LiquidColors.TextSecondary,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                text = section.title,
+                style = LiquidTypography.TitleSmall,
+                color = if (isSelected) LiquidColors.TextPrimary else LiquidColors.TextSecondary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsSectionPill(
+    section: SettingsSection,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
+    LiquidGlassSurface(
+        modifier = Modifier
+            .height(48.dp)
+            .clickable(interactionSource, null, onClick = onClick)
+            .focusable(interactionSource = interactionSource)
+            .testTag("settings_section_${section.name.lowercase()}"),
+        cornerRadius = 24.dp,
+        glassAlpha = if (isSelected) 0.36f else if (isFocused) 0.24f else 0.12f,
+        borderAlpha = if (isFocused) 0.75f else if (isSelected) 0.55f else 0.18f,
+        borderColor = if (isSelected) LiquidColors.AccentBlueLight else Color.White,
+        isFocused = isFocused,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(
+                imageVector = section.icon,
+                contentDescription = section.title,
+                tint = if (isSelected) LiquidColors.AccentBlueLight else LiquidColors.TextSecondary,
+                modifier = Modifier.size(18.dp),
+            )
+            Text(
+                text = section.title,
+                style = LiquidTypography.LabelLarge,
+                color = if (isSelected) Color.White else LiquidColors.TextSecondary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsDetailPane(
+    selectedSection: SettingsSection,
+    uiState: SettingsUiState,
+    updateState: UpdateState,
+    viewModel: SettingsViewModel,
+    updateViewModel: AppUpdateViewModel,
+    onManageSubscriptions: () -> Unit,
+    onEditRepo: () -> Unit,
+    onRequestPinAction: (PinDialogAction) -> Unit,
+    onOpenLockedCategories: () -> Unit,
+    contentPadding: PaddingValues,
+    modifier: Modifier = Modifier,
+) {
+    LiquidGlassSurface(
+        modifier = modifier,
+        cornerRadius = 22.dp,
+        glassAlpha = 0.14f,
+        borderAlpha = 0.22f,
+    ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .testTag("settings_content_list"),
+            contentPadding = contentPadding,
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            when (selectedSection) {
+                SettingsSection.Subscriptions -> {
+                    item {
+                        SettingHeader("اشتراكات IPTV والمزامنة", "إدارة حسابات Xtream وM3U والجدول الزمني ودليل البرامج")
+                    }
+                    item {
+                        val sub = uiState.activeSubscription
+                        SettingItemTile(
+                            title = "إدارة الاشتراكات",
+                            subtitle = if (sub != null) {
+                                "المفعّل: ${sub.name} (${localizedSubscriptionTypeAr(sub.type)}) • ${localizedSubscriptionStatusAr(sub.connectionStatus)}"
+                            } else {
+                                "إضافة أو تعديل أو التبديل بين حسابات IPTV"
+                            },
+                            action = {
+                                Icon(Icons.Filled.ManageAccounts, null, tint = LiquidColors.AccentBlueLight)
+                            },
+                            onClick = onManageSubscriptions,
+                            testTag = "setting_manage_subscriptions",
+                        )
+                    }
+                    item {
+                        SettingItemTile(
+                            title = "تحديث الاشتراك الحالي",
+                            subtitle = if (uiState.isRefreshing) "جارٍ مزامنة القنوات والأفلام..." else "مزامنة القنوات والتصنيفات والأفلام والمسلسلات الآن",
+                            action = {
+                                if (uiState.isRefreshing) {
+                                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = LiquidColors.AccentBlue)
+                                } else {
+                                    Icon(Icons.Filled.Refresh, null, tint = LiquidColors.AccentBlue)
+                                }
+                            },
+                            onClick = { viewModel.refreshPlaylists() },
+                        )
+                    }
+                    item {
+                        SettingItemTile(
+                            title = "مزامنة دليل البرامج (EPG)",
+                            subtitle = "تنزيل أحدث جدول برامج XMLTV للاشتراك المفعّل",
+                            action = {
+                                Icon(Icons.Filled.Schedule, null, tint = LiquidColors.AccentCyan)
+                            },
+                            onClick = { viewModel.refreshEpg() },
+                        )
+                    }
+                    item {
+                        SettingItemTile(
+                            title = "التحديث التلقائي للقائمة",
+                            subtitle = if (uiState.autoRefreshEnabled) {
+                                "المزامنة التلقائية في الخلفية مفعّلة كل ${uiState.autoRefreshInterval} ساعة"
+                            } else {
+                                "تحديث يدوي للقائمة فقط"
+                            },
+                            action = {
+                                Switch(
+                                    checked = uiState.autoRefreshEnabled,
+                                    onCheckedChange = { viewModel.setAutoRefreshEnabled(it) },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = LiquidColors.AccentBlue,
+                                        checkedTrackColor = LiquidColors.AccentBlueDark,
+                                    ),
+                                )
+                            },
+                            onClick = { viewModel.setAutoRefreshEnabled(!uiState.autoRefreshEnabled) },
+                            testTag = "setting_auto_refresh_toggle",
+                        )
+                    }
+                    item {
+                        SettingItemTile(
+                            title = "الفاصل الزمني للتحديث",
+                            subtitle = "تكرار المزامنة الدورية: كل ${uiState.autoRefreshInterval} ساعة",
+                            action = {
+                                Text("${uiState.autoRefreshInterval} س", style = LiquidTypography.LabelLarge, color = LiquidColors.AccentBlueLight)
+                            },
+                            onClick = {
+                                val intervals = listOf(6, 12, 24, 48)
+                                val next = (intervals.indexOf(uiState.autoRefreshInterval) + 1) % intervals.size
+                                viewModel.setAutoRefreshInterval(intervals[next])
+                            },
+                        )
+                    }
+                    item {
+                        SettingItemTile(
+                            title = "مسح سجل المشاهدة والبحث",
+                            subtitle = "حذف سجل المشاهدة الأخيرة واقتراحات البحث المحفوظة",
+                            action = {
+                                Icon(Icons.Filled.Delete, null, tint = LiquidColors.LiveRed)
+                            },
+                            onClick = { viewModel.clearCache() },
+                            testTag = "setting_clear_cache",
+                        )
+                    }
+                }
+                SettingsSection.Playback -> {
+                    item {
+                        SettingHeader("التشغيل والبث", "إعدادات اختيار المسار وجودة الفيديو وإعادة الاتصال التلقائي")
+                    }
+                    item {
+                        SettingItemTile(
+                            title = "جودة الفيديو الافتراضية",
+                            subtitle = "الحد الأقصى المفضل للدقة: ${localizedQualityAr(uiState.defaultQuality)}",
+                            action = {
+                                Text(localizedQualityAr(uiState.defaultQuality), style = LiquidTypography.LabelLarge, color = LiquidColors.AccentBlueLight)
+                            },
+                            onClick = {
+                                val qualities = listOf("Auto", "1080p", "720p", "480p", "Data Saver")
+                                val next = (qualities.indexOf(uiState.defaultQuality) + 1) % qualities.size
+                                viewModel.setDefaultQuality(qualities[next])
+                            },
+                            testTag = "setting_default_quality",
+                        )
+                    }
+                    item {
+                        SettingItemTile(
+                            title = "التشغيل التلقائي للتالي",
+                            subtitle = "تشغيل الحلقة أو القناة التالية تلقائياً عند انتهاء العرض",
+                            action = {
+                                Switch(
+                                    checked = uiState.autoPlay,
+                                    onCheckedChange = { viewModel.setAutoPlay(it) },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = LiquidColors.AccentBlue,
+                                        checkedTrackColor = LiquidColors.AccentBlueDark,
+                                    ),
+                                )
+                            },
+                            onClick = { viewModel.setAutoPlay(!uiState.autoPlay) },
+                        )
+                    }
+                    item {
+                        SettingItemTile(
+                            title = "تفعيل الترجمة افتراضياً",
+                            subtitle = "اختيار مسار الترجمة المفضل تلقائياً عند توفره",
+                            action = {
+                                Switch(
+                                    checked = uiState.subtitlesEnabled,
+                                    onCheckedChange = { viewModel.setSubtitlesEnabled(it) },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = LiquidColors.AccentBlue,
+                                        checkedTrackColor = LiquidColors.AccentBlueDark,
+                                    ),
+                                )
+                            },
+                            onClick = { viewModel.setSubtitlesEnabled(!uiState.subtitlesEnabled) },
+                        )
+                    }
+                    item {
+                        SettingItemTile(
+                            title = "لغة الترجمة المفضلة",
+                            subtitle = "اللغة المختارة للمسارات النصية: ${localizedSubtitleLangAr(uiState.preferredSubtitleLanguage)}",
+                            action = {
+                                Text(localizedSubtitleLangAr(uiState.preferredSubtitleLanguage), style = LiquidTypography.LabelLarge, color = LiquidColors.AccentBlueLight)
+                            },
+                            onClick = {
+                                val langs = listOf("ar", "en", "fr", "es", "de", "tr")
+                                val next = (langs.indexOf(uiState.preferredSubtitleLanguage) + 1) % langs.size
+                                viewModel.setPreferredSubtitleLanguage(langs[next])
+                            },
+                        )
+                    }
+                    item {
+                        SettingItemTile(
+                            title = "مهلة الاتصال بالخادم",
+                            subtitle = "مدة الانتظار القصوى لاتصالات الشبكة والبث: ${uiState.connectionTimeout} ثانية",
+                            action = {
+                                Text("${uiState.connectionTimeout} ث", style = LiquidTypography.LabelLarge, color = LiquidColors.AccentBlueLight)
+                            },
+                            onClick = {
+                                val timeouts = listOf(10, 15, 20, 30)
+                                val nextIndex = (timeouts.indexOf(uiState.connectionTimeout) + 1) % timeouts.size
+                                viewModel.setConnectionTimeout(timeouts[nextIndex])
+                            },
+                        )
+                    }
+                    item {
+                        SettingItemTile(
+                            title = "محاولات إعادة الاتصال",
+                            subtitle = "عدد المحاولات التلقائية عند انقطاع البث المؤقت: ${uiState.maxRetries}",
+                            action = {
+                                Text("${uiState.maxRetries}", style = LiquidTypography.LabelLarge, color = LiquidColors.AccentBlueLight)
+                            },
+                            onClick = {
+                                val retries = listOf(0, 1, 2, 3, 5)
+                                val nextIndex = (retries.indexOf(uiState.maxRetries) + 1) % retries.size
+                                viewModel.setMaxRetries(retries[nextIndex])
+                            },
+                            testTag = "setting_max_retries",
+                        )
+                    }
+                }
+                SettingsSection.Parental -> {
+                    item {
+                        SettingHeader("الرقابة الأبوية", "حماية التصنيفات المقفلة برمز PIN خاص")
+                    }
+                    item {
+                        SettingItemTile(
+                            title = "تفعيل الرقابة الأبوية",
+                            subtitle = if (uiState.parentalControlEnabled && uiState.hasParentalPin) {
+                                "التصنيفات المحمية تتطلب التحقق برمز الحماية"
+                            } else {
+                                "قفل التصنيفات الحساسة برمز مكوّن من 4 إلى 8 أرقام"
+                            },
+                            action = {
+                                Switch(
+                                    checked = uiState.parentalControlEnabled,
+                                    onCheckedChange = {
+                                        onRequestPinAction(
+                                            if (!uiState.parentalControlEnabled) PinDialogAction.SETUP_ENABLE
+                                            else PinDialogAction.VERIFY_DISABLE,
+                                        )
+                                    },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = LiquidColors.AccentBlue,
+                                        checkedTrackColor = LiquidColors.AccentBlueDark,
+                                    ),
+                                )
+                            },
+                            onClick = {
+                                onRequestPinAction(
+                                    if (!uiState.parentalControlEnabled) PinDialogAction.SETUP_ENABLE
+                                    else PinDialogAction.VERIFY_DISABLE,
+                                )
+                            },
+                            testTag = "setting_parental_toggle",
+                        )
+                    }
+                    if (uiState.hasParentalPin) {
+                        item {
+                            SettingItemTile(
+                                title = "تغيير رمز الحماية",
+                                subtitle = "تحديث رمز PIN المستخدم لفتح التصنيفات المقفلة",
+                                action = {
+                                    Icon(Icons.Filled.Key, null, tint = LiquidColors.AccentBlueLight)
+                                },
+                                onClick = { onRequestPinAction(PinDialogAction.CHANGE_PIN) },
+                            )
+                        }
+                    }
+                    item {
+                        SettingItemTile(
+                            title = "التصنيفات المقفلة",
+                            subtitle = "${uiState.categories.count { it.isLocked }} من أصل ${uiState.categories.size} تصنيف مقفل",
+                            action = {
+                                Icon(Icons.Filled.Shield, null, tint = LiquidColors.AccentVioletLight)
+                            },
+                            onClick = {
+                                if (uiState.parentalControlEnabled && uiState.hasParentalPin) {
+                                    onRequestPinAction(PinDialogAction.VERIFY_LOCK_CATEGORIES)
+                                } else {
+                                    onOpenLockedCategories()
+                                }
+                            },
+                            testTag = "setting_locked_categories",
+                        )
+                    }
+                }
+                SettingsSection.Appearance -> {
+                    item {
+                        SettingHeader("المظهر وتجربة الزجاج السائل", "تخصيص سمة الخلفية وعرض الساعة")
+                    }
+                    item {
+                        SettingItemTile(
+                            title = "سمة الخلفية",
+                            subtitle = "النمط البصري للخلفية ووضع التوقف: ${localizedThemeAr(uiState.theme)}",
+                            action = {
+                                Text(
+                                    text = localizedThemeAr(uiState.theme),
+                                    style = LiquidTypography.LabelLarge,
+                                    color = LiquidColors.AccentBlueLight,
+                                )
+                            },
+                            onClick = {
+                                val themes = listOf("midnight_glass", "aurora", "ocean", "cosmic", "minimal")
+                                val nextIndex = (themes.indexOf(uiState.theme) + 1) % themes.size
+                                viewModel.setTheme(themes[nextIndex])
+                            },
+                        )
+                    }
+                    item {
+                        SettingItemTile(
+                            title = "إظهار الساعة",
+                            subtitle = "عرض الساعة في الشاشة الرئيسية ووضع التوقف",
+                            action = {
+                                Switch(
+                                    checked = uiState.clockVisible,
+                                    onCheckedChange = { viewModel.setClockVisible(it) },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = LiquidColors.AccentBlue,
+                                        checkedTrackColor = LiquidColors.AccentBlueDark,
+                                    ),
+                                )
+                            },
+                            onClick = { viewModel.setClockVisible(!uiState.clockVisible) },
+                        )
+                    }
+                }
+                SettingsSection.Ambient -> {
+                    item {
+                        SettingHeader("وضع التوقف السينمائي", "شاشة انتظار أنيقة بتصميم الزجاج السائل")
+                    }
+                    item {
+                        SettingItemTile(
+                            title = "تفعيل شاشة التوقف",
+                            subtitle = if (uiState.ambientEnabled) "تعمل تلقائياً عند عدم الاستخدام" else "معطّلة",
+                            action = {
+                                Switch(
+                                    checked = uiState.ambientEnabled,
+                                    onCheckedChange = { viewModel.setAmbientEnabled(it) },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = LiquidColors.AccentBlue,
+                                        checkedTrackColor = LiquidColors.AccentBlueDark,
+                                    ),
+                                )
+                            },
+                            onClick = { viewModel.setAmbientEnabled(!uiState.ambientEnabled) },
+                        )
+                    }
+                    item {
+                        SettingItemTile(
+                            title = "مهلة التشغيل التلقائي",
+                            subtitle = "تشغيل شاشة التوقف بعد مرور: ${uiState.screenSaverTimeout} دقيقة",
+                            action = {
+                                Text("${uiState.screenSaverTimeout} د", style = LiquidTypography.LabelLarge, color = LiquidColors.AccentBlueLight)
+                            },
+                            onClick = {
+                                val durations = listOf(2, 5, 10, 15)
+                                val nextIndex = (durations.indexOf(uiState.screenSaverTimeout) + 1) % durations.size
+                                viewModel.setScreenSaverTimeout(durations[nextIndex])
+                            },
+                        )
+                    }
+                }
+                SettingsSection.Updates -> {
+                    item {
+                        SettingHeader("تحديثات التطبيق وGitHub", "التحقق من الإصدارات الموقّعة وتثبيتها مباشرة")
+                    }
+                    item {
+                        SettingItemTile(
+                            title = "التحقق من التحديثات",
+                            subtitle = when (updateState) {
+                                is UpdateState.Checking -> "جارٍ البحث في GitHub عن إصدارات جديدة..."
+                                is UpdateState.UpToDate -> "أنت تستخدم أحدث إصدار! (v${BuildConfig.VERSION_NAME})"
+                                is UpdateState.Available -> "يتوفر تحديث جديد: v${updateState.info.versionName} • اضغط للعرض"
+                                is UpdateState.Error -> "تعذّر الفحص: ${updateState.message}"
+                                else -> "الإصدار المثبّت: v${BuildConfig.VERSION_NAME} (بناء ${BuildConfig.VERSION_CODE})"
+                            },
+                            action = {
+                                if (updateState is UpdateState.Checking) {
+                                    CircularProgressIndicator(
+                                        color = LiquidColors.AccentBlue,
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.dp,
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .background(
+                                                Brush.linearGradient(
+                                                    listOf(LiquidColors.AccentBlue, LiquidColors.AccentViolet),
+                                                ),
+                                                RoundedCornerShape(50),
+                                            )
+                                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                                    ) {
+                                        Text("فحص الآن", style = LiquidTypography.LabelMedium, color = Color.White)
+                                    }
+                                }
+                            },
+                            onClick = { updateViewModel.checkForUpdate(uiState.githubRepo) },
+                        )
+                    }
+                    item {
+                        SettingItemTile(
+                            title = "مستودع GitHub",
+                            subtitle = uiState.githubRepo.ifBlank { "اضغط لتحديد المستودع (owner/repo)" },
+                            action = {
+                                Icon(Icons.Filled.Edit, null, tint = LiquidColors.AccentBlueLight)
+                            },
+                            onClick = onEditRepo,
+                        )
+                    }
+                    item {
+                        SettingItemTile(
+                            title = "فحص تلقائي عند التشغيل",
+                            subtitle = if (uiState.autoCheckUpdates) "يفحص GitHub في الخلفية عند فتح التطبيق" else "فحص يدوي للتحديثات فقط",
+                            action = {
+                                Switch(
+                                    checked = uiState.autoCheckUpdates,
+                                    onCheckedChange = { viewModel.setAutoCheckUpdates(it) },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color.White,
+                                        checkedTrackColor = LiquidColors.AccentBlue,
+                                    ),
+                                )
+                            },
+                            onClick = { viewModel.setAutoCheckUpdates(!uiState.autoCheckUpdates) },
+                        )
+                    }
+                }
+                SettingsSection.About -> {
+                    item {
+                        SettingHeader("حول LIQUID TV", "مصمم لأجهزة Android TV وGoogle TV والهواتف والأجهزة اللوحية")
+                    }
+                    item {
+                        SettingItemTile(
+                            title = "إصدار التطبيق",
+                            subtitle = "v${BuildConfig.VERSION_NAME} (بناء ${BuildConfig.VERSION_CODE}) • إصدار الزجاج السائل",
+                            action = {},
+                            onClick = {},
+                        )
+                    }
+                    item {
+                        SettingItemTile(
+                            title = "محرك التشغيل والبث",
+                            subtitle = "خدمة تشغيل موحّدة عبر AndroidX Media3 تدعم Xtream Codes وM3U ودليل البرامج XMLTV.",
+                            action = {
+                                Icon(Icons.Filled.LiveTv, null, tint = LiquidColors.AccentBlueLight)
+                            },
+                            onClick = {},
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun SettingHeader(title: String, subtitle: String) {
-    Column(modifier = Modifier.padding(bottom = 8.dp)) {
+    Column(modifier = Modifier.padding(bottom = 6.dp)) {
         Text(title, style = LiquidTypography.TitleLarge, color = LiquidColors.TextPrimary)
         Text(subtitle, style = LiquidTypography.BodySmall, color = LiquidColors.TextTertiary)
     }
@@ -824,11 +974,15 @@ private fun SettingItemTile(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(18.dp),
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 14.dp),
+            ) {
                 Text(title, style = LiquidTypography.TitleMedium, color = LiquidColors.TextPrimary)
                 Spacer(Modifier.height(4.dp))
                 Text(subtitle, style = LiquidTypography.BodySmall, color = LiquidColors.TextTertiary)

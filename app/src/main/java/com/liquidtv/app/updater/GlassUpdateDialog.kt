@@ -106,8 +106,9 @@ private fun UpdateAvailableContent(
 
     LiquidGlassSurface(
         modifier = Modifier
-            .width(520.dp)
-            .wrapContentHeight(),
+            .padding(horizontal = 20.dp)
+            .widthIn(max = 500.dp)
+            .fillMaxWidth(),
         cornerRadius = 24.dp,
         glassAlpha = 0.35f,
         borderAlpha = 0.45f,
@@ -154,7 +155,7 @@ private fun UpdateAvailableContent(
             // Title & Version Chip
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = "New Update Available!",
+                    text = "تحديث جديد متاح!",
                     style = LiquidTypography.HeadlineSmall.copy(
                         brush = Brush.linearGradient(
                             listOf(LiquidColors.TextPrimary, LiquidColors.AccentBlueLight)
@@ -171,12 +172,12 @@ private fun UpdateAvailableContent(
                             .padding(horizontal = 10.dp, vertical = 3.dp),
                     ) {
                         Text(
-                            text = "Current: v${BuildConfig.VERSION_NAME}",
+                            text = "الحالي: v${BuildConfig.VERSION_NAME}",
                             style = LiquidTypography.LabelSmall,
                             color = LiquidColors.TextTertiary,
                         )
                     }
-                    Text("→", style = LiquidTypography.LabelSmall, color = LiquidColors.AccentBlue)
+                    Text("←", style = LiquidTypography.LabelSmall, color = LiquidColors.AccentBlue)
                     Box(
                         modifier = Modifier
                             .background(LiquidColors.AccentBlue.copy(alpha = 0.25f), RoundedCornerShape(50))
@@ -184,7 +185,7 @@ private fun UpdateAvailableContent(
                             .padding(horizontal = 10.dp, vertical = 3.dp),
                     ) {
                         Text(
-                            text = "New: v${info.versionName}",
+                            text = "الجديد: v${info.versionName}",
                             style = LiquidTypography.LabelSmall,
                             color = LiquidColors.AccentBlueLight,
                         )
@@ -219,14 +220,14 @@ private fun UpdateAvailableContent(
             ) {
                 // Later button
                 DialogButton(
-                    text = "Later",
+                    text = "لاحقاً",
                     isPrimary = false,
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f),
                 )
                 // Update Now button
                 DialogButton(
-                    text = "Update Now",
+                    text = "تحديث الآن",
                     isPrimary = true,
                     onClick = onUpdateClick,
                     focusRequester = updateButtonRequester,
@@ -243,7 +244,10 @@ private fun DownloadingContent(
     onCancel: () -> Unit,
 ) {
     LiquidGlassSurface(
-        modifier = Modifier.width(480.dp),
+        modifier = Modifier
+            .padding(horizontal = 20.dp)
+            .widthIn(max = 460.dp)
+            .fillMaxWidth(),
         cornerRadius = 24.dp,
         glassAlpha = 0.35f,
         borderAlpha = 0.45f,
@@ -268,7 +272,7 @@ private fun DownloadingContent(
             }
 
             Text(
-                text = "Downloading Update...",
+                text = "جارٍ تنزيل التحديث...",
                 style = LiquidTypography.TitleMedium,
                 color = LiquidColors.TextPrimary,
             )
@@ -286,19 +290,19 @@ private fun DownloadingContent(
 
             // Progress text
             val pct = (state.progress * 100).toInt()
-            val dlMb = String.format("%.1f", state.downloadedBytes / (1024f * 1024f))
-            val totalMb = if (state.totalBytes > 0) String.format("%.1f", state.totalBytes / (1024f * 1024f)) else "?"
+            val dlMb = String.format(java.util.Locale.US, "%.1f", state.downloadedBytes / (1024f * 1024f))
+            val totalMb = if (state.totalBytes > 0) String.format(java.util.Locale.US, "%.1f", state.totalBytes / (1024f * 1024f)) else "؟"
             Text(
-                text = "$pct% ($dlMb MB / $totalMb MB)",
+                text = "$pct% ($dlMb م.ب / $totalMb م.ب)",
                 style = LiquidTypography.LabelSmall,
                 color = LiquidColors.TextSecondary,
             )
 
             DialogButton(
-                text = "Cancel",
+                text = "إلغاء",
                 isPrimary = false,
                 onClick = onCancel,
-                modifier = Modifier.fillMaxWidth(0.5f),
+                modifier = Modifier.fillMaxWidth(0.55f),
             )
         }
     }
@@ -310,7 +314,10 @@ private fun ReadyToInstallContent(
     onDismiss: () -> Unit,
 ) {
     LiquidGlassSurface(
-        modifier = Modifier.width(480.dp),
+        modifier = Modifier
+            .padding(horizontal = 20.dp)
+            .widthIn(max = 460.dp)
+            .fillMaxWidth(),
         cornerRadius = 24.dp,
         glassAlpha = 0.35f,
         borderAlpha = 0.45f,
@@ -321,15 +328,15 @@ private fun ReadyToInstallContent(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Icon(Icons.Filled.SystemUpdate, null, tint = LiquidColors.SuccessGreen, modifier = Modifier.size(40.dp))
-            Text("Update Downloaded!", style = LiquidTypography.TitleMedium, color = LiquidColors.TextPrimary)
+            Text("التحديث جاهز للتثبيت!", style = LiquidTypography.TitleMedium, color = LiquidColors.TextPrimary)
             Text(
-                "The update has finished downloading and is ready to install.",
+                "اكتمل تنزيل التحديث بنجاح وهو جاهز الآن للتثبيت.",
                 style = LiquidTypography.BodySmall,
                 color = LiquidColors.TextSecondary,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                DialogButton("Dismiss", isPrimary = false, onClick = onDismiss, modifier = Modifier.weight(1f))
-                DialogButton("Install Now", isPrimary = true, onClick = onInstallClick, modifier = Modifier.weight(1f))
+                DialogButton("إغلاق", isPrimary = false, onClick = onDismiss, modifier = Modifier.weight(1f))
+                DialogButton("تثبيت الآن", isPrimary = true, onClick = onInstallClick, modifier = Modifier.weight(1f))
             }
         }
     }
@@ -341,7 +348,10 @@ private fun ErrorContent(
     onDismiss: () -> Unit,
 ) {
     LiquidGlassSurface(
-        modifier = Modifier.width(480.dp),
+        modifier = Modifier
+            .padding(horizontal = 20.dp)
+            .widthIn(max = 460.dp)
+            .fillMaxWidth(),
         cornerRadius = 24.dp,
         glassAlpha = 0.35f,
         borderAlpha = 0.45f,
@@ -352,9 +362,9 @@ private fun ErrorContent(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Icon(Icons.Filled.ErrorOutline, null, tint = LiquidColors.ErrorRed, modifier = Modifier.size(40.dp))
-            Text("Update Check", style = LiquidTypography.TitleMedium, color = LiquidColors.TextPrimary)
+            Text("التحقق من التحديثات", style = LiquidTypography.TitleMedium, color = LiquidColors.TextPrimary)
             Text(message, style = LiquidTypography.BodySmall, color = LiquidColors.TextSecondary)
-            DialogButton("Dismiss", isPrimary = false, onClick = onDismiss, modifier = Modifier.fillMaxWidth(0.5f))
+            DialogButton("إغلاق", isPrimary = false, onClick = onDismiss, modifier = Modifier.fillMaxWidth(0.55f))
         }
     }
 }

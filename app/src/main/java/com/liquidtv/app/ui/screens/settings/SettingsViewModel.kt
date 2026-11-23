@@ -183,10 +183,10 @@ class SettingsViewModel @Inject constructor(
             _uiState.update { it.copy(isRefreshing = true, error = null, successMessage = null) }
             val result = subscriptionRepository.syncActiveSubscription()
             result.onSuccess {
-                _uiState.update { it.copy(isRefreshing = false, successMessage = "Subscription playlist refreshed") }
+                _uiState.update { it.copy(isRefreshing = false, successMessage = "تم تحديث قائمة الاشتراك بنجاح") }
             }.onFailure { throwable ->
                 _uiState.update {
-                    it.copy(isRefreshing = false, error = throwable.message ?: "Failed to refresh playlist")
+                    it.copy(isRefreshing = false, error = throwable.message ?: "فشل تحديث قائمة الاشتراك")
                 }
             }
         }
@@ -197,10 +197,10 @@ class SettingsViewModel @Inject constructor(
             _uiState.update { it.copy(isRefreshing = true, error = null, successMessage = null) }
             val result = subscriptionRepository.syncActiveEpg()
             result.onSuccess {
-                _uiState.update { it.copy(isRefreshing = false, successMessage = "EPG guide updated") }
+                _uiState.update { it.copy(isRefreshing = false, successMessage = "تم تحديث دليل البرامج بنجاح") }
             }.onFailure { throwable ->
                 _uiState.update {
-                    it.copy(isRefreshing = false, error = throwable.message ?: "Failed to sync EPG guide")
+                    it.copy(isRefreshing = false, error = throwable.message ?: "فشل تحديث دليل البرامج")
                 }
             }
         }
@@ -213,10 +213,10 @@ class SettingsViewModel @Inject constructor(
                 channelRepository.clearWatchHistory()
                 userPreferencesRepository.clearSearchHistory()
             }.onSuccess {
-                _uiState.update { it.copy(isLoading = false, successMessage = "Watch history and search cache cleared") }
+                _uiState.update { it.copy(isLoading = false, successMessage = "تم مسح سجل المشاهدة والبحث المؤقت") }
             }.onFailure { throwable ->
                 _uiState.update {
-                    it.copy(isLoading = false, error = throwable.message ?: "Failed to clear cache")
+                    it.copy(isLoading = false, error = throwable.message ?: "فشل مسح البيانات المؤقتة")
                 }
             }
         }
@@ -232,21 +232,21 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             userPreferencesRepository.setParentalPin(pin)
             userPreferencesRepository.setParentalControlEnabled(true)
-            _uiState.update { it.copy(successMessage = "Parental Control enabled") }
+            _uiState.update { it.copy(successMessage = "تم تفعيل الرقابة الأبوية") }
         }
     }
 
     fun updateParentalPin(newPin: String) {
         viewModelScope.launch {
             userPreferencesRepository.setParentalPin(newPin)
-            _uiState.update { it.copy(successMessage = "Parental PIN updated") }
+            _uiState.update { it.copy(successMessage = "تم تحديث رمز الحماية") }
         }
     }
 
     fun disableParentalControl() {
         viewModelScope.launch {
             userPreferencesRepository.setParentalControlEnabled(false)
-            _uiState.update { it.copy(successMessage = "Parental Control disabled") }
+            _uiState.update { it.copy(successMessage = "تم إيقاف الرقابة الأبوية") }
         }
     }
 

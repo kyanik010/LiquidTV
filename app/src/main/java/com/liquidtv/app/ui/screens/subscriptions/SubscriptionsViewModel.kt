@@ -55,8 +55,8 @@ class SubscriptionsViewModel @Inject constructor(
             _busyId.value = subscriptionId
             _error.value = null
             subscriptionRepository.activateSubscription(subscriptionId)
-                .onSuccess { _message.value = "Switched active subscription" }
-                .onFailure { _error.value = it.message ?: "Failed to switch subscription" }
+                .onSuccess { _message.value = "تم تفعيل الاشتراك المحدد" }
+                .onFailure { _error.value = it.message ?: "تعذّر تبديل الاشتراك" }
             _busyId.value = null
         }
     }
@@ -66,8 +66,8 @@ class SubscriptionsViewModel @Inject constructor(
             _busyId.value = subscriptionId
             _error.value = null
             subscriptionRepository.syncSubscription(subscriptionId)
-                .onSuccess { _message.value = "Subscription synced successfully" }
-                .onFailure { _error.value = it.message ?: "Sync failed" }
+                .onSuccess { _message.value = "تمت مزامنة الاشتراك بنجاح" }
+                .onFailure { _error.value = it.message ?: "فشلت المزامنة" }
             _busyId.value = null
         }
     }
@@ -77,8 +77,8 @@ class SubscriptionsViewModel @Inject constructor(
             _busyId.value = subscriptionId
             _error.value = null
             subscriptionRepository.deleteSubscription(subscriptionId)
-                .onSuccess { _message.value = "Subscription deleted" }
-                .onFailure { _error.value = it.message ?: "Delete failed" }
+                .onSuccess { _message.value = "تم حذف الاشتراك" }
+                .onFailure { _error.value = it.message ?: "فشل حذف الاشتراك" }
             _busyId.value = null
         }
     }

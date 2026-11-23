@@ -40,7 +40,7 @@ class LanguagesViewModel @Inject constructor(
             ) { languages, playlistInfo ->
                 val message = if (playlistInfo.isLoading) {
                     playlistInfo.statusMessage
-                        ?: "Syncing languages (${(playlistInfo.loadingProgress * 100).toInt()}%)..."
+                        ?: "جارٍ مزامنة اللغات (${(playlistInfo.loadingProgress * 100).toInt()}%)..."
                 } else null
                 LanguagesUiState(
                     languages = languages,

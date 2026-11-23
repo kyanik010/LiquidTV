@@ -76,7 +76,7 @@ fun LiveBadge(modifier: Modifier = Modifier) {
             )
 
             Text(
-                text = "LIVE",
+                text = "مباشر",
                 style = LiquidTypography.LabelSmall,
                 color = Color.White,
             )

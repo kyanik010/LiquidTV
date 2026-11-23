@@ -4,19 +4,23 @@ import android.view.KeyEvent
 import android.view.ViewGroup
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
-import androidx.compose.animation.*
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -55,6 +59,7 @@ import com.liquidtv.app.ui.components.LiveBadge
 import com.liquidtv.app.ui.theme.LiquidColors
 import com.liquidtv.app.ui.theme.LiquidTypography
 import kotlinx.coroutines.delay
+import java.util.Locale
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -71,7 +76,7 @@ fun PlayerScreen(
     val screenFocusRequester = remember { FocusRequester() }
     val playPauseFocusRequester = remember { FocusRequester() }
 
-    var focusedActionText by remember { mutableStateOf<String?>("Play / Pause") }
+    var focusedActionText by remember { mutableStateOf<String?>("تشغيل / إيقاف مؤقت") }
     var interactionCounter by remember { mutableIntStateOf(0) }
 
     val handleExit = {
@@ -244,9 +249,9 @@ fun PlayerScreen(
                         )
                         Text(
                             text = if (uiState.isRetrying) {
-                                uiState.errorMessage ?: "Reconnecting stream…"
+                                uiState.errorMessage ?: "جارٍ إعادة الاتصال بالبث…"
                             } else {
-                                "Buffering Stream…"
+                                "جارٍ تحميل البث…"
                             },
                             style = LiquidTypography.TitleMedium,
                             color = LiquidColors.TextPrimary,
@@ -263,7 +268,7 @@ fun PlayerScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 LiquidGlassSurface(
-                    modifier = Modifier.widthIn(min = 320.dp, max = 520.dp).padding(24.dp),
+                    modifier = Modifier.widthIn(min = 300.dp, max = 520.dp).padding(20.dp),
                     cornerRadius = 24.dp,
                     glassAlpha = 0.35f,
                     glassColor = Color(0xFF1E0A0A),
@@ -271,7 +276,7 @@ fun PlayerScreen(
                     borderColor = LiquidColors.ErrorRed,
                 ) {
                     Column(
-                        modifier = Modifier.padding(32.dp),
+                        modifier = Modifier.padding(28.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
@@ -282,30 +287,33 @@ fun PlayerScreen(
                             modifier = Modifier.size(48.dp),
                         )
                         Text(
-                            text = "Playback Issue",
+                            text = "مشكلة في التشغيل",
                             style = LiquidTypography.TitleLarge,
                             color = LiquidColors.TextPrimary,
                         )
                         Text(
-                            text = uiState.errorMessage ?: "Stream URL is offline or unreachable.",
+                            text = uiState.errorMessage ?: "رابط البث غير متاح أو تعذر الوصول إليه.",
                             style = LiquidTypography.BodySmall,
                             color = LiquidColors.TextSecondary,
                             textAlign = TextAlign.Center,
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        ) {
                             HighVisButton(
                                 icon = Icons.Filled.Refresh,
-                                text = "Retry",
+                                text = "إعادة المحاولة",
                                 onClick = { viewModel.retry() },
                             )
                             HighVisButton(
                                 icon = Icons.Filled.SkipNext,
-                                text = "Next",
+                                text = "التالي",
                                 onClick = { viewModel.nextChannel() },
                             )
                             HighVisButton(
                                 icon = Icons.AutoMirrored.Filled.ArrowBack,
-                                text = "Exit",
+                                text = "خروج",
                                 onClick = handleExit,
                             )
                         }
@@ -320,27 +328,31 @@ fun PlayerScreen(
             enter = fadeIn(animationSpec = spring(stiffness = 500f)),
             exit = fadeOut(animationSpec = spring(stiffness = 500f)),
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.safeDrawing),
+            ) {
                 // Top Info Bar + EPG Program Info
                 uiState.channel?.let { channel ->
                     LiquidGlassSurface(
                         modifier = Modifier
                             .align(Alignment.TopStart)
-                            .padding(start = 36.dp, top = 36.dp, end = 36.dp)
+                            .padding(horizontal = 24.dp, vertical = 20.dp)
                             .widthIn(max = 660.dp),
                         cornerRadius = 20.dp,
                         glassAlpha = 0.35f,
                         borderAlpha = 0.45f,
                     ) {
                         Column(
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
                             ) {
-                                if (channel.logoUrl != null) {
+                                if (!channel.logoUrl.isNullOrBlank()) {
                                     AsyncImage(
                                         model = channel.logoUrl,
                                         contentDescription = channel.name,
@@ -387,7 +399,7 @@ fun PlayerScreen(
                                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     nowProgram?.let { curr ->
                                         Text(
-                                            text = "Now: ${curr.title}",
+                                            text = "الآن: ${curr.title}",
                                             style = LiquidTypography.BodySmall,
                                             color = LiquidColors.AccentBlueLight,
                                             maxLines = 1,
@@ -405,7 +417,7 @@ fun PlayerScreen(
                                     }
                                     nextProgram?.let { nxt ->
                                         Text(
-                                            text = "Next: ${nxt.title}",
+                                            text = "التالي: ${nxt.title}",
                                             style = LiquidTypography.LabelSmall,
                                             color = LiquidColors.TextSecondary,
                                             maxLines = 1,
@@ -422,7 +434,7 @@ fun PlayerScreen(
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 32.dp, start = 24.dp, end = 24.dp),
+                        .padding(bottom = 24.dp, start = 16.dp, end = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
@@ -482,21 +494,23 @@ fun PlayerScreen(
                         borderAlpha = 0.50f,
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+                            modifier = Modifier
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             PlayerControlButton(
                                 icon = Icons.AutoMirrored.Filled.ArrowBack,
-                                description = "Back to Menu",
-                                onFocused = { focusedActionText = "Back" },
+                                description = "رجوع إلى القائمة",
+                                onFocused = { focusedActionText = "رجوع" },
                                 onClick = handleExit,
                             )
 
                             PlayerControlButton(
                                 icon = Icons.Filled.SkipPrevious,
-                                description = "Previous",
-                                onFocused = { focusedActionText = "Previous" },
+                                description = "السابق",
+                                onFocused = { focusedActionText = "السابق" },
                                 onClick = {
                                     viewModel.previousChannel()
                                     interactionCounter++
@@ -505,11 +519,11 @@ fun PlayerScreen(
 
                             PlayerControlButton(
                                 icon = if (uiState.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                description = if (uiState.isPlaying) "Pause" else "Play",
+                                description = if (uiState.isPlaying) "إيقاف مؤقت" else "تشغيل",
                                 isPrimary = true,
                                 focusRequester = playPauseFocusRequester,
                                 onFocused = {
-                                    focusedActionText = if (uiState.isPlaying) "Pause" else "Play"
+                                    focusedActionText = if (uiState.isPlaying) "إيقاف مؤقت" else "تشغيل"
                                 },
                                 onClick = {
                                     if (uiState.isPlaying) viewModel.pause() else viewModel.play()
@@ -519,8 +533,8 @@ fun PlayerScreen(
 
                             PlayerControlButton(
                                 icon = Icons.Filled.SkipNext,
-                                description = "Next",
-                                onFocused = { focusedActionText = "Next" },
+                                description = "التالي",
+                                onFocused = { focusedActionText = "التالي" },
                                 onClick = {
                                     viewModel.nextChannel()
                                     interactionCounter++
@@ -529,8 +543,8 @@ fun PlayerScreen(
 
                             PlayerControlButton(
                                 icon = Icons.Filled.Subtitles,
-                                description = "Audio & Subtitles",
-                                onFocused = { focusedActionText = "Audio & Subtitles" },
+                                description = "الصوت والترجمة",
+                                onFocused = { focusedActionText = "الصوت والترجمة" },
                                 onClick = {
                                     viewModel.openTrackSheet()
                                     interactionCounter++
@@ -541,10 +555,10 @@ fun PlayerScreen(
                             if (uiState.mediaType != MediaType.SERIES_EPISODE) {
                                 PlayerControlButton(
                                     icon = if (uiState.channel?.isFavorite == true) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                    description = if (uiState.channel?.isFavorite == true) "Remove from Favorites" else "Add to Favorites",
+                                    description = if (uiState.channel?.isFavorite == true) "إزالة من المفضلة" else "إضافة للمفضلة",
                                     iconTint = if (uiState.channel?.isFavorite == true) LiquidColors.LiveRed else LiquidColors.TextPrimary,
                                     onFocused = {
-                                        focusedActionText = if (uiState.channel?.isFavorite == true) "Unfavorite" else "Favorite"
+                                        focusedActionText = if (uiState.channel?.isFavorite == true) "إزالة من المفضلة" else "إضافة للمفضلة"
                                     },
                                     onClick = {
                                         viewModel.toggleFavorite()
@@ -555,8 +569,8 @@ fun PlayerScreen(
 
                             PlayerControlButton(
                                 icon = Icons.Filled.NightlightRound,
-                                description = "Ambient Mode",
-                                onFocused = { focusedActionText = "Ambient Mode" },
+                                description = "الوضع المحيطي",
+                                onFocused = { focusedActionText = "الوضع المحيطي" },
                                 onClick = onAmbientMode,
                             )
                         }
@@ -605,8 +619,8 @@ private fun TrackSelectionOverlay(
     ) {
         LiquidGlassSurface(
             modifier = Modifier
-                .padding(24.dp)
-                .widthIn(min = 340.dp, max = 560.dp)
+                .padding(20.dp)
+                .widthIn(min = 300.dp, max = 560.dp)
                 .heightIn(max = 520.dp)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
@@ -628,9 +642,9 @@ private fun TrackSelectionOverlay(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Audio & Subtitles", style = LiquidTypography.TitleLarge, color = LiquidColors.TextPrimary)
+                    Text("الصوت والترجمة", style = LiquidTypography.TitleLarge, color = LiquidColors.TextPrimary)
                     IconButton(onClick = onClose) {
-                        Icon(Icons.Filled.Close, contentDescription = "Close", tint = Color.White)
+                        Icon(Icons.Filled.Close, contentDescription = "إغلاق", tint = Color.White)
                     }
                 }
 
@@ -639,11 +653,11 @@ private fun TrackSelectionOverlay(
                     modifier = Modifier.weight(1f, fill = false),
                 ) {
                     item {
-                        Text("Audio Tracks", style = LiquidTypography.TitleSmall, color = LiquidColors.AccentBlueLight)
+                        Text("مسارات الصوت", style = LiquidTypography.TitleSmall, color = LiquidColors.AccentBlueLight)
                     }
                     if (audioTracks.isEmpty()) {
                         item {
-                            Text("No alternate audio tracks detected in this stream.", style = LiquidTypography.BodySmall, color = LiquidColors.TextTertiary)
+                            Text("لا توجد مسارات صوتية إضافية في هذا البث.", style = LiquidTypography.BodySmall, color = LiquidColors.TextTertiary)
                         }
                     } else {
                         items(audioTracks, key = { "a_${it.groupIndex}_${it.trackIndex}" }) { track ->
@@ -657,18 +671,18 @@ private fun TrackSelectionOverlay(
 
                     item {
                         Spacer(Modifier.height(6.dp))
-                        Text("Subtitles / Captions", style = LiquidTypography.TitleSmall, color = LiquidColors.AccentVioletLight)
+                        Text("الترجمة والشرح", style = LiquidTypography.TitleSmall, color = LiquidColors.AccentVioletLight)
                     }
                     item {
                         TrackOptionRow(
-                            label = "Off (Disable Subtitles)",
+                            label = "إيقاف (بدون ترجمة)",
                             selected = subtitleTracks.none { it.isSelected },
                             onClick = { onSelectSubtitle(null) },
                         )
                     }
                     if (subtitleTracks.isEmpty()) {
                         item {
-                            Text("No embedded subtitle tracks in this stream.", style = LiquidTypography.BodySmall, color = LiquidColors.TextTertiary)
+                            Text("لا توجد مسارات ترجمة مدمجة في هذا البث.", style = LiquidTypography.BodySmall, color = LiquidColors.TextTertiary)
                         }
                     } else {
                         items(subtitleTracks, key = { "s_${it.groupIndex}_${it.trackIndex}" }) { track ->
@@ -682,7 +696,7 @@ private fun TrackSelectionOverlay(
 
                     item {
                         Spacer(Modifier.height(6.dp))
-                        Text("External Subtitle URL (.srt / .vtt)", style = LiquidTypography.TitleSmall, color = LiquidColors.AccentCyan)
+                        Text("رابط ترجمة خارجية (.srt / .vtt)", style = LiquidTypography.TitleSmall, color = LiquidColors.AccentCyan)
                         Spacer(Modifier.height(6.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -706,7 +720,7 @@ private fun TrackSelectionOverlay(
                                 onClick = { onLoadExternalSubtitle(externalSubUrl, "und") },
                                 modifier = Modifier.height(48.dp),
                             ) {
-                                Text("Load")
+                                Text("تحميل")
                             }
                         }
                         externalSubtitleError?.let { err ->
@@ -753,7 +767,7 @@ private fun TrackOptionRow(
     ) {
         Text(label, style = LiquidTypography.BodyMedium, color = Color.White, modifier = Modifier.weight(1f))
         if (selected) {
-            Icon(Icons.Filled.Check, contentDescription = "Selected", tint = LiquidColors.AccentBlueLight)
+            Icon(Icons.Filled.Check, contentDescription = "محدد", tint = LiquidColors.AccentBlueLight)
         }
     }
 }
@@ -764,9 +778,9 @@ private fun formatDuration(ms: Long): String {
     val mins = (totalSec % 3600) / 60
     val secs = totalSec % 60
     return if (hrs > 0) {
-        String.format("%d:%02d:%02d", hrs, mins, secs)
+        String.format(Locale.US, "%d:%02d:%02d", hrs, mins, secs)
     } else {
-        String.format("%02d:%02d", mins, secs)
+        String.format(Locale.US, "%02d:%02d", mins, secs)
     }
 }
 
@@ -860,7 +874,7 @@ private fun HighVisButton(
                         .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)), RoundedCornerShape(20.dp))
                 }
             )
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .padding(horizontal = 18.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
         Row(

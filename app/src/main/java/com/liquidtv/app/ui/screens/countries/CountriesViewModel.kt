@@ -40,7 +40,7 @@ class CountriesViewModel @Inject constructor(
             ) { countries, playlistInfo ->
                 val message = if (playlistInfo.isLoading) {
                     playlistInfo.statusMessage
-                        ?: "Syncing countries (${(playlistInfo.loadingProgress * 100).toInt()}%)..."
+                        ?: "جارٍ مزامنة الدول (${(playlistInfo.loadingProgress * 100).toInt()}%)..."
                 } else null
                 CountriesUiState(
                     countries = countries,

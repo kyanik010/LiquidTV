@@ -54,7 +54,7 @@ class AppUpdateViewModel @Inject constructor(
                     _updateState.value = UpdateState.UpToDate
                 }
             } else {
-                val msg = result.exceptionOrNull()?.message ?: "Check failed"
+                val msg = result.exceptionOrNull()?.message ?: "فشل التحقق من التحديثات"
                 _updateState.value = UpdateState.Error(msg)
             }
         }
@@ -74,7 +74,7 @@ class AppUpdateViewModel @Inject constructor(
                 // Trigger installation prompt immediately
                 installCurrentUpdate()
             } else {
-                val errorMsg = result.exceptionOrNull()?.message ?: "Download failed"
+                val errorMsg = result.exceptionOrNull()?.message ?: "فشل تحميل التحديث"
                 _updateState.value = UpdateState.Error(errorMsg)
             }
         }
@@ -84,7 +84,7 @@ class AppUpdateViewModel @Inject constructor(
         val file = downloadedApkFile ?: return
         val result = appUpdateManager.installUpdate(file)
         if (result.isFailure) {
-            val msg = result.exceptionOrNull()?.message ?: "Installation failed"
+            val msg = result.exceptionOrNull()?.message ?: "فشل تثبيت التحديث"
             _updateState.value = UpdateState.Error(msg)
         }
     }

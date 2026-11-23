@@ -1,14 +1,14 @@
 package com.liquidtv.app.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 
-// Always dark for TV
+// Always dark for TV & IPTV
 private val LiquidDarkColorScheme = darkColorScheme(
     primary = LiquidColors.AccentBlue,
     onPrimary = LiquidColors.TextPrimary,
@@ -50,10 +50,12 @@ fun LiquidTVTheme(
     content: @Composable () -> Unit,
 ) {
     CompositionLocalProvider(
+        LocalLayoutDirection provides LayoutDirection.Rtl,
         LocalLiquidGlassTokens provides LiquidGlassTokens(),
     ) {
         MaterialTheme(
             colorScheme = LiquidDarkColorScheme,
+            typography = LiquidMaterialTypography,
             content = content,
         )
     }

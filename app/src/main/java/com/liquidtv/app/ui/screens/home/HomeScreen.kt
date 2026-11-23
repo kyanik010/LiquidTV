@@ -1,25 +1,40 @@
 package com.liquidtv.app.ui.screens.home
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
-import androidx.compose.ui.*
-import androidx.compose.ui.draw.*
-import androidx.compose.ui.focus.*
-import androidx.compose.ui.graphics.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.*
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.liquidtv.app.BuildConfig
@@ -30,10 +45,14 @@ import com.liquidtv.app.domain.model.MediaType
 import com.liquidtv.app.domain.model.SeriesItem
 import com.liquidtv.app.domain.model.Subscription
 import com.liquidtv.app.domain.model.SubscriptionStatus
-import com.liquidtv.app.ui.components.*
-import com.liquidtv.app.ui.theme.*
+import com.liquidtv.app.ui.components.AppBackground
+import com.liquidtv.app.ui.components.LiquidGlassSurface
+import com.liquidtv.app.ui.components.LiveBadge
+import com.liquidtv.app.ui.theme.LiquidColors
+import com.liquidtv.app.ui.theme.LiquidTypography
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Calendar
+import java.util.Locale
 
 @Composable
 fun HomeScreen(
@@ -53,211 +72,222 @@ fun HomeScreen(
         }
     }
 
-    AppBackground(
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        LazyColumn(
+    AppBackground(modifier = Modifier.fillMaxSize()) {
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 88.dp),
-            contentPadding = PaddingValues(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
+                .windowInsetsPadding(WindowInsets.statusBars),
         ) {
-            // Header
-            item {
-                HomeHeader(
-                    subscription = state.activeSubscription,
-                    clockVisible = state.clockVisible,
-                    onSearchClick = onSearchClick,
-                    onSubscriptionsClick = onSubscriptionsClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 40.dp)
-                        .padding(top = 8.dp),
-                )
-            }
+            val isCompact = maxWidth < 600.dp
+            val hPad = if (isCompact) 16.dp else 40.dp
+            val topNavSpace = if (isCompact) 76.dp else 88.dp
 
-            // Hero panel
-            state.featuredChannel?.let { channel ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = topNavSpace),
+                contentPadding = PaddingValues(bottom = if (isCompact) 96.dp else 32.dp),
+                verticalArrangement = Arrangement.spacedBy(if (isCompact) 18.dp else 24.dp),
+            ) {
+                // Header
                 item {
-                    HeroPanel(
-                        channel = channel,
-                        epg = state.featuredEpg,
-                        onWatchClick = { onChannelClick(channel.id, channel.mediaType) },
-                        onFavoriteClick = { viewModel.toggleFavorite(channel.id) },
+                    HomeHeader(
+                        subscription = state.activeSubscription,
+                        clockVisible = state.clockVisible,
+                        isCompact = isCompact,
+                        onSubscriptionsClick = onSubscriptionsClick,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 300.dp, max = 360.dp)
-                            .padding(horizontal = 40.dp),
-                        focusRequester = initialFocusRequester,
+                            .padding(horizontal = hPad)
+                            .padding(top = 8.dp),
                     )
                 }
-            }
 
-            // Loading state
-            if (state.isLoading && state.allChannels.isEmpty()) {
-                item {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Spacer(Modifier.height(32.dp))
-                        LoadingIndicator(
-                            message = state.loadingMessage ?: "Syncing IPTV streams…",
-                            progress = state.loadingProgress,
+                // Hero panel
+                state.featuredChannel?.let { channel ->
+                    item {
+                        HeroPanel(
+                            channel = channel,
+                            epg = state.featuredEpg,
+                            isCompact = isCompact,
+                            onWatchClick = { onChannelClick(channel.id, channel.mediaType) },
+                            onFavoriteClick = { viewModel.toggleFavorite(channel.id) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = hPad),
+                            focusRequester = initialFocusRequester,
                         )
                     }
                 }
-            } else if (state.allChannels.isEmpty() && state.featuredMovies.isEmpty() && state.featuredSeries.isEmpty()) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 40.dp, vertical = 24.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        LiquidGlassSurface(
-                            cornerRadius = 24.dp,
-                            glassAlpha = 0.18f,
-                            borderAlpha = 0.35f,
+
+                // Loading state
+                if (state.isLoading && state.allChannels.isEmpty()) {
+                    item {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            Column(
-                                modifier = Modifier.padding(32.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(14.dp),
+                            Spacer(Modifier.height(32.dp))
+                            LoadingIndicator(
+                                message = state.loadingMessage ?: "جارٍ مزامنة البث والقوائم…",
+                                progress = state.loadingProgress,
+                            )
+                        }
+                    }
+                } else if (state.allChannels.isEmpty() && state.featuredMovies.isEmpty() && state.featuredSeries.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = hPad, vertical = 20.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            LiquidGlassSurface(
+                                cornerRadius = 24.dp,
+                                glassAlpha = 0.18f,
+                                borderAlpha = 0.35f,
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.LiveTv,
-                                    contentDescription = null,
-                                    tint = LiquidColors.AccentBlueLight,
-                                    modifier = Modifier.size(48.dp),
-                                )
-                                Text(
-                                    text = "No channels loaded for this subscription",
-                                    style = LiquidTypography.TitleMedium,
-                                    color = LiquidColors.TextPrimary,
-                                )
-                                Text(
-                                    text = state.error ?: "Refresh the active subscription or manage your IPTV accounts.",
-                                    style = LiquidTypography.BodySmall,
-                                    color = LiquidColors.TextSecondary,
-                                )
-                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    GlassButton(
-                                        text = "Refresh",
-                                        icon = Icons.Filled.Refresh,
-                                        isPrimary = true,
-                                        onClick = { viewModel.refreshPlaylists() },
+                                Column(
+                                    modifier = Modifier.padding(28.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.LiveTv,
+                                        contentDescription = null,
+                                        tint = LiquidColors.AccentBlueLight,
+                                        modifier = Modifier.size(48.dp),
                                     )
-                                    GlassButton(
-                                        text = "Subscriptions",
-                                        icon = Icons.Filled.Subscriptions,
-                                        isPrimary = false,
-                                        onClick = onSubscriptionsClick,
+                                    Text(
+                                        text = "لا توجد قنوات محمّلة لهذا الاشتراك",
+                                        style = LiquidTypography.TitleMedium,
+                                        color = LiquidColors.TextPrimary,
                                     )
+                                    Text(
+                                        text = state.error ?: "قم بتحديث الاشتراك النشط أو إدارة حسابات IPTV الخاصة بك.",
+                                        style = LiquidTypography.BodySmall,
+                                        color = LiquidColors.TextSecondary,
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        GlassButton(
+                                            text = "تحديث",
+                                            icon = Icons.Filled.Refresh,
+                                            isPrimary = true,
+                                            onClick = { viewModel.refreshPlaylists() },
+                                        )
+                                        GlassButton(
+                                            text = "الاشتراكات",
+                                            icon = Icons.Filled.Subscriptions,
+                                            isPrimary = false,
+                                            onClick = onSubscriptionsClick,
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            // Continue Watching
-            if (state.recentlyWatched.isNotEmpty()) {
-                item {
-                    ChannelRow(
-                        title = "Continue Watching",
-                        channels = state.recentlyWatched,
-                        onChannelClick = { ch -> onChannelClick(ch.id, ch.mediaType) },
-                        onFavoriteToggle = { viewModel.toggleFavorite(it) },
-                    )
+                // Continue Watching
+                if (state.recentlyWatched.isNotEmpty()) {
+                    item {
+                        ChannelRow(
+                            title = "متابعة المشاهدة",
+                            channels = state.recentlyWatched,
+                            horizontalPadding = hPad,
+                            onChannelClick = { ch -> onChannelClick(ch.id, ch.mediaType) },
+                        )
+                    }
+                }
+
+                // Favorites
+                if (state.favoriteChannels.isNotEmpty()) {
+                    item {
+                        ChannelRow(
+                            title = "المفضلة",
+                            channels = state.favoriteChannels,
+                            horizontalPadding = hPad,
+                            onChannelClick = { ch -> onChannelClick(ch.id, ch.mediaType) },
+                        )
+                    }
+                }
+
+                // Popular Categories
+                if (state.popularCategories.isNotEmpty()) {
+                    item {
+                        CategoryRow(
+                            title = "تصفح التصنيفات",
+                            categories = state.popularCategories,
+                            horizontalPadding = hPad,
+                            onCategoryClick = onCategoryClick,
+                        )
+                    }
+                }
+
+                // All Channels preview
+                if (state.allChannels.isNotEmpty()) {
+                    item {
+                        ChannelRow(
+                            title = "القنوات المباشرة",
+                            channels = state.allChannels,
+                            horizontalPadding = hPad,
+                            onChannelClick = { ch -> onChannelClick(ch.id, ch.mediaType) },
+                        )
+                    }
+                }
+
+                // Movies VOD preview
+                if (state.featuredMovies.isNotEmpty()) {
+                    item {
+                        ChannelRow(
+                            title = "الأفلام",
+                            channels = state.featuredMovies,
+                            horizontalPadding = hPad,
+                            onChannelClick = { ch -> onChannelClick(ch.id, MediaType.MOVIE) },
+                        )
+                    }
+                }
+
+                // Series preview
+                if (state.featuredSeries.isNotEmpty()) {
+                    item {
+                        SeriesRow(
+                            title = "المسلسلات",
+                            series = state.featuredSeries,
+                            horizontalPadding = hPad,
+                            onSeriesClick = onSeriesClick,
+                        )
+                    }
                 }
             }
 
-            // Favorites
-            if (state.favoriteChannels.isNotEmpty()) {
-                item {
-                    ChannelRow(
-                        title = "My Favorites",
-                        channels = state.favoriteChannels,
-                        onChannelClick = { ch -> onChannelClick(ch.id, ch.mediaType) },
-                        onFavoriteToggle = { viewModel.toggleFavorite(it) },
-                    )
-                }
+            // Error state
+            state.error?.let { error ->
+                GlassErrorBanner(
+                    message = error,
+                    onRetry = { viewModel.refreshPlaylists() },
+                    onSubscriptions = onSubscriptionsClick,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = hPad, vertical = 20.dp),
+                )
             }
-
-            // Popular Categories
-            if (state.popularCategories.isNotEmpty()) {
-                item {
-                    CategoryRow(
-                        title = "Browse Categories",
-                        categories = state.popularCategories,
-                        onCategoryClick = onCategoryClick,
-                    )
-                }
-            }
-
-            // All Channels preview
-            if (state.allChannels.isNotEmpty()) {
-                item {
-                    ChannelRow(
-                        title = "Live Channels",
-                        channels = state.allChannels,
-                        onChannelClick = { ch -> onChannelClick(ch.id, ch.mediaType) },
-                        onFavoriteToggle = { viewModel.toggleFavorite(it) },
-                    )
-                }
-            }
-
-            // Movies VOD preview
-            if (state.featuredMovies.isNotEmpty()) {
-                item {
-                    ChannelRow(
-                        title = "Movies (VOD)",
-                        channels = state.featuredMovies,
-                        onChannelClick = { ch -> onChannelClick(ch.id, MediaType.MOVIE) },
-                        onFavoriteToggle = { viewModel.toggleFavorite(it) },
-                    )
-                }
-            }
-
-            // Series preview
-            if (state.featuredSeries.isNotEmpty()) {
-                item {
-                    SeriesRow(
-                        title = "Series",
-                        series = state.featuredSeries,
-                        onSeriesClick = onSeriesClick,
-                    )
-                }
-            }
-        }
-
-        // Error state
-        state.error?.let { error ->
-            GlassErrorBanner(
-                message = error,
-                onRetry = { viewModel.refreshPlaylists() },
-                onSubscriptions = onSubscriptionsClick,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(24.dp),
-            )
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun HomeHeader(
     subscription: Subscription?,
     clockVisible: Boolean,
-    onSearchClick: () -> Unit,
+    isCompact: Boolean,
     onSubscriptionsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val now = remember { Calendar.getInstance() }
-    val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
-    val dateFormat = remember { SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()) }
+    val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.US) }
+    val dateFormat = remember { SimpleDateFormat("EEEE، d MMMM", Locale("ar")) }
 
     var currentTime by remember { mutableStateOf(timeFormat.format(now.time)) }
     LaunchedEffect(Unit) {
@@ -267,16 +297,16 @@ private fun HomeHeader(
         }
     }
 
-    Row(
+    FlowRow(
         modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(contentAlignment = Alignment.Center) {
                 Box(
                     modifier = Modifier
-                        .size(52.dp)
+                        .size(if (isCompact) 44.dp else 52.dp)
                         .background(
                             Brush.radialGradient(
                                 listOf(LiquidColors.AccentBlue.copy(alpha = 0.4f), Color.Transparent)
@@ -286,7 +316,7 @@ private fun HomeHeader(
                 )
                 Box(
                     modifier = Modifier
-                        .size(42.dp)
+                        .size(if (isCompact) 38.dp else 42.dp)
                         .background(
                             Brush.linearGradient(
                                 listOf(LiquidColors.AccentBlue, LiquidColors.AccentViolet)
@@ -296,13 +326,13 @@ private fun HomeHeader(
                         .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Filled.LiveTv, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                    Icon(Icons.Filled.LiveTv, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
                 }
             }
             Column {
                 Text(
                     text = "LIQUID TV",
-                    style = LiquidTypography.HeadlineLarge.copy(
+                    style = (if (isCompact) LiquidTypography.HeadlineMedium else LiquidTypography.HeadlineLarge).copy(
                         brush = Brush.linearGradient(
                             listOf(
                                 LiquidColors.TextPrimary,
@@ -313,7 +343,7 @@ private fun HomeHeader(
                     ),
                 )
                 Text(
-                    text = "v${BuildConfig.VERSION_NAME} • Ultra Glass IPTV",
+                    text = "الإصدار ${BuildConfig.VERSION_NAME} • تجربة IPTV زجاجية",
                     style = LiquidTypography.LabelSmall,
                     color = LiquidColors.AccentBlue.copy(alpha = 0.75f),
                 )
@@ -322,7 +352,7 @@ private fun HomeHeader(
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             subscription?.let { sub ->
                 val statusColor = when (sub.connectionStatus) {
@@ -360,10 +390,11 @@ private fun HomeHeader(
                             color = LiquidColors.TextPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 150.dp),
                         )
                         Icon(
                             imageVector = Icons.Filled.SwapHoriz,
-                            contentDescription = "Manage subscriptions",
+                            contentDescription = "إدارة الاشتراكات",
                             tint = LiquidColors.AccentBlueLight,
                             modifier = Modifier.size(16.dp),
                         )
@@ -371,7 +402,7 @@ private fun HomeHeader(
                 }
             }
 
-            if (clockVisible) {
+            if (clockVisible && !isCompact) {
                 Column(horizontalAlignment = Alignment.End) {
                     Text(currentTime, style = LiquidTypography.HeadlineMedium, color = LiquidColors.TextPrimary)
                     Text(dateFormat.format(Calendar.getInstance().time), style = LiquidTypography.BodySmall, color = LiquidColors.TextSecondary)
@@ -385,6 +416,7 @@ private fun HomeHeader(
 private fun HeroPanel(
     channel: Channel,
     epg: ChannelEpgSummary,
+    isCompact: Boolean,
     onWatchClick: () -> Unit,
     onFavoriteClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -402,7 +434,7 @@ private fun HeroPanel(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .background(
                     Brush.horizontalGradient(
                         0.0f to Color.Black.copy(alpha = 0.0f),
@@ -410,110 +442,189 @@ private fun HeroPanel(
                         1.0f to Color.Black.copy(alpha = 0.35f),
                     )
                 ),
-        )
-
-        Row(
-            modifier = Modifier.fillMaxSize().padding(32.dp),
-            horizontalArrangement = Arrangement.spacedBy(32.dp),
-            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Box(
+            if (isCompact) {
+                Column(
                     modifier = Modifier
-                        .size(200.dp)
-                        .background(
-                            Brush.radialGradient(
-                                listOf(LiquidColors.AccentBlue.copy(alpha = 0.3f), Color.Transparent)
-                            ),
-                            CircleShape,
-                        ),
-                )
-                Box(
-                    modifier = Modifier
-                        .size(170.dp)
-                        .background(
-                            Brush.radialGradient(
-                                listOf(
-                                    LiquidColors.AccentBlue.copy(alpha = 0.18f),
-                                    LiquidColors.GlassPrimary,
-                                )
-                            ),
-                            RoundedCornerShape(24.dp),
-                        )
-                        .border(1.dp, LiquidColors.GlassBorder, RoundedCornerShape(24.dp)),
-                    contentAlignment = Alignment.Center,
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    if (channel.logoUrl != null) {
-                        AsyncImage(
-                            model = channel.logoUrl,
-                            contentDescription = channel.name,
-                            modifier = Modifier.size(150.dp).clip(RoundedCornerShape(18.dp)),
-                            contentScale = ContentScale.Fit,
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        HeroLogoBox(channel = channel, size = 76.dp)
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                LiveBadge()
+                                channel.groupTitle?.let { group ->
+                                    HeroCategoryPill(group)
+                                }
+                            }
+                            Text(
+                                text = channel.name,
+                                style = LiquidTypography.TitleLarge,
+                                color = LiquidColors.TextPrimary,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    epg.current?.let { nowProg ->
+                        Text(
+                            text = "الآن: ${nowProg.title}",
+                            style = LiquidTypography.BodySmall,
+                            color = LiquidColors.AccentBlueLight,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
-                    } else {
-                        Icon(Icons.Filled.LiveTv, null, tint = LiquidColors.AccentBlue.copy(alpha = 0.5f), modifier = Modifier.size(72.dp))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        GlassButton(
+                            text = "شاهد الآن",
+                            icon = Icons.Filled.PlayArrow,
+                            isPrimary = true,
+                            onClick = onWatchClick,
+                            interactionSource = watchInteraction,
+                            modifier = Modifier.focusRequester(focusRequester),
+                        )
+                        GlassButton(
+                            text = if (channel.isFavorite) "في المفضلة" else "إضافة للمفضلة",
+                            icon = if (channel.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                            isPrimary = false,
+                            onClick = onFavoriteClick,
+                        )
                     }
                 }
-            }
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 270.dp, max = 340.dp)
+                        .padding(28.dp),
+                    horizontalArrangement = Arrangement.spacedBy(28.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    HeroLogoBox(channel = channel, size = 160.dp)
 
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    LiveBadge()
-                    channel.groupTitle?.let { group ->
-                        Box(
-                            modifier = Modifier
-                                .background(LiquidColors.AccentBlue.copy(alpha = 0.18f), RoundedCornerShape(50.dp))
-                                .border(1.dp, LiquidColors.AccentBlue.copy(alpha = 0.4f), RoundedCornerShape(50.dp))
-                                .padding(horizontal = 10.dp, vertical = 3.dp),
-                        ) {
-                            Text(group, style = LiquidTypography.LabelMedium, color = LiquidColors.AccentBlueLight)
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            LiveBadge()
+                            channel.groupTitle?.let { group ->
+                                HeroCategoryPill(group)
+                            }
+                        }
+                        Text(
+                            text = channel.name,
+                            style = LiquidTypography.DisplayMedium,
+                            color = LiquidColors.TextPrimary,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        epg.current?.let { nowProg ->
+                            Text(
+                                text = "الآن: ${nowProg.title}",
+                                style = LiquidTypography.BodySmall,
+                                color = LiquidColors.AccentBlueLight,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            channel.country?.let { InfoChip(it) }
+                            channel.language?.let { InfoChip(it) }
+                        }
+
+                        Spacer(Modifier.height(4.dp))
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            GlassButton(
+                                text = "شاهد الآن",
+                                icon = Icons.Filled.PlayArrow,
+                                isPrimary = true,
+                                onClick = onWatchClick,
+                                interactionSource = watchInteraction,
+                                modifier = Modifier.focusRequester(focusRequester),
+                            )
+                            GlassButton(
+                                text = if (channel.isFavorite) "في المفضلة" else "إضافة للمفضلة",
+                                icon = if (channel.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                isPrimary = false,
+                                onClick = onFavoriteClick,
+                            )
                         }
                     }
                 }
-                Text(
-                    text = channel.name,
-                    style = LiquidTypography.DisplayMedium,
-                    color = LiquidColors.TextPrimary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                epg.current?.let { nowProg ->
-                    Text(
-                        text = "Now: ${nowProg.title}",
-                        style = LiquidTypography.BodySmall,
-                        color = LiquidColors.AccentBlueLight,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    channel.country?.let { InfoChip(it) }
-                    channel.language?.let { InfoChip(it) }
-                }
-
-                Spacer(Modifier.height(4.dp))
-
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    GlassButton(
-                        text = "Watch Now",
-                        icon = Icons.Filled.PlayArrow,
-                        isPrimary = true,
-                        onClick = onWatchClick,
-                        interactionSource = watchInteraction,
-                        modifier = Modifier.focusRequester(focusRequester),
-                    )
-                    GlassButton(
-                        text = if (channel.isFavorite) "Favorited" else "Favorite",
-                        icon = if (channel.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                        isPrimary = false,
-                        onClick = onFavoriteClick,
-                    )
-                }
             }
         }
+    }
+}
+
+@Composable
+private fun HeroLogoBox(channel: Channel, size: Dp) {
+    Box(contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .size(size + 24.dp)
+                .background(
+                    Brush.radialGradient(
+                        listOf(LiquidColors.AccentBlue.copy(alpha = 0.28f), Color.Transparent)
+                    ),
+                    CircleShape,
+                ),
+        )
+        Box(
+            modifier = Modifier
+                .size(size)
+                .background(
+                    Brush.radialGradient(
+                        listOf(
+                            LiquidColors.AccentBlue.copy(alpha = 0.18f),
+                            LiquidColors.GlassPrimary,
+                        )
+                    ),
+                    RoundedCornerShape(22.dp),
+                )
+                .border(1.dp, LiquidColors.GlassBorder, RoundedCornerShape(22.dp))
+                .padding(10.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (!channel.logoUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = channel.logoUrl,
+                    contentDescription = channel.name,
+                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(14.dp)),
+                    contentScale = ContentScale.Fit,
+                )
+            } else {
+                Icon(Icons.Filled.LiveTv, null, tint = LiquidColors.AccentBlue.copy(alpha = 0.5f), modifier = Modifier.size(size * 0.44f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeroCategoryPill(group: String) {
+    Box(
+        modifier = Modifier
+            .background(LiquidColors.AccentBlue.copy(alpha = 0.18f), RoundedCornerShape(50.dp))
+            .border(1.dp, LiquidColors.AccentBlue.copy(alpha = 0.4f), RoundedCornerShape(50.dp))
+            .padding(horizontal = 10.dp, vertical = 3.dp),
+    ) {
+        Text(
+            text = group,
+            style = LiquidTypography.LabelMedium,
+            color = LiquidColors.AccentBlueLight,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -531,7 +642,7 @@ private fun InfoChip(text: String) {
 @Composable
 private fun GlassButton(
     text: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     isPrimary: Boolean,
     onClick: () -> Unit,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
@@ -553,12 +664,12 @@ private fun GlassButton(
                 ) else Modifier.background(LiquidColors.GlassPrimary, RoundedCornerShape(50.dp))
                     .border(1.dp, if (isFocused) LiquidColors.GlassBorderFocused else LiquidColors.GlassBorder, RoundedCornerShape(50.dp))
             )
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+            .padding(horizontal = 18.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, tint = LiquidColors.TextPrimary, modifier = Modifier.size(18.dp))
-            Text(text, style = LiquidTypography.LabelLarge, color = LiquidColors.TextPrimary)
+            Text(text, style = LiquidTypography.LabelLarge, color = LiquidColors.TextPrimary, maxLines = 1)
         }
     }
 }
@@ -567,12 +678,12 @@ private fun GlassButton(
 private fun ChannelRow(
     title: String,
     channels: List<Channel>,
+    horizontalPadding: Dp,
     onChannelClick: (Channel) -> Unit,
-    onFavoriteToggle: (String) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Row(
-            modifier = Modifier.padding(horizontal = 40.dp),
+            modifier = Modifier.padding(horizontal = horizontalPadding),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -592,14 +703,13 @@ private fun ChannelRow(
             )
         }
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 40.dp),
+            contentPadding = PaddingValues(horizontal = horizontalPadding),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             items(channels, key = { it.id }) { channel ->
                 MiniChannelCard(
                     channel = channel,
                     onClick = { onChannelClick(channel) },
-                    onFavoriteToggle = { onFavoriteToggle(channel.id) },
                 )
             }
         }
@@ -610,11 +720,12 @@ private fun ChannelRow(
 private fun SeriesRow(
     title: String,
     series: List<SeriesItem>,
+    horizontalPadding: Dp,
     onSeriesClick: (String) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Row(
-            modifier = Modifier.padding(horizontal = 40.dp),
+            modifier = Modifier.padding(horizontal = horizontalPadding),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -634,7 +745,7 @@ private fun SeriesRow(
             )
         }
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 40.dp),
+            contentPadding = PaddingValues(horizontal = horizontalPadding),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             items(series, key = { it.id }) { item ->
@@ -642,8 +753,8 @@ private fun SeriesRow(
                 val isFocused by interactionSource.collectIsFocusedAsState()
                 LiquidGlassSurface(
                     modifier = Modifier
-                        .width(170.dp)
-                        .height(215.dp)
+                        .width(156.dp)
+                        .height(235.dp)
                         .clickable(interactionSource = interactionSource, indication = null) { onSeriesClick(item.id) }
                         .focusable(interactionSource = interactionSource),
                     cornerRadius = 18.dp,
@@ -655,7 +766,7 @@ private fun SeriesRow(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(130.dp)
+                                .height(155.dp)
                                 .background(LiquidColors.GlassTertiary),
                             contentAlignment = Alignment.Center,
                         ) {
@@ -696,11 +807,12 @@ private fun SeriesRow(
 private fun CategoryRow(
     title: String,
     categories: List<Category>,
+    horizontalPadding: Dp,
     onCategoryClick: (String) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Row(
-            modifier = Modifier.padding(horizontal = 40.dp),
+            modifier = Modifier.padding(horizontal = horizontalPadding),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -716,7 +828,7 @@ private fun CategoryRow(
             Text(title, style = LiquidTypography.HeadlineSmall, color = LiquidColors.TextPrimary)
         }
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 40.dp),
+            contentPadding = PaddingValues(horizontal = horizontalPadding),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             items(categories, key = { it.id }) { category ->
@@ -730,7 +842,6 @@ private fun CategoryRow(
 private fun MiniChannelCard(
     channel: Channel,
     onClick: () -> Unit,
-    onFavoriteToggle: () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
@@ -762,39 +873,30 @@ private fun MiniChannelCard(
                             )
                         ),
                         RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
-                    ),
+                    )
+                    .padding(10.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                if (channel.logoUrl != null) {
+                if (!channel.logoUrl.isNullOrBlank()) {
                     AsyncImage(
                         model = channel.logoUrl,
                         contentDescription = channel.name,
-                        modifier = Modifier.size(78.dp),
+                        modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit,
                     )
                 } else {
                     Icon(Icons.Filled.LiveTv, null, tint = LiquidColors.AccentBlue.copy(alpha = 0.4f), modifier = Modifier.size(36.dp))
                 }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
-                        .height(30.dp)
-                        .background(
-                            Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.4f)))
-                        ),
-                )
                 if (channel.mediaType == MediaType.LIVE) {
-                    LiveBadge(modifier = Modifier.align(Alignment.TopStart).padding(6.dp))
+                    LiveBadge(modifier = Modifier.align(Alignment.TopStart))
                 } else {
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopStart)
-                            .padding(6.dp)
-                            .background(LiquidColors.AccentViolet.copy(alpha = 0.7f), RoundedCornerShape(6.dp))
+                            .background(LiquidColors.AccentViolet.copy(alpha = 0.78f), RoundedCornerShape(6.dp))
                             .padding(horizontal = 6.dp, vertical = 2.dp),
                     ) {
-                        Text("VOD", style = LiquidTypography.LabelSmall, color = Color.White)
+                        Text("فيلم", style = LiquidTypography.LabelSmall, color = Color.White)
                     }
                 }
             }
@@ -853,19 +955,19 @@ private fun MiniCategoryCard(category: Category, onClick: () -> Unit) {
             modifier = Modifier.padding(horizontal = 10.dp),
         ) {
             Text(category.name, style = LiquidTypography.TitleSmall, color = LiquidColors.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("${category.channelCount} ch", style = LiquidTypography.LabelSmall, color = Color.White.copy(alpha = 0.65f))
+            Text("${category.channelCount} قناة", style = LiquidTypography.LabelSmall, color = Color.White.copy(alpha = 0.7f))
         }
     }
 }
 
 private fun getCategoryCardColors(name: String): Pair<Color, Color> = when {
-    name.contains("sport", ignoreCase = true) -> LiquidColors.CategorySports to LiquidColors.CategorySportsEnd
-    name.contains("news", ignoreCase = true) -> LiquidColors.CategoryNews to LiquidColors.CategoryNewsEnd
-    name.contains("movie", ignoreCase = true) || name.contains("film", ignoreCase = true) || name.contains("cinema", ignoreCase = true) -> LiquidColors.CategoryMovies to LiquidColors.CategoryMoviesEnd
-    name.contains("music", ignoreCase = true) -> LiquidColors.CategoryMusic to LiquidColors.CategoryMusicEnd
-    name.contains("kid", ignoreCase = true) || name.contains("child", ignoreCase = true) || name.contains("cartoon", ignoreCase = true) -> LiquidColors.CategoryKids to LiquidColors.CategoryKidsEnd
-    name.contains("doc", ignoreCase = true) -> LiquidColors.CategoryDoc to LiquidColors.CategoryDocEnd
-    name.contains("entertain", ignoreCase = true) || name.contains("general", ignoreCase = true) -> LiquidColors.CategoryEnt to LiquidColors.CategoryEntEnd
+    name.contains("sport", ignoreCase = true) || name.contains("رياض") -> LiquidColors.CategorySports to LiquidColors.CategorySportsEnd
+    name.contains("news", ignoreCase = true) || name.contains("اخبار") || name.contains("أخبار") -> LiquidColors.CategoryNews to LiquidColors.CategoryNewsEnd
+    name.contains("movie", ignoreCase = true) || name.contains("film", ignoreCase = true) || name.contains("cinema", ignoreCase = true) || name.contains("أفلام") -> LiquidColors.CategoryMovies to LiquidColors.CategoryMoviesEnd
+    name.contains("music", ignoreCase = true) || name.contains("موسيق") -> LiquidColors.CategoryMusic to LiquidColors.CategoryMusicEnd
+    name.contains("kid", ignoreCase = true) || name.contains("child", ignoreCase = true) || name.contains("cartoon", ignoreCase = true) || name.contains("أطفال") -> LiquidColors.CategoryKids to LiquidColors.CategoryKidsEnd
+    name.contains("doc", ignoreCase = true) || name.contains("وثائق") -> LiquidColors.CategoryDoc to LiquidColors.CategoryDocEnd
+    name.contains("entertain", ignoreCase = true) || name.contains("general", ignoreCase = true) || name.contains("ترفيه") -> LiquidColors.CategoryEnt to LiquidColors.CategoryEntEnd
     else -> LiquidColors.AccentBlue to LiquidColors.AccentViolet
 }
 
@@ -901,23 +1003,23 @@ private fun GlassErrorBanner(
 ) {
     LiquidGlassSurface(
         modifier = modifier,
-        cornerRadius = 12.dp,
+        cornerRadius = 14.dp,
         glassAlpha = 0.25f,
         borderAlpha = 0.4f,
         glassColor = LiquidColors.ErrorRed,
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(Icons.Filled.ErrorOutline, null, tint = LiquidColors.ErrorRed)
             Text(message, style = LiquidTypography.BodyMedium, color = LiquidColors.TextPrimary, modifier = Modifier.weight(1f))
             TextButton(onClick = onSubscriptions) {
-                Text("Accounts", color = LiquidColors.TextPrimary)
+                Text("الحسابات", color = LiquidColors.TextPrimary)
             }
             TextButton(onClick = onRetry) {
-                Text("Retry", color = LiquidColors.AccentBlueLight)
+                Text("إعادة المحاولة", color = LiquidColors.AccentBlueLight)
             }
         }
     }

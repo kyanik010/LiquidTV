@@ -47,7 +47,7 @@ class CategoriesViewModel @Inject constructor(
             ) { categories, playlistInfo, lockedNames, prefs ->
                 val message = if (playlistInfo.isLoading) {
                     playlistInfo.statusMessage
-                        ?: "Syncing categories (${(playlistInfo.loadingProgress * 100).toInt()}%)..."
+                        ?: "جارٍ مزامنة التصنيفات (${(playlistInfo.loadingProgress * 100).toInt()}%)..."
                 } else null
                 CategoriesUiState(
                     categories = categories,

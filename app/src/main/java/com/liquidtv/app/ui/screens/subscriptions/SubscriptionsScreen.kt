@@ -34,9 +34,13 @@ import com.liquidtv.app.ui.components.AppBackground
 import com.liquidtv.app.ui.components.LiquidGlassSurface
 import com.liquidtv.app.ui.theme.LiquidColors
 import com.liquidtv.app.ui.theme.LiquidTypography
+import com.liquidtv.app.ui.utils.localizedSubscriptionStatusAr
+import com.liquidtv.app.ui.utils.localizedSubscriptionTypeAr
 import java.text.DateFormat
 import java.util.Date
+import java.util.Locale
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SubscriptionsScreen(
     onAddSubscription: () -> Unit,
@@ -51,186 +55,195 @@ fun SubscriptionsScreen(
     BackHandler { onBack() }
 
     AppBackground(modifier = Modifier.fillMaxSize()) {
-        Column(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(horizontal = 32.dp, vertical = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+                .windowInsetsPadding(WindowInsets.safeDrawing),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+            val isCompact = maxWidth < 600.dp
+            val hPad = if (isCompact) 16.dp else 32.dp
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = hPad, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    IconButton(
-                        onClick = onBack,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.10f)),
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = Color.White,
-                        )
-                    }
-                    Column {
-                        Text(
-                            text = "IPTV Subscriptions",
-                            style = LiquidTypography.HeadlineMedium.copy(
-                                brush = Brush.linearGradient(
-                                    listOf(LiquidColors.TextPrimary, LiquidColors.AccentBlueLight),
+                        IconButton(
+                            onClick = onBack,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.10f)),
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "رجوع",
+                                tint = Color.White,
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "اشتراكات IPTV",
+                                style = LiquidTypography.HeadlineMedium.copy(
+                                    brush = Brush.linearGradient(
+                                        listOf(LiquidColors.TextPrimary, LiquidColors.AccentBlueLight),
+                                    ),
                                 ),
-                            ),
-                        )
-                        Text(
-                            text = "Manage Xtream Codes and M3U accounts",
-                            style = LiquidTypography.BodySmall,
-                            color = LiquidColors.TextSecondary,
-                        )
+                            )
+                            Text(
+                                text = "إدارة حسابات Xtream وملفات M3U",
+                                style = LiquidTypography.BodySmall,
+                                color = LiquidColors.TextSecondary,
+                            )
+                        }
+                    }
+
+                    GlassActionPill(
+                        text = "إضافة اشتراك",
+                        icon = Icons.Filled.Add,
+                        isPrimary = true,
+                        onClick = onAddSubscription,
+                        modifier = Modifier.testTag("add_subscription_button"),
+                    )
+                }
+
+                state.message?.let { msg ->
+                    LiquidGlassSurface(
+                        cornerRadius = 14.dp,
+                        glassAlpha = 0.22f,
+                        borderAlpha = 0.45f,
+                        glassColor = LiquidColors.SuccessGreen,
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(msg, style = LiquidTypography.BodySmall, color = Color.White, modifier = Modifier.weight(1f))
+                            TextButton(onClick = viewModel::clearFeedback) {
+                                Text("إغلاق", color = Color.White)
+                            }
+                        }
                     }
                 }
 
-                GlassActionPill(
-                    text = "Add Subscription",
-                    icon = Icons.Filled.Add,
-                    isPrimary = true,
-                    onClick = onAddSubscription,
-                    modifier = Modifier.testTag("add_subscription_button"),
+                state.error?.let { err ->
+                    LiquidGlassSurface(
+                        cornerRadius = 14.dp,
+                        glassAlpha = 0.25f,
+                        borderAlpha = 0.5f,
+                        glassColor = LiquidColors.ErrorRed,
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(err, style = LiquidTypography.BodySmall, color = Color.White, modifier = Modifier.weight(1f))
+                            TextButton(onClick = viewModel::clearFeedback) {
+                                Text("إغلاق", color = Color.White)
+                            }
+                        }
+                    }
+                }
+
+                if (state.subscriptions.isEmpty()) {
+                    LiquidGlassSurface(
+                        modifier = Modifier.fillMaxWidth(),
+                        cornerRadius = 24.dp,
+                        glassAlpha = 0.16f,
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(36.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(14.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Subscriptions,
+                                contentDescription = null,
+                                tint = LiquidColors.AccentBlueLight,
+                                modifier = Modifier.size(48.dp),
+                            )
+                            Text("لا توجد اشتراكات محفوظة", style = LiquidTypography.TitleMedium, color = Color.White)
+                            Text(
+                                "أضف حساب Xtream Codes أو رابط قائمة M3U لتحميل القنوات والمحتوى.",
+                                style = LiquidTypography.BodySmall,
+                                color = LiquidColors.TextSecondary,
+                            )
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        contentPadding = PaddingValues(bottom = 24.dp),
+                    ) {
+                        items(state.subscriptions, key = { it.id }) { sub ->
+                            SubscriptionCard(
+                                subscription = sub,
+                                isBusy = state.busySubscriptionId == sub.id ||
+                                    (state.syncInfo.isLoading && state.syncInfo.subscriptionId == sub.id),
+                                onActivate = {
+                                    viewModel.activate(sub.id)
+                                    onActivated()
+                                },
+                                onSync = { viewModel.sync(sub.id) },
+                                onEdit = { onEditSubscription(sub.id) },
+                                onDelete = { pendingDelete = sub },
+                            )
+                        }
+                    }
+                }
+            }
+
+            pendingDelete?.let { sub ->
+                AlertDialog(
+                    onDismissRequest = { pendingDelete = null },
+                    title = { Text("حذف الاشتراك", color = Color.White) },
+                    text = {
+                        Text(
+                            "هل تريد حذف \"${sub.name}\" وجميع قنواته وتصنيفاته ومفضلته ودليل البرامج المخزن؟",
+                            color = LiquidColors.TextSecondary,
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                viewModel.delete(sub.id)
+                                pendingDelete = null
+                            },
+                        ) {
+                            Text("حذف", color = LiquidColors.ErrorRed)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { pendingDelete = null }) {
+                            Text("إلغاء", color = LiquidColors.TextSecondary)
+                        }
+                    },
+                    containerColor = LiquidColors.DeepSurface,
                 )
             }
-
-            state.message?.let { msg ->
-                LiquidGlassSurface(
-                    cornerRadius = 14.dp,
-                    glassAlpha = 0.22f,
-                    borderAlpha = 0.45f,
-                    glassColor = LiquidColors.SuccessGreen,
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(msg, style = LiquidTypography.BodySmall, color = Color.White, modifier = Modifier.weight(1f))
-                        TextButton(onClick = viewModel::clearFeedback) {
-                            Text("Dismiss", color = Color.White)
-                        }
-                    }
-                }
-            }
-
-            state.error?.let { err ->
-                LiquidGlassSurface(
-                    cornerRadius = 14.dp,
-                    glassAlpha = 0.25f,
-                    borderAlpha = 0.5f,
-                    glassColor = LiquidColors.ErrorRed,
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(err, style = LiquidTypography.BodySmall, color = Color.White, modifier = Modifier.weight(1f))
-                        TextButton(onClick = viewModel::clearFeedback) {
-                            Text("Dismiss", color = Color.White)
-                        }
-                    }
-                }
-            }
-
-            if (state.subscriptions.isEmpty()) {
-                LiquidGlassSurface(
-                    modifier = Modifier.fillMaxWidth(),
-                    cornerRadius = 24.dp,
-                    glassAlpha = 0.16f,
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(36.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(14.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Subscriptions,
-                            contentDescription = null,
-                            tint = LiquidColors.AccentBlueLight,
-                            modifier = Modifier.size(48.dp),
-                        )
-                        Text("No IPTV Subscriptions Saved", style = LiquidTypography.TitleMedium, color = Color.White)
-                        Text(
-                            "Add an Xtream Codes account or M3U playlist URL to load channels.",
-                            style = LiquidTypography.BodySmall,
-                            color = LiquidColors.TextSecondary,
-                        )
-                    }
-                }
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                    contentPadding = PaddingValues(bottom = 24.dp),
-                ) {
-                    items(state.subscriptions, key = { it.id }) { sub ->
-                        SubscriptionCard(
-                            subscription = sub,
-                            isBusy = state.busySubscriptionId == sub.id ||
-                                (state.syncInfo.isLoading && state.syncInfo.subscriptionId == sub.id),
-                            onActivate = {
-                                viewModel.activate(sub.id)
-                                onActivated()
-                            },
-                            onSync = { viewModel.sync(sub.id) },
-                            onEdit = { onEditSubscription(sub.id) },
-                            onDelete = { pendingDelete = sub },
-                        )
-                    }
-                }
-            }
-        }
-
-        pendingDelete?.let { sub ->
-            AlertDialog(
-                onDismissRequest = { pendingDelete = null },
-                title = { Text("Delete Subscription", color = Color.White) },
-                text = {
-                    Text(
-                        "Remove \"${sub.name}\" and all its cached channels, categories, favorites, and EPG data?",
-                        color = LiquidColors.TextSecondary,
-                    )
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            viewModel.delete(sub.id)
-                            pendingDelete = null
-                        },
-                    ) {
-                        Text("Delete", color = LiquidColors.ErrorRed)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { pendingDelete = null }) {
-                        Text("Cancel", color = LiquidColors.TextSecondary)
-                    }
-                },
-                containerColor = LiquidColors.DeepSurface,
-            )
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SubscriptionCard(
     subscription: Subscription,
@@ -259,17 +272,17 @@ private fun SubscriptionCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
+                .padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.Top,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                    FlowRow(
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(
@@ -280,12 +293,12 @@ private fun SubscriptionCard(
                             overflow = TextOverflow.Ellipsis,
                         )
                         BadgeChip(
-                            text = subscription.type.name,
+                            text = localizedSubscriptionTypeAr(subscription.type),
                             color = LiquidColors.AccentVioletLight,
                         )
                         if (subscription.isActive) {
                             BadgeChip(
-                                text = "ACTIVE",
+                                text = "نشط",
                                 color = LiquidColors.AccentBlueLight,
                             )
                         }
@@ -300,15 +313,16 @@ private fun SubscriptionCard(
                     )
                     subscription.username?.let { user ->
                         Text(
-                            text = "User: $user",
+                            text = "المستخدم: $user",
                             style = LiquidTypography.LabelSmall,
                             color = LiquidColors.TextTertiary,
                         )
                     }
                 }
 
+                Spacer(Modifier.width(8.dp))
                 BadgeChip(
-                    text = subscription.connectionStatus.name,
+                    text = localizedSubscriptionStatusAr(subscription.connectionStatus),
                     color = statusColor,
                 )
             }
@@ -319,20 +333,21 @@ private fun SubscriptionCard(
                     subscription.expDateEpochSec != null ||
                     subscription.maxConnections != null)
             ) {
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     subscription.accountStatus?.let {
-                        Text("Status: $it", style = LiquidTypography.LabelSmall, color = LiquidColors.TextSecondary)
+                        Text("الحالة: $it", style = LiquidTypography.LabelSmall, color = LiquidColors.TextSecondary)
                     }
                     subscription.expDateEpochSec?.let { exp ->
-                        val dateText = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(exp * 1000L))
-                        Text("Expires: $dateText", style = LiquidTypography.LabelSmall, color = LiquidColors.TextSecondary)
+                        val dateText = DateFormat.getDateInstance(DateFormat.MEDIUM, Locale("ar")).format(Date(exp * 1000L))
+                        Text("ينتهي في: $dateText", style = LiquidTypography.LabelSmall, color = LiquidColors.TextSecondary)
                     }
                     if (subscription.activeConnections != null || subscription.maxConnections != null) {
                         Text(
-                            "Connections: ${subscription.activeConnections ?: "?"} / ${subscription.maxConnections ?: "?"}",
+                            "الاتصالات: ${subscription.activeConnections ?: "؟"} / ${subscription.maxConnections ?: "؟"}",
                             style = LiquidTypography.LabelSmall,
                             color = LiquidColors.TextSecondary,
                         )
@@ -348,14 +363,14 @@ private fun SubscriptionCard(
                 )
             }
 
-            Row(
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 if (!subscription.isActive) {
                     GlassActionPill(
-                        text = "Use Subscription",
+                        text = "تفعيل الاشتراك",
                         icon = Icons.Filled.CheckCircle,
                         isPrimary = true,
                         enabled = !isBusy,
@@ -363,21 +378,21 @@ private fun SubscriptionCard(
                     )
                 }
                 GlassActionPill(
-                    text = if (isBusy) "Syncing…" else "Refresh",
+                    text = if (isBusy) "جارٍ التحديث…" else "تحديث",
                     icon = Icons.Filled.Refresh,
                     isPrimary = false,
                     enabled = !isBusy,
                     onClick = onSync,
                 )
                 GlassActionPill(
-                    text = "Edit",
+                    text = "تعديل",
                     icon = Icons.Filled.Edit,
                     isPrimary = false,
                     enabled = !isBusy,
                     onClick = onEdit,
                 )
                 GlassActionPill(
-                    text = "Delete",
+                    text = "حذف",
                     icon = Icons.Filled.Delete,
                     isPrimary = false,
                     enabled = !isBusy,

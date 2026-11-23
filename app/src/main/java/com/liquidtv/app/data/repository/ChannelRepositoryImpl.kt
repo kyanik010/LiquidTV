@@ -49,7 +49,7 @@ class ChannelRepositoryImpl @Inject constructor(
         }
 
     override fun getSeriesById(seriesId: String): Flow<SeriesItem?> =
-        flow { emit(seriesDao.getSeriesById(seriesId)?.toDomain()) }
+        seriesDao.observeSeriesById(seriesId).map { it?.toDomain() }
 
     override fun getEpisodesForSeries(seriesId: String): Flow<List<EpisodeItem>> =
         seriesDao.getEpisodesForSeries(seriesId).map { list -> list.map { it.toDomain() } }
@@ -169,21 +169,79 @@ class ChannelRepositoryImpl @Inject constructor(
     override fun getAllCategories(mediaType: MediaType): Flow<List<Category>> =
         activeSubIdFlow().flatMapLatest { subId ->
             if (subId == null) flowOf(emptyList())
-            else combine(
-                channelDao.getCategoriesWithCount(subId, mediaType.name),
-                categoryDao.getLockedCategoryNames(subId),
-            ) { counts, locked ->
-                val lockedSet = locked.toSet()
-                counts.map { row ->
-                    Category(
-                        id = "${subId}_${mediaType.name}_${row.groupTitle.lowercase()}",
-                        subscriptionId = subId,
-                        contentType = mediaType,
-                        name = row.groupTitle,
-                        channelCount = row.count,
-                        iconName = categoryIconName(row.groupTitle),
-                        isLocked = row.groupTitle in lockedSet,
-                    )
+            else if (mediaType == MediaType.SERIES_EPISODE) {
+                combine(
+                    seriesDao.getSeries(subId),
+                    categoryDao.getCategories(subId, MediaType.SERIES_EPISODE.name),
+                    categoryDao.getLockedCategoryNames(subId),
+                ) { seriesList, categoryEntities, locked ->
+                    val lockedSet = locked.map { it.trim().lowercase() }.toSet()
+                    val countByName = mutableMapOf<String, Int>()
+                    val displayNameByKey = mutableMapOf<String, String>()
+                    for (item in seriesList) {
+                        val rawName = item.categoryName?.trim().orEmpty()
+                        if (rawName.isNotEmpty()) {
+                            val key = rawName.lowercase()
+                            countByName[key] = (countByName[key] ?: 0) + 1
+                            displayNameByKey.putIfAbsent(key, rawName)
+                        }
+                    }
+                    val orderByKey = categoryEntities.associateBy { it.name.trim().lowercase() }
+                    val result = mutableListOf<Category>()
+                    val seenKeys = mutableSetOf<String>()
+
+                    // Preserve backend/database sort order for categories that actually contain series
+                    for (cat in categoryEntities) {
+                        val key = cat.name.trim().lowercase()
+                        val count = countByName[key] ?: 0
+                        if (count > 0 && seenKeys.add(key)) {
+                            result += Category(
+                                id = "${subId}_${mediaType.name}_$key",
+                                subscriptionId = subId,
+                                contentType = mediaType,
+                                name = cat.name,
+                                channelCount = count,
+                                iconName = categoryIconName(cat.name),
+                                isLocked = key in lockedSet,
+                            )
+                        }
+                    }
+
+                    // Include any series category names not present in categories table
+                    for ((key, count) in countByName) {
+                        if (seenKeys.add(key)) {
+                            val name = displayNameByKey[key] ?: continue
+                            result += Category(
+                                id = "${subId}_${mediaType.name}_$key",
+                                subscriptionId = subId,
+                                contentType = mediaType,
+                                name = name,
+                                channelCount = count,
+                                iconName = categoryIconName(name),
+                                isLocked = key in lockedSet,
+                            )
+                        }
+                    }
+
+                    if (orderByKey.isEmpty()) result.sortedByDescending { it.channelCount } else result
+                }
+            } else {
+                combine(
+                    channelDao.getCategoriesWithCount(subId, mediaType.name),
+                    categoryDao.getLockedCategoryNames(subId),
+                ) { counts, locked ->
+                    val lockedSet = locked.toSet()
+                    counts.map { row ->
+                        Category(
+                            id = "${subId}_${mediaType.name}_${row.groupTitle.lowercase()}",
+                            subscriptionId = subId,
+                            contentType = mediaType,
+                            name = row.groupTitle,
+                            channelCount = row.count,
+                            iconName = categoryIconName(row.groupTitle),
+                            isLocked = row.groupTitle in lockedSet,
+                        )
+                    }
                 }
             }
         }
@@ -366,7 +424,7 @@ class ChannelRepositoryImpl @Inject constructor(
                     val keys = json.keys()
                     while (keys.hasNext()) {
                         val k = keys.next()
-                        put(k, json.optString(k))
+                        put(k, json.optString(k, ""))
                     }
                 }
             }.getOrDefault(emptyMap())

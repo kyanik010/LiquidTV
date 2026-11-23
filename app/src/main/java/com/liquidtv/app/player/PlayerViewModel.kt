@@ -157,7 +157,7 @@ class PlayerViewModel @Inject constructor(
                     it.copy(
                         isBuffering = false,
                         isError = true,
-                        errorMessage = "Unable to start playback service (${e.localizedMessage ?: "error"}).",
+                        errorMessage = "تعذّر بدء خدمة التشغيل (${e.localizedMessage ?: "خطأ"}).",
                     )
                 }
             }
@@ -204,7 +204,7 @@ class PlayerViewModel @Inject constructor(
                             it.copy(
                                 isBuffering = false,
                                 isError = true,
-                                errorMessage = "Episode could not be found.",
+                                errorMessage = "تعذّر العثور على الحلقة.",
                             )
                         }
                         return@launch
@@ -223,7 +223,7 @@ class PlayerViewModel @Inject constructor(
                         name = "S${episode.seasonNumber}E${episode.episodeNumber} • ${episode.title}",
                         streamUrl = episode.streamUrl,
                         logoUrl = episode.coverUrl,
-                        groupTitle = "Series",
+                        groupTitle = "المسلسلات",
                         containerExtension = episode.containerExtension,
                         plot = episode.plot,
                         durationSec = episode.durationSec,
@@ -254,7 +254,7 @@ class PlayerViewModel @Inject constructor(
                             it.copy(
                                 isBuffering = false,
                                 isError = true,
-                                errorMessage = "Stream item could not be found.",
+                                errorMessage = "تعذّر العثور على البث.",
                             )
                         }
                         return@launch
@@ -370,7 +370,7 @@ class PlayerViewModel @Inject constructor(
                         isError = false,
                         retryAttempt = nextAttempt,
                         maxRetries = maxRetries,
-                        errorMessage = "Reconnecting ($nextAttempt/$maxRetries)…",
+                        errorMessage = "إعادة الاتصال ($nextAttempt/$maxRetries)...",
                     )
                 }
                 delay(PlayerMediaHelper.backoffDelayMs(nextAttempt))
@@ -509,7 +509,7 @@ class PlayerViewModel @Inject constructor(
     fun loadExternalSubtitle(url: String, language: String = "und") {
         val trimmed = url.trim()
         if (!trimmed.startsWith("http://", true) && !trimmed.startsWith("https://", true)) {
-            _state.update { it.copy(externalSubtitleError = "Subtitle URL must start with http:// or https://") }
+            _state.update { it.copy(externalSubtitleError = "يجب أن يبدأ رابط الترجمة بـ http:// أو https://") }
             return
         }
         val channel = _state.value.channel ?: return
