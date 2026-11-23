@@ -8,9 +8,12 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Tracks
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.HttpDataSource
 import com.liquidtv.app.domain.model.TrackInfo
 
+@OptIn(UnstableApi::class)
 object PlayerMediaHelper {
 
     const val EXTRA_HEADERS_BUNDLE = "liquidtv.extra.headers"

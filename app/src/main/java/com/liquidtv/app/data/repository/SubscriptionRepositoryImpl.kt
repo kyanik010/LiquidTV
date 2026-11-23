@@ -474,7 +474,7 @@ class SubscriptionRepositoryImpl @Inject constructor(
                 id = ch.id,
                 subscriptionId = subscription.id,
                 externalId = ch.externalId,
-                mediaType = MediaType.LIVE.name,
+                mediaType = ch.mediaType.name,
                 name = ch.name,
                 streamUrl = ch.streamUrl,
                 logoUrl = ch.logoUrl,
@@ -493,39 +493,56 @@ class SubscriptionRepositoryImpl @Inject constructor(
             )
         }
 
-        val categoryNames = parseResult.channels
+        val liveCategories = parseResult.channels
+            .filter { it.mediaType == MediaType.LIVE }
             .mapNotNull { it.groupTitle?.takeIf { g -> g.isNotBlank() } }
             .distinct()
-        val categoryEntities = categoryNames.mapIndexed { idx, name ->
-            CategoryEntity(
-                id = "${subscription.id}_LIVE_${name.lowercase()}",
-                subscriptionId = subscription.id,
-                externalCategoryId = name,
-                contentType = MediaType.LIVE.name,
-                name = name,
-                sortOrder = idx,
-                isLocked = name in existingLockedCategories,
-            )
-        }
+            .mapIndexed { idx, name ->
+                CategoryEntity(
+                    id = "${subscription.id}_LIVE_${name.lowercase()}",
+                    subscriptionId = subscription.id,
+                    externalCategoryId = name,
+                    contentType = MediaType.LIVE.name,
+                    name = name,
+                    sortOrder = idx,
+                    isLocked = name in existingLockedCategories,
+                )
+            }
+        val movieCategories = parseResult.channels
+            .filter { it.mediaType == MediaType.MOVIE }
+            .mapNotNull { it.groupTitle?.takeIf { g -> g.isNotBlank() } }
+            .distinct()
+            .mapIndexed { idx, name ->
+                CategoryEntity(
+                    id = "${subscription.id}_MOVIE_${name.lowercase()}",
+                    subscriptionId = subscription.id,
+                    externalCategoryId = name,
+                    contentType = MediaType.MOVIE.name,
+                    name = name,
+                    sortOrder = idx,
+                    isLocked = name in existingLockedCategories,
+                )
+            }
 
         database.withTransaction {
             subscriptionDao.upsertSubscription(subscription)
             if (subscription.isActive) {
                 subscriptionDao.setActiveSubscription(subscription.id)
             }
-            // M3U only populates Live TV unless explicitly provided; clear stale series/movies atomically
             seriesDao.deleteSeriesForSubscription(subscription.id)
             channelDao.replaceChannelsAtomically(subscription.id, null, channelEntities)
-            categoryDao.replaceCategoriesAtomically(subscription.id, MediaType.LIVE.name, categoryEntities)
-            categoryDao.deleteCategoriesByType(subscription.id, MediaType.MOVIE.name)
+            categoryDao.replaceCategoriesAtomically(subscription.id, MediaType.LIVE.name, liveCategories)
+            categoryDao.replaceCategoriesAtomically(subscription.id, MediaType.MOVIE.name, movieCategories)
             categoryDao.deleteCategoriesByType(subscription.id, MediaType.SERIES_EPISODE.name)
         }
 
+        val liveCount = channelEntities.count { it.mediaType == MediaType.LIVE.name }
+        val movieCount = channelEntities.count { it.mediaType == MediaType.MOVIE.name }
         _syncInfo.value = PlaylistInfo(
             subscriptionId = subscription.id,
             name = subscription.name,
-            totalChannels = channelEntities.size,
-            totalMovies = 0,
+            totalChannels = liveCount,
+            totalMovies = movieCount,
             totalSeries = 0,
             lastRefreshed = subscription.lastSyncedAt,
             isLoading = false,

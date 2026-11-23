@@ -4,7 +4,10 @@ import com.liquidtv.app.domain.model.Channel
 import com.liquidtv.app.domain.model.MediaType
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import org.json.JSONObject
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.io.BufferedReader
 import java.io.ByteArrayInputStream
 import java.io.InputStream
@@ -157,15 +160,17 @@ class M3UParser @Inject constructor() {
                                     )
                                 } else {
                                     val name = extractChannelNameFromUrl(streamUrl)
+                                    val mediaType = inferMediaType(streamUrl = streamUrl, groupTitle = pendingExtGrp)
                                     val stableId = makeUniqueStableId(
                                         subscriptionId = subscriptionId,
+                                        mediaType = mediaType,
                                         baseKey = sha256Short("$name|$streamUrl"),
                                         seenIds = seenIds,
                                     )
                                     Channel(
                                         id = stableId,
                                         subscriptionId = subscriptionId,
-                                        mediaType = MediaType.LIVE,
+                                        mediaType = mediaType,
                                         name = name,
                                         streamUrl = streamUrl,
                                         groupTitle = pendingExtGrp,
@@ -249,7 +254,8 @@ class M3UParser @Inject constructor() {
         } else {
             sha256Short("name:${name.lowercase()}|$streamUrl")
         }
-        val stableId = makeUniqueStableId(subscriptionId, baseStableKey, seenIds)
+        val mediaType = inferMediaType(streamUrl = streamUrl, groupTitle = groupTitle)
+        val stableId = makeUniqueStableId(subscriptionId, mediaType, baseStableKey, seenIds)
 
         val countryCodeFromId = tvgId
             ?.substringBefore("@")
@@ -263,7 +269,7 @@ class M3UParser @Inject constructor() {
             id = stableId,
             subscriptionId = subscriptionId,
             externalId = tvgId ?: baseStableKey,
-            mediaType = MediaType.LIVE,
+            mediaType = mediaType,
             name = name,
             streamUrl = streamUrl,
             logoUrl = tvgLogo,
@@ -324,12 +330,10 @@ class M3UParser @Inject constructor() {
     private fun parseExtHttpJson(raw: String, outHeaders: MutableMap<String, String>) {
         if (!raw.startsWith("{")) return
         try {
-            val json = JSONObject(raw)
-            val keys = json.keys()
-            while (keys.hasNext()) {
-                val key = keys.next()
-                val value = json.optString(key).trim()
-                if (value.isNotEmpty()) {
+            val jsonObj = Json.parseToJsonElement(raw).jsonObject
+            jsonObj.forEach { (key, elem) ->
+                val value = elem.jsonPrimitive.contentOrNull?.trim()
+                if (!value.isNullOrEmpty()) {
                     outHeaders[key] = value
                 }
             }
@@ -338,15 +342,38 @@ class M3UParser @Inject constructor() {
         }
     }
 
+    private fun inferMediaType(streamUrl: String, groupTitle: String?): MediaType {
+        val cleanUrl = streamUrl.lowercase().substringBefore('?')
+        val pathOnly = cleanUrl.substringAfter("://").substringAfter("/", "")
+        val isMovieExt = pathOnly.endsWith(".mp4") ||
+            pathOnly.endsWith(".mkv") ||
+            pathOnly.endsWith(".avi") ||
+            pathOnly.endsWith(".mov") ||
+            pathOnly.endsWith(".m4v") ||
+            pathOnly.endsWith(".wmv") ||
+            pathOnly.endsWith(".flv")
+        val isMoviePath = pathOnly.contains("/movie/") || pathOnly.contains("/vod/")
+        val isLiveExt = pathOnly.endsWith(".ts") || pathOnly.endsWith(".m3u8")
+        val lowerGroup = groupTitle?.lowercase().orEmpty()
+        val isMovieGroup = lowerGroup.contains("vod") || lowerGroup.contains("movie") || lowerGroup.contains("أفلام")
+        return if (isMovieExt || isMoviePath || (!isLiveExt && isMovieGroup)) {
+            MediaType.MOVIE
+        } else {
+            MediaType.LIVE
+        }
+    }
+
     private fun isStreamUrl(line: String): Boolean =
         SUPPORTED_SCHEMES.any { line.startsWith(it, ignoreCase = true) }
 
     private fun makeUniqueStableId(
         subscriptionId: String,
+        mediaType: MediaType,
         baseKey: String,
         seenIds: MutableMap<String, Int>,
     ): String {
-        val prefix = if (subscriptionId.isNotBlank()) "${subscriptionId}_live_$baseKey" else "live_$baseKey"
+        val typeTag = if (mediaType == MediaType.MOVIE) "vod" else "live"
+        val prefix = if (subscriptionId.isNotBlank()) "${subscriptionId}_${typeTag}_$baseKey" else "${typeTag}_$baseKey"
         val count = seenIds.getOrDefault(prefix, 0)
         seenIds[prefix] = count + 1
         return if (count == 0) prefix else "${prefix}_$count"
