@@ -13,6 +13,7 @@ data class AppUpdateInfo(
     val releaseNotes: String = "",
     val apkDownloadUrl: String,
     val apkSize: Long = 0L,
+    val sha256: String? = null,
     val publishedAt: String? = null,
 )
 
