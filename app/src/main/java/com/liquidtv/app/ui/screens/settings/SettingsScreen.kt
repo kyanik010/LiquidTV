@@ -944,10 +944,12 @@ private fun SettingsDetailPane(
                             onClick = {},
                         )
                     }
+                }
             }
             }
         }
     }
+}
 }
 
 @Composable
