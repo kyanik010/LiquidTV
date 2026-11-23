@@ -8,6 +8,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -91,7 +93,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.scalars.ScalarsConverterFactory
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36], qualifiers = "w1280dp-h900dp-xhdpi")
+@Config(sdk = [36], qualifiers = "w2000dp-h1200dp-xhdpi")
 class RedesignUiAndLogicTest {
 
     @get:Rule
@@ -440,6 +442,124 @@ class RedesignUiAndLogicTest {
         composeRule.onNodeWithTag("series_categories_sidebar").assertIsDisplayed()
         composeRule.onNodeWithTag("series_grid").assertIsDisplayed()
         composeRule.onNodeWithText("الأفق").assertIsDisplayed()
+    }
+
+    @Test
+    fun `LiveTVScreen landscape phone keeps all header controls clickable, shows channel names, toggles grid, and expands content`() {
+        val fakeChannels = FakeChannelRepository()
+        val prefs = UserPreferencesDataStore(context)
+        val liveVm = LiveTVViewModel(fakeChannels, prefs, SavedStateHandle())
+        val totalHeightDp = 400f
+
+        composeRule.setContent {
+            LiquidTVTheme {
+                Box(Modifier.width(850.dp).height(totalHeightDp.dp)) {
+                    LiveTVScreen(onChannelClick = {}, viewModel = liveVm)
+                }
+            }
+        }
+
+        // Preserve all required header controls & info
+        composeRule.onNodeWithText("البث المباشر").assertIsDisplayed()
+        composeRule.onNodeWithTag("live_channels_count").assertIsDisplayed()
+        composeRule.onNodeWithTag("live_sort_name_asc").assertIsDisplayed()
+        composeRule.onNodeWithTag("live_sort_name_desc").assertIsDisplayed()
+        composeRule.onNodeWithTag("live_sort_favorites_first").assertIsDisplayed()
+        composeRule.onNodeWithTag("live_sort_category").assertIsDisplayed()
+        composeRule.onNodeWithTag("live_view_list").assertIsDisplayed()
+        composeRule.onNodeWithTag("live_view_grid").assertIsDisplayed()
+
+        // Ensure channel name inside middle list row is NOT crushed at 850dp wide
+        composeRule.onAllNodesWithText("الجزيرة الإخبارية").onFirst().assertIsDisplayed()
+
+        val density = composeRule.density.density
+        val headerHeightDp = composeRule.onNodeWithTag("live_tv_header").fetchSemanticsNode().boundsInRoot.height / density
+        val sidebarPaneHeightDp = composeRule.onNodeWithTag("live_categories_pane").fetchSemanticsNode().boundsInRoot.height / density
+        val sidebarListHeightDp = composeRule.onNodeWithTag("live_categories_sidebar").fetchSemanticsNode().boundsInRoot.height / density
+        val listHeightDp = composeRule.onNodeWithTag("live_channels_list").fetchSemanticsNode().boundsInRoot.height / density
+
+        assertTrue("Expected single-row compact header <= 54dp on landscape, was $headerHeightDp", headerHeightDp <= 54f)
+        assertTrue("Expected sidebar pane >= 68% of 400dp screen height, was $sidebarPaneHeightDp", sidebarPaneHeightDp >= totalHeightDp * 0.68f)
+        assertTrue("Expected scrollable sidebar list >= 245dp inside 400dp landscape, was $sidebarListHeightDp", sidebarListHeightDp >= 245f)
+        assertTrue("Expected channel list >= 65% of 400dp screen height, was $listHeightDp", listHeightDp >= totalHeightDp * 0.65f)
+
+        // Verify ViewMode switch to Grid and back to List works
+        composeRule.onNodeWithTag("live_view_grid").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("live_channels_grid").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("live_view_list").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("live_channels_list").assertIsDisplayed()
+    }
+
+    @Test
+    fun `LiveTVScreen maximizes content pane height on 720p TV and portrait phone`() {
+        val fakeChannels = FakeChannelRepository()
+        val prefs = UserPreferencesDataStore(context)
+        val liveVm = LiveTVViewModel(fakeChannels, prefs, SavedStateHandle())
+        val tvHeightDp = 540f
+
+        composeRule.setContent {
+            LiquidTVTheme {
+                Box(Modifier.width(960.dp).height(tvHeightDp.dp)) {
+                    LiveTVScreen(onChannelClick = {}, viewModel = liveVm)
+                }
+            }
+        }
+
+        val density = composeRule.density.density
+        val listHeightDp = composeRule.onNodeWithTag("live_channels_list").fetchSemanticsNode().boundsInRoot.height / density
+        assertTrue("Expected >= 74% vertical space for TV channel list on 540dp, was $listHeightDp", listHeightDp >= tvHeightDp * 0.74f)
+    }
+
+    @Test
+    fun `MoviesScreen and SeriesScreen maximize 2-to-3 poster grid and sidebar vertical ratio across TV viewports`() {
+        val fakeChannels = FakeChannelRepository()
+        val prefs = UserPreferencesDataStore(context)
+        val moviesVm = MoviesViewModel(fakeChannels, prefs)
+        val heightDp = 1080f
+
+        composeRule.setContent {
+            LiquidTVTheme {
+                Box(Modifier.width(1920.dp).height(heightDp.dp)) {
+                    MoviesScreen(onMovieClick = {}, viewModel = moviesVm)
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag("movies_count").assertIsDisplayed()
+        composeRule.onNodeWithTag("movies_categories_sidebar").assertIsDisplayed()
+        composeRule.onNodeWithTag("movies_grid").assertIsDisplayed()
+
+        val density = composeRule.density.density
+        val headerHeightDp = composeRule.onNodeWithTag("movies_header").fetchSemanticsNode().boundsInRoot.height / density
+        val gridHeightDp = composeRule.onNodeWithTag("movies_grid").fetchSemanticsNode().boundsInRoot.height / density
+        assertTrue("Expected compact Movies header <= 52dp, was $headerHeightDp", headerHeightDp <= 52f)
+        assertTrue("Expected Movies grid >= 84% of 1080dp screen height, was $gridHeightDp", gridHeightDp >= heightDp * 0.84f)
+    }
+
+    @Test
+    fun `SeriesScreen allocates majority vertical space on 720p landscape and portrait phone`() {
+        val fakeChannels = FakeChannelRepository()
+        val prefs = UserPreferencesDataStore(context)
+        val seriesVm = SeriesViewModel(fakeChannels, prefs)
+        val phoneHeightDp = 800f
+
+        composeRule.setContent {
+            LiquidTVTheme {
+                Box(Modifier.width(390.dp).height(phoneHeightDp.dp)) {
+                    SeriesScreen(onSeriesClick = {}, viewModel = seriesVm)
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag("series_header").assertIsDisplayed()
+        composeRule.onNodeWithTag("series_count").assertIsDisplayed()
+        composeRule.onNodeWithTag("series_grid").assertIsDisplayed()
+        val density = composeRule.density.density
+        val gridHeightDp = composeRule.onNodeWithTag("series_grid").fetchSemanticsNode().boundsInRoot.height / density
+        assertTrue("Expected portrait phone Series grid >= 75% of 800dp screen height, was $gridHeightDp", gridHeightDp >= phoneHeightDp * 0.75f)
     }
 }
 

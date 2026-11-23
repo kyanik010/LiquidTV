@@ -51,55 +51,92 @@ fun MoviesScreen(
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.statusBars),
         ) {
-            val isWide = maxWidth >= 760.dp
-            val topPad = if (isWide) 84.dp else 74.dp
-            val hPad = if (isWide) 28.dp else 14.dp
+            val isWide = maxWidth >= 720.dp
+            val isCompactHeight = maxHeight < 520.dp
+            val topPad = if (isCompactHeight) 62.dp else 66.dp
+            val hPad = when {
+                maxWidth >= 1100.dp -> 24.dp
+                isWide -> 16.dp
+                else -> 12.dp
+            }
+            val sidebarWidth = when {
+                maxWidth >= 1200.dp -> 230.dp
+                maxWidth >= 960.dp -> 205.dp
+                else -> 182.dp
+            }
+            val gridMinCardWidth = when {
+                isCompactHeight -> 130
+                maxWidth >= 1600.dp -> 185
+                maxWidth >= 1100.dp -> 170
+                isWide -> 152
+                else -> 144
+            }
 
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(top = topPad, start = hPad, end = hPad),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(if (isCompactHeight) 6.dp else 8.dp),
             ) {
+                // Single-line compact header: Title + inline count pill (+ filter button on narrow portrait)
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 36.dp)
+                        .testTag("movies_header"),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
                         Text(
                             text = uiState.selectedCategory
                                 ?: if (uiState.favoritesOnly) "الأفلام المفضلة" else "الأفلام",
-                            style = LiquidTypography.HeadlineSmall.copy(
+                            style = (if (isCompactHeight) LiquidTypography.TitleLarge else LiquidTypography.HeadlineSmall).copy(
                                 brush = Brush.linearGradient(
                                     listOf(LiquidColors.TextPrimary, LiquidColors.AccentBlueLight),
                                 ),
                             ),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
                         )
-                        Text(
-                            text = "${uiState.movies.size} فيلم متاح",
-                            style = LiquidTypography.BodySmall,
-                            color = LiquidColors.TextTertiary,
-                        )
+                        LiquidGlassSurface(
+                            cornerRadius = 12.dp,
+                            glassAlpha = 0.14f,
+                            borderAlpha = 0.22f,
+                        ) {
+                            Text(
+                                text = "${uiState.movies.size} فيلم متاح",
+                                style = LiquidTypography.LabelSmall,
+                                color = LiquidColors.TextSecondary,
+                                maxLines = 1,
+                                modifier = Modifier
+                                    .padding(horizontal = 9.dp, vertical = 4.dp)
+                                    .testTag("movies_count"),
+                            )
+                        }
                     }
 
                     if (!isWide) {
+                        Spacer(Modifier.width(8.dp))
                         LiquidGlassSurface(
                             modifier = Modifier
-                                .height(42.dp)
+                                .height(38.dp)
                                 .clickable { showCategoriesSheet = true },
-                            cornerRadius = 21.dp,
+                            cornerRadius = 19.dp,
                             glassAlpha = 0.20f,
                             borderColor = LiquidColors.AccentBlueLight,
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(5.dp),
                             ) {
-                                Icon(Icons.Filled.FilterList, contentDescription = "التصنيفات", tint = LiquidColors.AccentBlueLight, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Filled.FilterList, contentDescription = "التصنيفات", tint = LiquidColors.AccentBlueLight, modifier = Modifier.size(16.dp))
                                 Text("التصنيفات", style = LiquidTypography.LabelMedium, color = Color.White)
                             }
                         }
@@ -107,7 +144,7 @@ fun MoviesScreen(
                 }
 
                 if (!isWide && (uiState.categories.isNotEmpty() || uiState.favoritesCount > 0)) {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         item {
                             MovieFilterPill(
                                 label = "الكل (${uiState.totalCount})",
@@ -157,8 +194,8 @@ fun MoviesScreen(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
-                            .padding(bottom = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            .padding(bottom = if (isCompactHeight) 8.dp else 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(if (isCompactHeight) 12.dp else 14.dp),
                     ) {
                         MoviesCategoriesSidebar(
                             categories = uiState.categories,
@@ -166,11 +203,12 @@ fun MoviesScreen(
                             favoritesCount = uiState.favoritesCount,
                             selectedCategory = uiState.selectedCategory,
                             favoritesOnly = uiState.favoritesOnly,
+                            compactHeight = isCompactHeight,
                             onSelectAll = { viewModel.selectCategory(null) },
                             onSelectFavorites = { viewModel.selectFavoritesOnly() },
                             onSelectCategory = { viewModel.selectCategory(it) },
                             modifier = Modifier
-                                .width(225.dp)
+                                .width(sidebarWidth)
                                 .fillMaxHeight(),
                         )
 
@@ -178,8 +216,9 @@ fun MoviesScreen(
                             movies = uiState.movies,
                             onMovieClick = onMovieClick,
                             onFavoriteToggle = viewModel::toggleFavorite,
-                            contentPadding = PaddingValues(bottom = 24.dp),
-                            minCardWidth = 175,
+                            contentPadding = PaddingValues(bottom = 12.dp),
+                            minCardWidth = gridMinCardWidth,
+                            compactHeight = isCompactHeight,
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight(),
@@ -190,8 +229,9 @@ fun MoviesScreen(
                         movies = uiState.movies,
                         onMovieClick = onMovieClick,
                         onFavoriteToggle = viewModel::toggleFavorite,
-                        contentPadding = PaddingValues(bottom = 88.dp),
-                        minCardWidth = 148,
+                        contentPadding = PaddingValues(bottom = 16.dp),
+                        minCardWidth = gridMinCardWidth,
+                        compactHeight = isCompactHeight,
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
@@ -225,6 +265,7 @@ fun MoviesScreen(
                                 label = "جميع الأفلام",
                                 count = uiState.totalCount,
                                 isSelected = uiState.selectedCategory == null && !uiState.favoritesOnly,
+                                compact = false,
                                 onClick = {
                                     viewModel.selectCategory(null)
                                     showCategoriesSheet = false
@@ -236,6 +277,7 @@ fun MoviesScreen(
                                 label = "المفضلة",
                                 count = uiState.favoritesCount,
                                 isSelected = uiState.favoritesOnly,
+                                compact = false,
                                 onClick = {
                                     viewModel.selectFavoritesOnly()
                                     showCategoriesSheet = false
@@ -247,6 +289,7 @@ fun MoviesScreen(
                                 label = cat.name,
                                 count = cat.channelCount,
                                 isSelected = !uiState.favoritesOnly && uiState.selectedCategory.equals(cat.name, ignoreCase = true),
+                                compact = false,
                                 onClick = {
                                     viewModel.selectCategory(cat.name)
                                     showCategoriesSheet = false
@@ -267,6 +310,7 @@ private fun MoviesCategoriesSidebar(
     favoritesCount: Int,
     selectedCategory: String?,
     favoritesOnly: Boolean,
+    compactHeight: Boolean,
     onSelectAll: () -> Unit,
     onSelectFavorites: () -> Unit,
     onSelectCategory: (String) -> Unit,
@@ -274,31 +318,35 @@ private fun MoviesCategoriesSidebar(
 ) {
     LiquidGlassSurface(
         modifier = modifier,
-        cornerRadius = 22.dp,
+        cornerRadius = 20.dp,
         glassAlpha = 0.14f,
         borderAlpha = 0.22f,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(horizontal = 8.dp, vertical = if (compactHeight) 6.dp else 8.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compactHeight) 4.dp else 5.dp),
         ) {
             Text(
                 text = "التصنيفات",
-                style = LiquidTypography.TitleMedium,
+                style = if (compactHeight) LiquidTypography.TitleSmall else LiquidTypography.TitleMedium,
                 color = LiquidColors.TextPrimary,
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = if (compactHeight) 0.dp else 2.dp),
             )
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .testTag("movies_categories_sidebar"),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
             ) {
                 item(key = "__all__") {
                     MovieSidebarRow(
                         label = "جميع الأفلام",
                         count = totalCount,
                         isSelected = selectedCategory == null && !favoritesOnly,
+                        compact = compactHeight,
                         onClick = onSelectAll,
                     )
                 }
@@ -307,6 +355,7 @@ private fun MoviesCategoriesSidebar(
                         label = "المفضلة",
                         count = favoritesCount,
                         isSelected = favoritesOnly,
+                        compact = compactHeight,
                         onClick = onSelectFavorites,
                     )
                 }
@@ -315,6 +364,7 @@ private fun MoviesCategoriesSidebar(
                         label = cat.name,
                         count = cat.channelCount,
                         isSelected = !favoritesOnly && selectedCategory.equals(cat.name, ignoreCase = true),
+                        compact = compactHeight,
                         onClick = { onSelectCategory(cat.name) },
                     )
                 }
@@ -328,6 +378,7 @@ private fun MovieSidebarRow(
     label: String,
     count: Int,
     isSelected: Boolean,
+    compact: Boolean,
     onClick: () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -336,10 +387,10 @@ private fun MovieSidebarRow(
     LiquidGlassSurface(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 48.dp)
+            .heightIn(min = if (compact) 40.dp else 44.dp)
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
-        cornerRadius = 14.dp,
+        cornerRadius = 12.dp,
         glassAlpha = if (isSelected) 0.34f else if (isFocused) 0.22f else 0.08f,
         borderAlpha = if (isFocused) 0.85f else if (isSelected) 0.55f else 0.14f,
         borderColor = if (isSelected || isFocused) LiquidColors.AccentBlueLight else Color.White,
@@ -348,7 +399,7 @@ private fun MovieSidebarRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(horizontal = 10.dp, vertical = if (compact) 7.dp else 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
@@ -360,7 +411,7 @@ private fun MovieSidebarRow(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(6.dp))
             Text(
                 text = count.toString(),
                 style = LiquidTypography.LabelSmall,
@@ -377,6 +428,7 @@ private fun MoviesGridArea(
     onFavoriteToggle: (String) -> Unit,
     contentPadding: PaddingValues,
     minCardWidth: Int,
+    compactHeight: Boolean,
     modifier: Modifier = Modifier,
 ) {
     if (movies.isEmpty()) {
@@ -404,16 +456,18 @@ private fun MoviesGridArea(
         return
     }
 
+    val gridGap = if (compactHeight) 10.dp else 14.dp
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = minCardWidth.dp),
         contentPadding = contentPadding,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(gridGap),
+        verticalArrangement = Arrangement.spacedBy(gridGap),
         modifier = modifier.testTag("movies_grid"),
     ) {
         items(movies, key = { it.id }) { movie ->
             MovieCinemaPosterCard(
                 movie = movie,
+                compactHeight = compactHeight,
                 onClick = { onMovieClick(movie.id) },
                 onFavoriteToggle = { onFavoriteToggle(movie.id) },
             )
@@ -431,17 +485,17 @@ private fun MovieFilterPill(
     val isFocused by interactionSource.collectIsFocusedAsState()
     LiquidGlassSurface(
         modifier = Modifier
-            .height(42.dp)
+            .height(36.dp)
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
-        cornerRadius = 21.dp,
+        cornerRadius = 18.dp,
         glassAlpha = if (selected) 0.35f else if (isFocused) 0.24f else 0.12f,
         borderAlpha = if (isFocused) 0.8f else if (selected) 0.55f else 0.18f,
         borderColor = if (selected || isFocused) LiquidColors.AccentBlueLight else Color.White,
         isFocused = isFocused,
     ) {
         Box(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -456,6 +510,7 @@ private fun MovieFilterPill(
 @Composable
 private fun MovieCinemaPosterCard(
     movie: Channel,
+    compactHeight: Boolean,
     onClick: () -> Unit,
     onFavoriteToggle: () -> Unit,
 ) {
@@ -467,19 +522,19 @@ private fun MovieCinemaPosterCard(
             .fillMaxWidth()
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
-        cornerRadius = 18.dp,
+        cornerRadius = 16.dp,
         glassAlpha = if (isFocused) 0.30f else 0.15f,
         borderAlpha = if (isFocused) 0.90f else 0.22f,
         borderColor = if (isFocused) LiquidColors.AccentBlueLight else Color.White,
         isFocused = isFocused,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // 2:3 Cinema Poster Ratio
+            // Strict 2:3 Cinema Poster Ratio — never squashed
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(2f / 3f)
-                    .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
+                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                     .background(LiquidColors.GlassTertiary),
                 contentAlignment = Alignment.Center,
             ) {
@@ -495,7 +550,7 @@ private fun MovieCinemaPosterCard(
                         imageVector = Icons.Filled.Movie,
                         contentDescription = null,
                         tint = LiquidColors.AccentBlueLight.copy(alpha = 0.45f),
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.size(44.dp),
                     )
                 }
 
@@ -503,7 +558,7 @@ private fun MovieCinemaPosterCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(64.dp)
+                        .height(56.dp)
                         .align(Alignment.BottomCenter)
                         .background(
                             Brush.verticalGradient(
@@ -512,14 +567,13 @@ private fun MovieCinemaPosterCard(
                         ),
                 )
 
-                // Rating Badge ONLY if real rating exists
                 movie.rating?.takeIf { it.isNotBlank() && it != "0" }?.let { rating ->
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopStart)
-                            .padding(8.dp)
+                            .padding(7.dp)
                             .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 7.dp, vertical = 3.dp),
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
                     ) {
                         Text(
                             text = "★ $rating",
@@ -529,12 +583,11 @@ private fun MovieCinemaPosterCard(
                     }
                 }
 
-                // Favorite button (48.dp touch target)
                 IconButton(
                     onClick = onFavoriteToggle,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .size(48.dp),
+                        .size(44.dp),
                 ) {
                     Icon(
                         imageVector = if (movie.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
@@ -543,14 +596,13 @@ private fun MovieCinemaPosterCard(
                     )
                 }
 
-                // Resume badge ONLY if user has watched progress
                 if (movie.resumePositionMs > 0L) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomStart)
-                            .padding(8.dp)
+                            .padding(7.dp)
                             .background(LiquidColors.AccentBlue.copy(alpha = 0.90f), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            .padding(horizontal = 7.dp, vertical = 3.dp),
                     ) {
                         Text(
                             text = "متابعة",
@@ -560,14 +612,13 @@ private fun MovieCinemaPosterCard(
                     }
                 }
 
-                // Release Year badge ONLY if real releaseYear is present
                 movie.releaseYear?.takeIf { it.isNotBlank() && it != "0" }?.let { year ->
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(8.dp)
+                            .padding(7.dp)
                             .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 7.dp, vertical = 3.dp),
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
                     ) {
                         Text(
                             text = year.take(4),
@@ -579,14 +630,14 @@ private fun MovieCinemaPosterCard(
             }
 
             Column(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = if (compactHeight) 6.dp else 8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
                     text = movie.name,
                     style = LiquidTypography.TitleSmall,
                     color = LiquidColors.TextPrimary,
-                    maxLines = 2,
+                    maxLines = if (compactHeight) 1 else 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 movie.groupTitle?.takeIf { it.isNotBlank() }?.let { group ->

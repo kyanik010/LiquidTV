@@ -1,7 +1,6 @@
 package com.liquidtv.app.ui.screens.livetv
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -80,17 +79,32 @@ fun LiveTVScreen(
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.statusBars),
         ) {
-            val isWide = maxWidth >= 840.dp
-            val topPad = if (isWide) 84.dp else 74.dp
-            val hPad = if (isWide) 24.dp else 14.dp
+            val isWide = maxWidth >= 720.dp
+            val isCompactHeight = maxHeight < 520.dp
+            val topPad = if (isCompactHeight) 62.dp else 66.dp
+            val hPad = when {
+                maxWidth >= 1100.dp -> 24.dp
+                isWide -> 14.dp
+                else -> 12.dp
+            }
+            val paneSpacing = if (maxWidth >= 1000.dp) 14.dp else 10.dp
+            val sidebarWidth = when {
+                maxWidth >= 1200.dp -> 235.dp
+                maxWidth >= 960.dp -> 205.dp
+                else -> 178.dp
+            }
+            val previewWidth = when {
+                maxWidth >= 1200.dp -> 305.dp
+                maxWidth >= 960.dp -> 260.dp
+                else -> 225.dp
+            }
 
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(top = topPad, start = hPad, end = hPad),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(if (isCompactHeight) 6.dp else 8.dp),
             ) {
-                // Header bar
                 LiveTVHeader(
                     filterTitle = filterLanguage ?: filterCountry ?: uiState.filter.category
                         ?: if (uiState.filter.showFavoritesOnly) "القنوات المفضلة" else "البث المباشر",
@@ -98,6 +112,7 @@ fun LiveTVScreen(
                     sortOrder = uiState.filter.sortOrder,
                     viewMode = uiState.viewMode,
                     isWide = isWide,
+                    compactHeight = isCompactHeight,
                     onOpenCategoriesSheet = { showCategoriesSheet = true },
                     onSortSelected = viewModel::setSortOrder,
                     onViewModeSelected = viewModel::setViewMode,
@@ -124,14 +139,14 @@ fun LiveTVScreen(
                         }
                     }
                 } else if (isWide) {
-                    // Wide TV / Tablet 3-Pane Liquid Glass Layout:
+                    // Wide TV / Tablet / Landscape 3-Pane Liquid Glass Layout:
                     // Categories Sidebar | Channels List/Grid | Channel Info + EPG Preview
                     Row(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
-                            .padding(bottom = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            .padding(bottom = if (isCompactHeight) 8.dp else 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(paneSpacing),
                     ) {
                         LiveCategoriesSidebar(
                             categories = uiState.categories,
@@ -139,11 +154,12 @@ fun LiveTVScreen(
                             favoritesCount = uiState.favoritesCount,
                             selectedCategory = uiState.filter.category,
                             favoritesOnly = uiState.filter.showFavoritesOnly,
+                            compactHeight = isCompactHeight,
                             onSelectAll = { viewModel.selectCategory(null) },
                             onSelectFavorites = { viewModel.selectFavoritesFilter() },
                             onSelectCategory = { viewModel.selectCategory(it) },
                             modifier = Modifier
-                                .width(225.dp)
+                                .width(sidebarWidth)
                                 .fillMaxHeight(),
                         )
 
@@ -151,7 +167,7 @@ fun LiveTVScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight(),
-                            cornerRadius = 22.dp,
+                            cornerRadius = 20.dp,
                             glassAlpha = 0.12f,
                             borderAlpha = 0.20f,
                         ) {
@@ -159,6 +175,7 @@ fun LiveTVScreen(
                                 channels = uiState.channels,
                                 selectedChannelId = uiState.selectedChannel?.id,
                                 viewMode = uiState.viewMode,
+                                compactHeight = isCompactHeight,
                                 onChannelFocused = viewModel::selectChannelForPreview,
                                 onChannelClicked = { channel ->
                                     if (uiState.selectedChannel?.id == channel.id) {
@@ -169,25 +186,26 @@ fun LiveTVScreen(
                                 },
                                 onChannelPlayDirect = { channel -> onChannelClick(channel.id) },
                                 onFavoriteToggle = viewModel::toggleFavorite,
-                                contentPadding = PaddingValues(14.dp),
+                                contentPadding = PaddingValues(if (isCompactHeight) 6.dp else 10.dp),
                             )
                         }
 
                         LiveChannelInfoEpgPane(
                             channel = uiState.selectedChannel,
                             epg = uiState.selectedEpg,
+                            compactHeight = isCompactHeight,
                             onPlayClick = { ch -> onChannelClick(ch.id) },
                             onFavoriteToggle = { ch -> viewModel.toggleFavorite(ch.id) },
                             modifier = Modifier
-                                .width(290.dp)
+                                .width(previewWidth)
                                 .fillMaxHeight(),
                         )
                     }
                 } else {
-                    // Compact Phone Layout: Quick filter pills + selected EPG strip + full-width channel list
+                    // Compact Portrait Phone Layout: Quick filter pills + selected EPG strip + full-height channel list
                     LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        contentPadding = PaddingValues(vertical = 1.dp),
                     ) {
                         item {
                             CompactFilterChip(
@@ -227,11 +245,12 @@ fun LiveTVScreen(
                         channels = uiState.channels,
                         selectedChannelId = uiState.selectedChannel?.id,
                         viewMode = uiState.viewMode,
+                        compactHeight = false,
                         onChannelFocused = viewModel::selectChannelForPreview,
                         onChannelClicked = { ch -> onChannelClick(ch.id) },
                         onChannelPlayDirect = { ch -> onChannelClick(ch.id) },
                         onFavoriteToggle = viewModel::toggleFavorite,
-                        contentPadding = PaddingValues(bottom = 88.dp),
+                        contentPadding = PaddingValues(bottom = 16.dp),
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
@@ -270,6 +289,7 @@ fun LiveTVScreen(
                                 label = "جميع القنوات",
                                 count = uiState.totalChannelsCount,
                                 isSelected = uiState.filter.category == null && !uiState.filter.showFavoritesOnly,
+                                compact = false,
                                 onClick = {
                                     viewModel.selectCategory(null)
                                     showCategoriesSheet = false
@@ -281,6 +301,7 @@ fun LiveTVScreen(
                                 label = "المفضلة",
                                 count = uiState.favoritesCount,
                                 isSelected = uiState.filter.showFavoritesOnly,
+                                compact = false,
                                 onClick = {
                                     viewModel.selectFavoritesFilter()
                                     showCategoriesSheet = false
@@ -292,6 +313,7 @@ fun LiveTVScreen(
                                 label = cat.name,
                                 count = cat.channelCount,
                                 isSelected = uiState.filter.category.equals(cat.name, ignoreCase = true),
+                                compact = false,
                                 onClick = {
                                     viewModel.selectCategory(cat.name)
                                     showCategoriesSheet = false
@@ -312,89 +334,192 @@ private fun LiveTVHeader(
     sortOrder: SortOrder,
     viewMode: ViewMode,
     isWide: Boolean,
+    compactHeight: Boolean,
     onOpenCategoriesSheet: () -> Unit,
     onSortSelected: (SortOrder) -> Unit,
     onViewModeSelected: (ViewMode) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    val sortOrders = remember {
+        listOf(
+            "أ - ي" to SortOrder.NAME_ASC,
+            "ي - أ" to SortOrder.NAME_DESC,
+            "المفضلة" to SortOrder.FAVORITES_FIRST,
+            "التصنيف" to SortOrder.CATEGORY,
+        )
+    }
+
+    if (isWide) {
+        // Unified single-row bar: Title + Count | Sort Pills | Circular ViewMode toggles
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 42.dp)
+                .testTag("live_tv_header"),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 Text(
                     text = filterTitle,
-                    style = LiquidTypography.HeadlineSmall.copy(
+                    style = (if (compactHeight) LiquidTypography.TitleLarge else LiquidTypography.HeadlineSmall).copy(
                         brush = Brush.linearGradient(
                             listOf(LiquidColors.TextPrimary, LiquidColors.AccentBlueLight),
                         ),
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
-                Text(
-                    text = "$channelsCount قناة متاحة",
-                    style = LiquidTypography.BodySmall,
-                    color = LiquidColors.TextTertiary,
-                )
+                LiquidGlassSurface(
+                    cornerRadius = 12.dp,
+                    glassAlpha = 0.14f,
+                    borderAlpha = 0.22f,
+                ) {
+                    Text(
+                        text = "$channelsCount قناة متاحة",
+                        style = LiquidTypography.LabelSmall,
+                        color = LiquidColors.TextSecondary,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .padding(horizontal = 9.dp, vertical = 4.dp)
+                            .testTag("live_channels_count"),
+                    )
+                }
+            }
+
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                items(sortOrders, key = { it.second.name }) { (label, order) ->
+                    CompactFilterChip(
+                        label = label,
+                        selected = sortOrder == order,
+                        onClick = { onSortSelected(order) },
+                        modifier = Modifier.testTag("live_sort_${order.name.lowercase()}"),
+                    )
+                }
             }
 
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (!isWide) {
-                    LiquidGlassSurface(
-                        modifier = Modifier
-                            .height(42.dp)
-                            .clickable(onClick = onOpenCategoriesSheet),
-                        cornerRadius = 21.dp,
-                        glassAlpha = 0.20f,
-                        borderColor = LiquidColors.AccentBlueLight,
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            Icon(Icons.Filled.FilterList, contentDescription = "التصنيفات", tint = LiquidColors.AccentBlueLight, modifier = Modifier.size(18.dp))
-                            Text("التصنيفات", style = LiquidTypography.LabelMedium, color = Color.White)
-                        }
-                    }
-                }
-
-                // ViewMode toggle buttons (48.dp touch target)
                 ViewModeIconButton(
                     icon = Icons.AutoMirrored.Filled.List,
                     contentDescription = "عرض القائمة",
                     selected = viewMode == ViewMode.LIST,
                     onClick = { onViewModeSelected(ViewMode.LIST) },
+                    modifier = Modifier.testTag("live_view_list"),
                 )
                 ViewModeIconButton(
                     icon = Icons.Filled.GridView,
                     contentDescription = "عرض الشبكة",
                     selected = viewMode == ViewMode.GRID,
                     onClick = { onViewModeSelected(ViewMode.GRID) },
+                    modifier = Modifier.testTag("live_view_grid"),
                 )
             }
         }
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("live_tv_header"),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = filterTitle,
+                        style = LiquidTypography.TitleLarge.copy(
+                            brush = Brush.linearGradient(
+                                listOf(LiquidColors.TextPrimary, LiquidColors.AccentBlueLight),
+                            ),
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    LiquidGlassSurface(
+                        cornerRadius = 10.dp,
+                        glassAlpha = 0.14f,
+                        borderAlpha = 0.22f,
+                    ) {
+                        Text(
+                            text = "$channelsCount قناة متاحة",
+                            style = LiquidTypography.LabelSmall,
+                            color = LiquidColors.TextSecondary,
+                            maxLines = 1,
+                            modifier = Modifier
+                                .padding(horizontal = 7.dp, vertical = 3.dp)
+                                .testTag("live_channels_count"),
+                        )
+                    }
+                }
 
-        // Sort pills
-        val sortOrders = listOf(
-            "أ - ي" to SortOrder.NAME_ASC,
-            "ي - أ" to SortOrder.NAME_DESC,
-            "المفضلة" to SortOrder.FAVORITES_FIRST,
-            "التصنيف" to SortOrder.CATEGORY,
-        )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(sortOrders) { (label, order) ->
-                val isSelected = sortOrder == order
-                CompactFilterChip(
-                    label = label,
-                    selected = isSelected,
-                    onClick = { onSortSelected(order) },
-                )
+                Spacer(Modifier.width(6.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    LiquidGlassSurface(
+                        modifier = Modifier
+                            .height(38.dp)
+                            .clickable(onClick = onOpenCategoriesSheet),
+                        cornerRadius = 19.dp,
+                        glassAlpha = 0.20f,
+                        borderColor = LiquidColors.AccentBlueLight,
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Icon(Icons.Filled.FilterList, contentDescription = "التصنيفات", tint = LiquidColors.AccentBlueLight, modifier = Modifier.size(16.dp))
+                            Text("التصنيفات", style = LiquidTypography.LabelMedium, color = Color.White)
+                        }
+                    }
+
+                    ViewModeIconButton(
+                        icon = Icons.AutoMirrored.Filled.List,
+                        contentDescription = "عرض القائمة",
+                        selected = viewMode == ViewMode.LIST,
+                        onClick = { onViewModeSelected(ViewMode.LIST) },
+                        modifier = Modifier.testTag("live_view_list"),
+                    )
+                    ViewModeIconButton(
+                        icon = Icons.Filled.GridView,
+                        contentDescription = "عرض الشبكة",
+                        selected = viewMode == ViewMode.GRID,
+                        onClick = { onViewModeSelected(ViewMode.GRID) },
+                        modifier = Modifier.testTag("live_view_grid"),
+                    )
+                }
+            }
+
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(sortOrders, key = { it.second.name }) { (label, order) ->
+                    CompactFilterChip(
+                        label = label,
+                        selected = sortOrder == order,
+                        onClick = { onSortSelected(order) },
+                        modifier = Modifier.testTag("live_sort_${order.name.lowercase()}"),
+                    )
+                }
             }
         }
     }
@@ -406,15 +531,16 @@ private fun ViewModeIconButton(
     contentDescription: String,
     selected: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     LiquidGlassSurface(
-        modifier = Modifier
-            .size(44.dp)
+        modifier = modifier
+            .size(42.dp)
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
-        cornerRadius = 22.dp,
+        cornerRadius = 21.dp,
         glassAlpha = if (selected) 0.34f else 0.14f,
         borderAlpha = if (isFocused) 0.85f else if (selected) 0.55f else 0.20f,
         borderColor = if (selected || isFocused) LiquidColors.AccentBlueLight else Color.White,
@@ -425,7 +551,7 @@ private fun ViewModeIconButton(
                 imageVector = icon,
                 contentDescription = contentDescription,
                 tint = if (selected) LiquidColors.AccentBlueLight else LiquidColors.TextSecondary,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(19.dp),
             )
         }
     }
@@ -438,41 +564,44 @@ private fun LiveCategoriesSidebar(
     favoritesCount: Int,
     selectedCategory: String?,
     favoritesOnly: Boolean,
+    compactHeight: Boolean,
     onSelectAll: () -> Unit,
     onSelectFavorites: () -> Unit,
     onSelectCategory: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LiquidGlassSurface(
-        modifier = modifier,
-        cornerRadius = 22.dp,
+        modifier = modifier.testTag("live_categories_pane"),
+        cornerRadius = 20.dp,
         glassAlpha = 0.14f,
         borderAlpha = 0.22f,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(horizontal = 8.dp, vertical = if (compactHeight) 6.dp else 8.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compactHeight) 4.dp else 5.dp),
         ) {
             Text(
                 text = "التصنيفات",
-                style = LiquidTypography.TitleMedium,
+                style = if (compactHeight) LiquidTypography.TitleSmall else LiquidTypography.TitleMedium,
                 color = LiquidColors.TextPrimary,
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = if (compactHeight) 0.dp else 2.dp),
             )
 
             LazyColumn(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .weight(1f)
+                    .fillMaxWidth()
                     .testTag("live_categories_sidebar"),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
             ) {
                 item(key = "__all__") {
                     CategorySidebarRow(
                         label = "جميع القنوات",
                         count = totalCount,
                         isSelected = selectedCategory == null && !favoritesOnly,
+                        compact = compactHeight,
                         onClick = onSelectAll,
                     )
                 }
@@ -481,6 +610,7 @@ private fun LiveCategoriesSidebar(
                         label = "المفضلة",
                         count = favoritesCount,
                         isSelected = favoritesOnly,
+                        compact = compactHeight,
                         onClick = onSelectFavorites,
                     )
                 }
@@ -489,6 +619,7 @@ private fun LiveCategoriesSidebar(
                         label = category.name,
                         count = category.channelCount,
                         isSelected = !favoritesOnly && selectedCategory.equals(category.name, ignoreCase = true),
+                        compact = compactHeight,
                         onClick = { onSelectCategory(category.name) },
                     )
                 }
@@ -502,6 +633,7 @@ private fun CategorySidebarRow(
     label: String,
     count: Int,
     isSelected: Boolean,
+    compact: Boolean,
     onClick: () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -510,10 +642,10 @@ private fun CategorySidebarRow(
     LiquidGlassSurface(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 48.dp)
+            .heightIn(min = if (compact) 40.dp else 44.dp)
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
-        cornerRadius = 14.dp,
+        cornerRadius = 12.dp,
         glassAlpha = if (isSelected) 0.34f else if (isFocused) 0.22f else 0.08f,
         borderAlpha = if (isFocused) 0.85f else if (isSelected) 0.55f else 0.14f,
         borderColor = if (isSelected || isFocused) LiquidColors.AccentBlueLight else Color.White,
@@ -522,7 +654,7 @@ private fun CategorySidebarRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(horizontal = 10.dp, vertical = if (compact) 7.dp else 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
@@ -534,7 +666,7 @@ private fun CategorySidebarRow(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(6.dp))
             Text(
                 text = count.toString(),
                 style = LiquidTypography.LabelSmall,
@@ -549,6 +681,7 @@ private fun LiveChannelsPane(
     channels: List<Channel>,
     selectedChannelId: String?,
     viewMode: ViewMode,
+    compactHeight: Boolean,
     onChannelFocused: (Channel) -> Unit,
     onChannelClicked: (Channel) -> Unit,
     onChannelPlayDirect: (Channel) -> Unit,
@@ -574,16 +707,19 @@ private fun LiveChannelsPane(
     when (viewMode) {
         ViewMode.GRID -> {
             LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 170.dp),
+                columns = GridCells.Adaptive(minSize = if (compactHeight) 145.dp else 165.dp),
                 contentPadding = contentPadding,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = modifier
+                    .fillMaxSize()
+                    .testTag("live_channels_grid"),
             ) {
                 items(channels, key = { it.id }) { channel ->
                     LiveTVGridCard(
                         channel = channel,
                         isSelected = channel.id == selectedChannelId,
+                        compactHeight = compactHeight,
                         onFocused = { onChannelFocused(channel) },
                         onClick = { onChannelPlayDirect(channel) },
                         onFavoriteToggle = { onFavoriteToggle(channel.id) },
@@ -596,7 +732,7 @@ private fun LiveChannelsPane(
             LazyColumn(
                 state = listState,
                 contentPadding = contentPadding,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = modifier
                     .fillMaxSize()
                     .testTag("live_channels_list"),
@@ -607,6 +743,7 @@ private fun LiveChannelsPane(
                         index = idx + 1,
                         channel = channel,
                         isSelected = channel.id == selectedChannelId,
+                        compactHeight = compactHeight,
                         onFocused = { onChannelFocused(channel) },
                         onClick = { onChannelClicked(channel) },
                         onPlayClick = { onChannelPlayDirect(channel) },
@@ -622,13 +759,14 @@ private fun LiveChannelsPane(
 private fun LiveChannelInfoEpgPane(
     channel: Channel?,
     epg: ChannelEpgSummary,
+    compactHeight: Boolean,
     onPlayClick: (Channel) -> Unit,
     onFavoriteToggle: (Channel) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LiquidGlassSurface(
         modifier = modifier,
-        cornerRadius = 22.dp,
+        cornerRadius = 20.dp,
         glassAlpha = 0.16f,
         borderAlpha = 0.24f,
     ) {
@@ -638,7 +776,7 @@ private fun LiveChannelInfoEpgPane(
                     text = "اختر قناة لعرض معلوماتها ودليل البرامج",
                     style = LiquidTypography.BodySmall,
                     color = LiquidColors.TextSecondary,
-                    modifier = Modifier.padding(20.dp),
+                    modifier = Modifier.padding(16.dp),
                 )
             }
             return@LiquidGlassSurface
@@ -647,16 +785,16 @@ private fun LiveChannelInfoEpgPane(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(if (compactHeight) 10.dp else 14.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compactHeight) 8.dp else 12.dp),
         ) {
             // Uncropped channel logo showcase
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(130.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .height(if (compactHeight) 76.dp else 118.dp)
+                    .clip(RoundedCornerShape(14.dp))
                     .background(
                         Brush.verticalGradient(
                             listOf(
@@ -673,16 +811,16 @@ private fun LiveChannelInfoEpgPane(
                         contentDescription = channel.name,
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(14.dp),
+                            .padding(if (compactHeight) 8.dp else 12.dp),
                         contentScale = ContentScale.Fit,
                     )
                 } else {
-                    Icon(Icons.Filled.Tv, null, tint = LiquidColors.AccentBlueLight, modifier = Modifier.size(48.dp))
+                    Icon(Icons.Filled.Tv, null, tint = LiquidColors.AccentBlueLight, modifier = Modifier.size(if (compactHeight) 34.dp else 44.dp))
                 }
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(10.dp),
+                        .padding(8.dp),
                 ) {
                     LiveBadge()
                 }
@@ -701,26 +839,26 @@ private fun LiveChannelInfoEpgPane(
             }
 
             // Channel title & metadata
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     text = channel.name,
-                    style = LiquidTypography.TitleLarge,
+                    style = if (compactHeight) LiquidTypography.TitleMedium else LiquidTypography.TitleLarge,
                     color = LiquidColors.TextPrimary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     channel.groupTitle?.takeIf { it.isNotBlank() }?.let { group ->
-                        Text(group, style = LiquidTypography.LabelSmall, color = LiquidColors.AccentBlueLight)
+                        Text(group, style = LiquidTypography.LabelSmall, color = LiquidColors.AccentBlueLight, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     channel.country?.takeIf { it.isNotBlank() }?.let { country ->
-                        Text("• $country", style = LiquidTypography.LabelSmall, color = LiquidColors.TextTertiary)
+                        Text("• $country", style = LiquidTypography.LabelSmall, color = LiquidColors.TextTertiary, maxLines = 1)
                     }
                     channel.language?.takeIf { it.isNotBlank() }?.let { lang ->
-                        Text("• $lang", style = LiquidTypography.LabelSmall, color = LiquidColors.TextTertiary)
+                        Text("• $lang", style = LiquidTypography.LabelSmall, color = LiquidColors.TextTertiary, maxLines = 1)
                     }
                 }
             }
@@ -728,32 +866,33 @@ private fun LiveChannelInfoEpgPane(
             // Play CTA
             Button(
                 onClick = { onPlayClick(channel) },
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = LiquidColors.AccentBlue,
                     contentColor = Color.White,
                 ),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
+                    .height(if (compactHeight) 40.dp else 46.dp)
                     .testTag("live_preview_play_button"),
             ) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
+                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
                 Text("تشغيل القناة", style = LiquidTypography.LabelLarge.copy(fontWeight = FontWeight.Bold))
             }
 
             // EPG Current & Next
             LiquidGlassSurface(
-                cornerRadius = 16.dp,
+                cornerRadius = 14.dp,
                 glassAlpha = 0.12f,
                 borderAlpha = 0.20f,
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                        .padding(if (compactHeight) 10.dp else 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (compactHeight) 6.dp else 8.dp),
                 ) {
                     Text(
                         text = "دليل البرامج المباشر",
@@ -772,7 +911,7 @@ private fun LiveChannelInfoEpgPane(
                         )
                     } else {
                         current?.let { prog ->
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -796,7 +935,7 @@ private fun LiveChannelInfoEpgPane(
                                         text = desc,
                                         style = LiquidTypography.BodySmall,
                                         color = LiquidColors.TextSecondary,
-                                        maxLines = 3,
+                                        maxLines = if (compactHeight) 2 else 3,
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                 }
@@ -814,7 +953,7 @@ private fun LiveChannelInfoEpgPane(
 
                         next?.let { prog ->
                             HorizontalDivider(color = Color.White.copy(alpha = 0.10f))
-                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -830,7 +969,7 @@ private fun LiveChannelInfoEpgPane(
                                     text = prog.title,
                                     style = LiquidTypography.BodySmall,
                                     color = LiquidColors.TextPrimary,
-                                    maxLines = 2,
+                                    maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }
@@ -858,7 +997,7 @@ private fun CompactSelectedEpgStrip(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 12.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -887,22 +1026,23 @@ private fun CompactFilterChip(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     LiquidGlassSurface(
-        modifier = Modifier
-            .heightIn(min = 42.dp)
+        modifier = modifier
+            .height(36.dp)
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
-        cornerRadius = 21.dp,
+        cornerRadius = 18.dp,
         glassAlpha = if (selected) 0.35f else if (isFocused) 0.22f else 0.12f,
         borderAlpha = if (isFocused) 0.80f else if (selected) 0.55f else 0.18f,
         borderColor = if (selected || isFocused) LiquidColors.AccentBlueLight else Color.White,
         isFocused = isFocused,
     ) {
         Box(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -919,6 +1059,7 @@ private fun CompactFilterChip(
 private fun LiveTVGridCard(
     channel: Channel,
     isSelected: Boolean,
+    compactHeight: Boolean,
     onFocused: () -> Unit,
     onClick: () -> Unit,
     onFavoriteToggle: () -> Unit,
@@ -929,11 +1070,11 @@ private fun LiveTVGridCard(
     LiquidGlassSurface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(200.dp)
+            .height(if (compactHeight) 152.dp else 184.dp)
             .onFocusChanged { if (it.isFocused) onFocused() }
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
-        cornerRadius = 18.dp,
+        cornerRadius = 16.dp,
         glassAlpha = if (isFocused || isSelected) 0.30f else 0.15f,
         borderAlpha = if (isFocused || isSelected) 0.85f else 0.22f,
         borderColor = if (isFocused || isSelected) LiquidColors.AccentBlueLight else Color.White,
@@ -946,7 +1087,7 @@ private fun LiveTVGridCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(112.dp)
+                    .weight(1f)
                     .background(
                         Brush.verticalGradient(
                             listOf(
@@ -954,7 +1095,7 @@ private fun LiveTVGridCard(
                                 LiquidColors.GlassTertiary,
                             ),
                         ),
-                        RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
+                        RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
                     ),
                 contentAlignment = Alignment.Center,
             ) {
@@ -964,16 +1105,16 @@ private fun LiveTVGridCard(
                         contentDescription = channel.name,
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(12.dp),
+                            .padding(10.dp),
                         contentScale = ContentScale.Fit,
                     )
                 } else {
-                    Icon(Icons.Filled.Tv, null, tint = LiquidColors.AccentBlue.copy(alpha = 0.45f), modifier = Modifier.size(40.dp))
+                    Icon(Icons.Filled.Tv, null, tint = LiquidColors.AccentBlue.copy(alpha = 0.45f), modifier = Modifier.size(34.dp))
                 }
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .padding(8.dp),
+                        .padding(6.dp),
                     contentAlignment = Alignment.TopStart,
                 ) {
                     LiveBadge()
@@ -996,8 +1137,8 @@ private fun LiveTVGridCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(3.dp),
+                    .padding(horizontal = 10.dp, vertical = 7.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
                     text = channel.name,
@@ -1023,6 +1164,7 @@ private fun LiveTVListRow(
     index: Int,
     channel: Channel,
     isSelected: Boolean,
+    compactHeight: Boolean,
     onFocused: () -> Unit,
     onClick: () -> Unit,
     onPlayClick: () -> Unit,
@@ -1035,122 +1177,138 @@ private fun LiveTVListRow(
     LiquidGlassSurface(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 68.dp)
+            .heightIn(min = if (compactHeight) 52.dp else 58.dp)
             .onFocusChanged { if (it.isFocused) onFocused() }
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
-        cornerRadius = 16.dp,
+        cornerRadius = 14.dp,
         glassAlpha = if (isFocused) 0.30f else if (isSelected) 0.22f else 0.12f,
         borderAlpha = if (isFocused) 0.85f else if (isSelected) 0.55f else 0.18f,
         borderColor = if (isFocused || isSelected) LiquidColors.AccentBlueLight else Color.White,
         isFocused = isFocused,
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            // Channel Number Badge
-            Box(
-                modifier = Modifier
-                    .widthIn(min = 38.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.White.copy(alpha = 0.08f))
-                    .padding(horizontal = 6.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = displayNumber,
-                    style = LiquidTypography.LabelSmall,
-                    color = if (isFocused || isSelected) LiquidColors.AccentBlueLight else LiquidColors.TextTertiary,
-                )
-            }
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val showLiveBadgeInline = maxWidth >= 320.dp
+            val showPlayIcon = maxWidth >= 260.dp
 
-            // Uncropped Logo Container
-            Box(
+            Row(
                 modifier = Modifier
-                    .size(46.dp)
-                    .background(
-                        Brush.linearGradient(
-                            listOf(
-                                LiquidColors.AccentBlue.copy(alpha = if (isFocused) 0.25f else 0.12f),
-                                LiquidColors.GlassTertiary,
-                            ),
-                        ),
-                        RoundedCornerShape(10.dp),
-                    ),
-                contentAlignment = Alignment.Center,
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = if (compactHeight) 5.dp else 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (!channel.logoUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = channel.logoUrl,
-                        contentDescription = channel.name,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(4.dp),
-                        contentScale = ContentScale.Fit,
-                    )
-                } else {
-                    Icon(Icons.Filled.Tv, null, tint = LiquidColors.AccentBlue.copy(alpha = 0.45f), modifier = Modifier.size(22.dp))
-                }
-            }
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(
-                    text = channel.name,
-                    style = LiquidTypography.TitleMedium,
-                    color = LiquidColors.TextPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                // Channel Number Badge
+                Box(
+                    modifier = Modifier
+                        .widthIn(min = 34.dp)
+                        .clip(RoundedCornerShape(7.dp))
+                        .background(Color.White.copy(alpha = 0.08f))
+                        .padding(horizontal = 5.dp, vertical = 3.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    channel.groupTitle?.takeIf { it.isNotBlank() }?.let {
-                        Text(it, style = LiquidTypography.LabelSmall, color = LiquidColors.AccentBlueLight, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                    channel.language?.takeIf { it.isNotBlank() }?.let {
-                        Text(it, style = LiquidTypography.LabelSmall, color = LiquidColors.TextTertiary, maxLines = 1)
-                    }
-                    channel.country?.takeIf { it.isNotBlank() }?.let {
-                        Text(it, style = LiquidTypography.LabelSmall, color = LiquidColors.TextTertiary, maxLines = 1)
+                    Text(
+                        text = displayNumber,
+                        style = LiquidTypography.LabelSmall,
+                        color = if (isFocused || isSelected) LiquidColors.AccentBlueLight else LiquidColors.TextTertiary,
+                    )
+                }
+
+                // Uncropped Logo Container
+                Box(
+                    modifier = Modifier
+                        .size(if (compactHeight) 38.dp else 42.dp)
+                        .background(
+                            Brush.linearGradient(
+                                listOf(
+                                    LiquidColors.AccentBlue.copy(alpha = if (isFocused) 0.25f else 0.12f),
+                                    LiquidColors.GlassTertiary,
+                                ),
+                            ),
+                            RoundedCornerShape(9.dp),
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (!channel.logoUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = channel.logoUrl,
+                            contentDescription = channel.name,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(3.dp),
+                            contentScale = ContentScale.Fit,
+                        )
+                    } else {
+                        Icon(Icons.Filled.Tv, null, tint = LiquidColors.AccentBlue.copy(alpha = 0.45f), modifier = Modifier.size(20.dp))
                     }
                 }
-            }
 
-            LiveBadge()
+                // Channel Name & Metadata always receive guaranteed flexible width
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(1.dp),
+                ) {
+                    Text(
+                        text = channel.name,
+                        style = LiquidTypography.TitleMedium,
+                        color = LiquidColors.TextPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        channel.groupTitle?.takeIf { it.isNotBlank() }?.let {
+                            Text(
+                                text = it,
+                                style = LiquidTypography.LabelSmall,
+                                color = LiquidColors.AccentBlueLight,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        channel.language?.takeIf { it.isNotBlank() }?.let {
+                            Text(it, style = LiquidTypography.LabelSmall, color = LiquidColors.TextTertiary, maxLines = 1)
+                        }
+                        channel.country?.takeIf { it.isNotBlank() }?.let {
+                            Text(it, style = LiquidTypography.LabelSmall, color = LiquidColors.TextTertiary, maxLines = 1)
+                        }
+                    }
+                }
 
-            IconButton(
-                onClick = onFavoriteToggle,
-                modifier = Modifier.size(48.dp),
-            ) {
-                Icon(
-                    imageVector = if (channel.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                    contentDescription = if (channel.isFavorite) "إزالة من المفضلة" else "إضافة إلى المفضلة",
-                    tint = if (channel.isFavorite) LiquidColors.LiveRed else LiquidColors.TextTertiary,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
+                if (showLiveBadgeInline) {
+                    LiveBadge()
+                }
 
-            IconButton(
-                onClick = onPlayClick,
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(CircleShape)
-                    .background(LiquidColors.AccentBlue.copy(alpha = 0.20f)),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.PlayArrow,
-                    contentDescription = "تشغيل القناة",
-                    tint = LiquidColors.AccentBlueLight,
-                    modifier = Modifier.size(20.dp),
-                )
+                IconButton(
+                    onClick = onFavoriteToggle,
+                    modifier = Modifier.size(40.dp),
+                ) {
+                    Icon(
+                        imageVector = if (channel.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                        contentDescription = if (channel.isFavorite) "إزالة من المفضلة" else "إضافة إلى المفضلة",
+                        tint = if (channel.isFavorite) LiquidColors.LiveRed else LiquidColors.TextTertiary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+
+                if (showPlayIcon) {
+                    IconButton(
+                        onClick = onPlayClick,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(LiquidColors.AccentBlue.copy(alpha = 0.20f)),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.PlayArrow,
+                            contentDescription = "تشغيل القناة",
+                            tint = LiquidColors.AccentBlueLight,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
             }
         }
     }

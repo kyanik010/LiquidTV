@@ -72,7 +72,7 @@ fun MirrorBubbleNavigation(
         modifier = modifier
             .padding(horizontal = 12.dp)
             .wrapContentWidth()
-            .height(60.dp)
+            .height(56.dp)
             .drawBehind {
                 val w = size.width
                 val h = size.height
