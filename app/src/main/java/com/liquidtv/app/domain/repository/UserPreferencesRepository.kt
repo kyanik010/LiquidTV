@@ -6,7 +6,6 @@ import kotlinx.coroutines.flow.Flow
 interface UserPreferencesRepository {
     val userPreferences: Flow<UserPreferences>
     val searchHistory: Flow<List<String>>
-
     fun getGlassIntensity(): Flow<Float>
     fun getBlurIntensity(): Flow<Float>
     fun getAnimationIntensity(): Flow<Float>
@@ -29,7 +28,6 @@ interface UserPreferencesRepository {
     suspend fun setAutoPlayNext(enabled: Boolean)
     suspend fun setStreamTimeout(seconds: Int)
     suspend fun setRetryAttempts(count: Int)
-
     suspend fun setDefaultQuality(quality: String)
     suspend fun setAutoPlay(enabled: Boolean)
     suspend fun setSubtitlesEnabled(enabled: Boolean)
@@ -37,15 +35,16 @@ interface UserPreferencesRepository {
     suspend fun setTheme(theme: String)
     suspend fun setClockVisible(visible: Boolean)
     suspend fun setScreenSaverTimeout(minutes: Int)
-    suspend fun setPlaylistUrl(url: String)
     suspend fun setAutoRefreshEnabled(enabled: Boolean)
     suspend fun setAutoRefreshInterval(hours: Int)
     suspend fun setConnectionTimeout(seconds: Int)
     suspend fun setMaxRetries(retries: Int)
     suspend fun setParentalControlEnabled(enabled: Boolean)
+    suspend fun setParentalPin(pin: String)
+    suspend fun verifyParentalPin(pin: String): Boolean
+    suspend fun clearParentalPin()
     suspend fun setGithubRepo(repo: String)
     suspend fun setAutoCheckUpdates(enabled: Boolean)
-
     suspend fun addSearchHistory(query: String)
     suspend fun removeSearchHistory(query: String)
     suspend fun clearSearchHistory()
