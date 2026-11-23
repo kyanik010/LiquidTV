@@ -561,6 +561,62 @@ class RedesignUiAndLogicTest {
         val gridHeightDp = composeRule.onNodeWithTag("series_grid").fetchSemanticsNode().boundsInRoot.height / density
         assertTrue("Expected portrait phone Series grid >= 75% of 800dp screen height, was $gridHeightDp", gridHeightDp >= phoneHeightDp * 0.75f)
     }
+
+    @Test
+    fun `LoginScreen card is compact horizontally and vertically on landscape phone without clipping CTA`() {
+        val fakeSubRepo = FakeSubscriptionRepository()
+        val vm = LoginViewModel(fakeSubRepo)
+
+        composeRule.setContent {
+            LiquidTVTheme {
+                Box(Modifier.width(850.dp).height(400.dp)) {
+                    LoginScreen(onLoginSuccess = {}, viewModel = vm)
+                }
+            }
+        }
+
+        val density = composeRule.density.density
+        val cardBounds = composeRule.onNodeWithTag("login_card").fetchSemanticsNode().boundsInRoot
+        val cardWidthDp = cardBounds.width / density
+        val cardHeightDp = cardBounds.height / density
+        val cardLeftDp = cardBounds.left / density
+        val cardRightDp = cardBounds.right / density
+
+        assertTrue("Expected compact Login card width <= 360dp on 850dp screen, was $cardWidthDp", cardWidthDp <= 360f)
+        assertTrue("Expected compact Login card height <= 355dp on 400dp landscape, was $cardHeightDp", cardHeightDp <= 355f)
+        assertTrue("Expected Login card centered with generous side margins (left=$cardLeftDp, right=$cardRightDp)", cardLeftDp >= 200f && cardRightDp <= 650f)
+
+        composeRule.onNodeWithTag("input_subscription_name").assertIsDisplayed()
+        composeRule.onNodeWithTag("input_xtream_url").assertIsDisplayed()
+        composeRule.onNodeWithTag("input_xtream_username").assertIsDisplayed()
+        composeRule.onNodeWithTag("input_xtream_password").assertIsDisplayed()
+        composeRule.onNodeWithTag("toggle_password_visibility").assertIsDisplayed()
+        composeRule.onNodeWithTag("connect_button").assertIsDisplayed()
+    }
+
+    @Test
+    fun `LoginScreen card remains compact and centered on Android TV 1080p viewport`() {
+        val fakeSubRepo = FakeSubscriptionRepository()
+        val vm = LoginViewModel(fakeSubRepo)
+
+        composeRule.setContent {
+            LiquidTVTheme {
+                Box(Modifier.width(1280.dp).height(720.dp)) {
+                    LoginScreen(onLoginSuccess = {}, viewModel = vm)
+                }
+            }
+        }
+
+        val density = composeRule.density.density
+        val cardBounds = composeRule.onNodeWithTag("login_card").fetchSemanticsNode().boundsInRoot
+        val cardWidthDp = cardBounds.width / density
+        val cardHeightDp = cardBounds.height / density
+
+        assertTrue("Expected Login card width <= 370dp on TV, was $cardWidthDp", cardWidthDp <= 370f)
+        assertTrue("Expected Login card height <= 375dp on TV, was $cardHeightDp", cardHeightDp <= 375f)
+        composeRule.onNodeWithTag("toggle_password_visibility").performClick()
+        composeRule.onNodeWithTag("connect_button").assertIsDisplayed()
+    }
 }
 
 private class FakeSubscriptionRepository : SubscriptionRepository {
