@@ -36,7 +36,7 @@ fun LiquidTVApp(
 ) {
     val rootState by startupViewModel.rootState.collectAsState()
     val updateState by updateViewModel.updateState.collectAsState()
-    var lastInteractionMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val lastInteractionMs = remember { mutableLongStateOf(System.currentTimeMillis()) }
 
     val gate = rootState.gate
     if (gate is AppStartupGate.Checking) {
@@ -87,12 +87,11 @@ fun LiquidTVApp(
 
     val showNavBar = !isFullScreenOverlayRoute
 
-    // Real inactivity screensaver timer respecting user preferences
+    // Real inactivity screensaver timer respecting user preferences without recomposing on pointer moves
     LaunchedEffect(
         rootState.preferences.ambientEnabled,
         rootState.preferences.screenSaverTimeout,
         currentRoute,
-        lastInteractionMs,
         gate,
     ) {
         val prefs = rootState.preferences
@@ -102,11 +101,16 @@ fun LiquidTVApp(
             !currentRoute.startsWith("login")
         if (gate is AppStartupGate.Ready && prefs.ambientEnabled && eligibleRoute) {
             val timeoutMs = (prefs.screenSaverTimeout.coerceAtLeast(1) * 60_000L)
-            val elapsed = System.currentTimeMillis() - lastInteractionMs
-            val remaining = (timeoutMs - elapsed).coerceAtLeast(0L)
-            delay(remaining)
-            navController.navigate(Screen.Ambient.route) {
-                launchSingleTop = true
+            while (true) {
+                val elapsed = System.currentTimeMillis() - lastInteractionMs.longValue
+                val remaining = timeoutMs - elapsed
+                if (remaining <= 0L) {
+                    navController.navigate(Screen.Ambient.route) {
+                        launchSingleTop = true
+                    }
+                    break
+                }
+                delay(remaining.coerceAtMost(5_000L))
             }
         }
     }
@@ -133,14 +137,14 @@ fun LiquidTVApp(
             .fillMaxSize()
             .background(LiquidColors.MidnightNavy)
             .onPreviewKeyEvent {
-                lastInteractionMs = System.currentTimeMillis()
+                lastInteractionMs.longValue = System.currentTimeMillis()
                 false
             }
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
-                        awaitPointerEvent()
-                        lastInteractionMs = System.currentTimeMillis()
+                        awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                        lastInteractionMs.longValue = System.currentTimeMillis()
                     }
                 }
             },

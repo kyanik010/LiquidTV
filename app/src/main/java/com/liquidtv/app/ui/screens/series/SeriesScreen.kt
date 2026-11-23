@@ -53,30 +53,30 @@ fun SeriesScreen(
         ) {
             val isWide = maxWidth >= 720.dp
             val isCompactHeight = maxHeight < 520.dp
-            val topPad = if (isCompactHeight) 62.dp else 66.dp
+            val topPad = if (isCompactHeight) 60.dp else 64.dp
             val hPad = when {
-                maxWidth >= 1100.dp -> 24.dp
-                isWide -> 16.dp
+                maxWidth >= 1100.dp -> 20.dp
+                isWide -> 14.dp
                 else -> 12.dp
             }
             val sidebarWidth = when {
-                maxWidth >= 1200.dp -> 230.dp
-                maxWidth >= 960.dp -> 205.dp
-                else -> 182.dp
+                maxWidth >= 1200.dp -> 215.dp
+                maxWidth >= 960.dp -> 192.dp
+                else -> 168.dp
             }
             val gridMinCardWidth = when {
-                isCompactHeight -> 130
-                maxWidth >= 1600.dp -> 185
-                maxWidth >= 1100.dp -> 170
-                isWide -> 152
-                else -> 144
+                isCompactHeight -> 96
+                maxWidth >= 1600.dp -> 148
+                maxWidth >= 1100.dp -> 124
+                isWide -> 108
+                else -> 112
             }
 
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(top = topPad, start = hPad, end = hPad),
-                verticalArrangement = Arrangement.spacedBy(if (isCompactHeight) 6.dp else 8.dp),
+                verticalArrangement = Arrangement.spacedBy(if (isCompactHeight) 5.dp else 6.dp),
             ) {
                 // Single-line compact header: Title + inline count pill (+ filter button on narrow portrait)
                 Row(
@@ -95,7 +95,7 @@ fun SeriesScreen(
                         Text(
                             text = uiState.selectedCategory
                                 ?: if (uiState.favoritesOnly) "المسلسلات المفضلة" else "المسلسلات",
-                            style = (if (isCompactHeight) LiquidTypography.TitleLarge else LiquidTypography.HeadlineSmall).copy(
+                            style = (if (isCompactHeight) LiquidTypography.TitleMedium else LiquidTypography.TitleLarge).copy(
                                 brush = Brush.linearGradient(
                                     listOf(LiquidColors.TextPrimary, LiquidColors.AccentVioletLight),
                                 ),
@@ -194,8 +194,8 @@ fun SeriesScreen(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
-                            .padding(bottom = if (isCompactHeight) 8.dp else 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(if (isCompactHeight) 12.dp else 14.dp),
+                            .padding(bottom = if (isCompactHeight) 6.dp else 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(if (isCompactHeight) 10.dp else 12.dp),
                     ) {
                         SeriesCategoriesSidebar(
                             categories = uiState.categories,
@@ -339,7 +339,7 @@ private fun SeriesCategoriesSidebar(
                     .weight(1f)
                     .fillMaxWidth()
                     .testTag("series_categories_sidebar"),
-                verticalArrangement = Arrangement.spacedBy(5.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 item(key = "__all__") {
                     SeriesSidebarRow(
@@ -387,10 +387,10 @@ private fun SeriesSidebarRow(
     LiquidGlassSurface(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = if (compact) 40.dp else 44.dp)
+            .heightIn(min = if (compact) 36.dp else 38.dp)
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
-        cornerRadius = 12.dp,
+        cornerRadius = 11.dp,
         glassAlpha = if (isSelected) 0.34f else if (isFocused) 0.22f else 0.08f,
         borderAlpha = if (isFocused) 0.85f else if (isSelected) 0.55f else 0.14f,
         borderColor = if (isSelected || isFocused) LiquidColors.AccentVioletLight else Color.White,
@@ -399,7 +399,7 @@ private fun SeriesSidebarRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = if (compact) 7.dp else 8.dp),
+                .padding(horizontal = 9.dp, vertical = if (compact) 5.dp else 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
@@ -456,7 +456,7 @@ private fun SeriesGridArea(
         return
     }
 
-    val gridGap = if (compactHeight) 10.dp else 14.dp
+    val gridGap = if (compactHeight) 8.dp else 10.dp
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = minCardWidth.dp),
         contentPadding = contentPadding,
@@ -629,8 +629,8 @@ private fun SeriesCinemaPosterCard(
             }
 
             Column(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = if (compactHeight) 6.dp else 8.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.padding(horizontal = 7.dp, vertical = if (compactHeight) 4.dp else 6.dp),
+                verticalArrangement = Arrangement.spacedBy(1.dp),
             ) {
                 Text(
                     text = series.name,

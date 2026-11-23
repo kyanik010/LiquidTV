@@ -89,19 +89,19 @@ fun LoginScreen(
         ) {
             val isCompactHeight = maxHeight < 520.dp
             val maxCardWidth: Dp = when {
-                maxWidth < 420.dp -> (maxWidth - 28.dp).coerceIn(270.dp, 336.dp)
+                maxWidth < 420.dp -> (maxWidth * 0.90f).coerceIn(270.dp, 344.dp)
                 maxWidth < 720.dp -> 340.dp
                 maxWidth < 1100.dp -> 352.dp
                 else -> 364.dp
             }
-            val fieldInputHeight = if (isCompactHeight) 36.dp else 38.dp
-            val verticalGap = if (isCompactHeight) 6.dp else 8.dp
+            val fieldInputHeight = if (isCompactHeight) 34.dp else 38.dp
+            val verticalGap = if (isCompactHeight) 5.dp else 8.dp
 
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(scrollState)
-                    .padding(horizontal = 14.dp, vertical = if (isCompactHeight) 10.dp else 16.dp),
+                    .padding(horizontal = 14.dp, vertical = if (isCompactHeight) 8.dp else 16.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 // Note: widthIn BEFORE fillMaxWidth so the card container itself stays strictly capped
@@ -119,7 +119,7 @@ fun LoginScreen(
                             .fillMaxWidth()
                             .padding(
                                 horizontal = if (isCompactHeight) 14.dp else 16.dp,
-                                vertical = if (isCompactHeight) 11.dp else 14.dp,
+                                vertical = if (isCompactHeight) 9.dp else 14.dp,
                             ),
                         verticalArrangement = Arrangement.spacedBy(verticalGap),
                     ) {
@@ -498,7 +498,7 @@ fun LoginScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(if (isCompactHeight) 40.dp else 44.dp)
+                                .height(if (isCompactHeight) 38.dp else 44.dp)
                                 .scale(connectScale)
                                 .clip(RoundedCornerShape(50))
                                 .background(

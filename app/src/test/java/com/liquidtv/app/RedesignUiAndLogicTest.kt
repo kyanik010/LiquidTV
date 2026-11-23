@@ -15,6 +15,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.SavedStateHandle
 import androidx.room.Room
@@ -616,6 +619,79 @@ class RedesignUiAndLogicTest {
         assertTrue("Expected Login card height <= 375dp on TV, was $cardHeightDp", cardHeightDp <= 375f)
         composeRule.onNodeWithTag("toggle_password_visibility").performClick()
         composeRule.onNodeWithTag("connect_button").assertIsDisplayed()
+    }
+
+    @Test
+    fun `LiveTVScreen distributes 3-pane widths close to 20-34-46 percent on TV`() {
+        val fakeChannels = FakeChannelRepository()
+        val prefs = UserPreferencesDataStore(context)
+        val liveVm = LiveTVViewModel(fakeChannels, prefs, SavedStateHandle())
+
+        composeRule.setContent {
+            LiquidTVTheme {
+                Box(Modifier.width(960.dp).height(540.dp)) {
+                    LiveTVScreen(onChannelClick = {}, viewModel = liveVm)
+                }
+            }
+        }
+
+        val density = composeRule.density.density
+        val catW = composeRule.onNodeWithTag("live_categories_pane").fetchSemanticsNode().boundsInRoot.width / density
+        val chW = composeRule.onNodeWithTag("live_channels_pane").fetchSemanticsNode().boundsInRoot.width / density
+        val prevW = composeRule.onNodeWithTag("live_preview_pane").fetchSemanticsNode().boundsInRoot.width / density
+        val totalW = catW + chW + prevW
+
+        val catRatio = catW / totalW
+        val chRatio = chW / totalW
+        val prevRatio = prevW / totalW
+
+        assertTrue("Expected categories pane ratio ~0.20, was $catRatio", catRatio in 0.18f..0.22f)
+        assertTrue("Expected channels pane ratio ~0.34, was $chRatio", chRatio in 0.32f..0.36f)
+        assertTrue("Expected preview pane ratio ~0.46, was $prevRatio", prevRatio in 0.44f..0.48f)
+    }
+
+    @Test
+    fun `SettingsScreen supports touch vertical swipe scrolling up and down on landscape and portrait phones`() {
+        val prefs = UserPreferencesDataStore(context)
+        val fakeChannels = FakeChannelRepository()
+        val fakeSubRepo = FakeSubscriptionRepository()
+        val vm = SettingsViewModel(context, prefs, fakeChannels, fakeSubRepo)
+        val updateVm = AppUpdateViewModel(AppUpdateManager(context, OkHttpClient(), prefs), prefs)
+
+        composeRule.setContent {
+            LiquidTVTheme {
+                Box(Modifier.width(850.dp).height(400.dp)) {
+                    SettingsScreen(
+                        viewModel = vm,
+                        updateViewModel = updateVm,
+                    )
+                }
+            }
+        }
+
+        // Scroll detail pane via real touch drag down to bottom item and back up
+        composeRule.onNodeWithTag("settings_content_list").performTouchInput {
+            swipeUp()
+            swipeUp()
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("setting_clear_cache").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("settings_content_list").performTouchInput {
+            swipeDown()
+            swipeDown()
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("setting_manage_subscriptions").assertIsDisplayed()
+
+        // Scroll left sections list via touch swipe and tap a lower section
+        composeRule.onNodeWithTag("settings_sections_list").performTouchInput {
+            swipeUp()
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("settings_section_about").assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("حول LIQUID TV").assertIsDisplayed()
     }
 }
 

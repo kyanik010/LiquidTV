@@ -11,9 +11,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -41,6 +40,8 @@ import com.liquidtv.app.ui.utils.localizedThemeAr
 import com.liquidtv.app.updater.AppUpdateViewModel
 import com.liquidtv.app.updater.UpdateState
 import kotlinx.coroutines.launch
+
+private val LocalSettingsCompactHeight = staticCompositionLocalOf { false }
 
 private enum class SettingsSection(val title: String, val icon: ImageVector) {
     Subscriptions("الاشتراكات والمزامنة", Icons.Filled.Subscriptions),
@@ -85,8 +86,9 @@ fun SettingsScreen(
                 .windowInsetsPadding(WindowInsets.statusBars),
         ) {
             val isWide = maxWidth >= 760.dp
-            val horizontalPad = if (isWide) 32.dp else 16.dp
-            val topNavClearance = if (isWide) 84.dp else 76.dp
+            val isCompactHeight = maxHeight < 520.dp
+            val horizontalPad = if (isWide) if (isCompactHeight) 16.dp else 28.dp else 16.dp
+            val topNavClearance = if (isCompactHeight) 60.dp else 68.dp
 
             Column(
                 modifier = Modifier
@@ -95,13 +97,13 @@ fun SettingsScreen(
             ) {
                 Text(
                     text = "الإعدادات",
-                    style = LiquidTypography.HeadlineMedium.copy(
+                    style = (if (isCompactHeight) LiquidTypography.TitleLarge else LiquidTypography.HeadlineMedium).copy(
                         brush = Brush.linearGradient(
                             listOf(LiquidColors.TextPrimary, LiquidColors.AccentBlueLight),
                         ),
                     ),
                     color = LiquidColors.TextPrimary,
-                    modifier = Modifier.padding(vertical = 8.dp),
+                    modifier = Modifier.padding(vertical = if (isCompactHeight) 2.dp else 6.dp),
                 )
 
                 uiState.successMessage?.let { msg ->
@@ -155,20 +157,22 @@ fun SettingsScreen(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
-                            .padding(top = 6.dp, bottom = 20.dp),
-                        horizontalArrangement = Arrangement.spacedBy(24.dp),
+                            .padding(top = 4.dp, bottom = if (isCompactHeight) 8.dp else 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(if (isCompactHeight) 14.dp else 20.dp),
                     ) {
-                        Column(
+                        LazyColumn(
                             modifier = Modifier
-                                .width(240.dp)
+                                .width(if (isCompactHeight) 200.dp else 230.dp)
                                 .fillMaxHeight()
-                                .verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                                .testTag("settings_sections_list"),
+                            contentPadding = PaddingValues(bottom = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(if (isCompactHeight) 6.dp else 8.dp),
                         ) {
-                            SettingsSection.entries.forEach { section ->
+                            items(SettingsSection.entries, key = { it.name }) { section ->
                                 SettingsSectionTab(
                                     section = section,
                                     isSelected = selectedSection == section,
+                                    compactHeight = isCompactHeight,
                                     onClick = { selectedSection = section },
                                     modifier = Modifier.fillMaxWidth(),
                                 )
@@ -191,7 +195,12 @@ fun SettingsScreen(
                                 pinAction = action
                             },
                             onOpenLockedCategories = { showLockedCategoriesDialog = true },
-                            contentPadding = PaddingValues(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 40.dp),
+                            compactHeight = isCompactHeight,
+                            contentPadding = if (isCompactHeight) {
+                                PaddingValues(start = 14.dp, top = 12.dp, end = 14.dp, bottom = 24.dp)
+                            } else {
+                                PaddingValues(start = 24.dp, top = 20.dp, end = 24.dp, bottom = 36.dp)
+                            },
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight(),
@@ -202,13 +211,13 @@ fun SettingsScreen(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             contentPadding = PaddingValues(vertical = 2.dp),
                         ) {
-                            items(SettingsSection.entries) { section ->
+                            items(SettingsSection.entries, key = { it.name }) { section ->
                                 SettingsSectionPill(
                                     section = section,
                                     isSelected = selectedSection == section,
@@ -233,6 +242,7 @@ fun SettingsScreen(
                                 pinAction = action
                             },
                             onOpenLockedCategories = { showLockedCategoriesDialog = true },
+                            compactHeight = isCompactHeight,
                             contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 96.dp),
                             modifier = Modifier
                                 .weight(1f)
@@ -399,6 +409,7 @@ fun SettingsScreen(
 private fun SettingsSectionTab(
     section: SettingsSection,
     isSelected: Boolean,
+    compactHeight: Boolean = false,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -407,7 +418,7 @@ private fun SettingsSectionTab(
 
     LiquidGlassSurface(
         modifier = modifier
-            .height(52.dp)
+            .height(if (compactHeight) 42.dp else 48.dp)
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource)
             .testTag("settings_section_${section.name.lowercase()}"),
@@ -420,7 +431,7 @@ private fun SettingsSectionTab(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = if (compactHeight) 12.dp else 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -491,6 +502,7 @@ private fun SettingsDetailPane(
     onEditRepo: () -> Unit,
     onRequestPinAction: (PinDialogAction) -> Unit,
     onOpenLockedCategories: () -> Unit,
+    compactHeight: Boolean,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
@@ -500,13 +512,17 @@ private fun SettingsDetailPane(
         glassAlpha = 0.14f,
         borderAlpha = 0.22f,
     ) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .testTag("settings_content_list"),
-            contentPadding = contentPadding,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
+        key(selectedSection) {
+            val listState = rememberLazyListState()
+            CompositionLocalProvider(LocalSettingsCompactHeight provides compactHeight) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag("settings_content_list"),
+                    contentPadding = contentPadding,
+                    verticalArrangement = Arrangement.spacedBy(if (compactHeight) 10.dp else 14.dp),
+                ) {
             when (selectedSection) {
                 SettingsSection.Subscriptions -> {
                     item {
@@ -928,16 +944,24 @@ private fun SettingsDetailPane(
                             onClick = {},
                         )
                     }
-                }
+            }
             }
         }
     }
 }
 
 @Composable
-private fun SettingHeader(title: String, subtitle: String) {
-    Column(modifier = Modifier.padding(bottom = 6.dp)) {
-        Text(title, style = LiquidTypography.TitleLarge, color = LiquidColors.TextPrimary)
+private fun SettingHeader(
+    title: String,
+    subtitle: String,
+    compactHeight: Boolean = LocalSettingsCompactHeight.current,
+) {
+    Column(modifier = Modifier.padding(bottom = if (compactHeight) 2.dp else 6.dp)) {
+        Text(
+            text = title,
+            style = if (compactHeight) LiquidTypography.TitleMedium else LiquidTypography.TitleLarge,
+            color = LiquidColors.TextPrimary,
+        )
         Text(subtitle, style = LiquidTypography.BodySmall, color = LiquidColors.TextTertiary)
     }
 }
@@ -949,6 +973,7 @@ private fun SettingItemTile(
     action: @Composable () -> Unit,
     onClick: () -> Unit,
     testTag: String? = null,
+    compactHeight: Boolean = LocalSettingsCompactHeight.current,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
@@ -974,7 +999,10 @@ private fun SettingItemTile(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(
+                    horizontal = if (compactHeight) 14.dp else 16.dp,
+                    vertical = if (compactHeight) 11.dp else 16.dp,
+                ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
@@ -984,7 +1012,7 @@ private fun SettingItemTile(
                     .padding(end = 14.dp),
             ) {
                 Text(title, style = LiquidTypography.TitleMedium, color = LiquidColors.TextPrimary)
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(if (compactHeight) 2.dp else 4.dp))
                 Text(subtitle, style = LiquidTypography.BodySmall, color = LiquidColors.TextTertiary)
             }
             action()
