@@ -40,7 +40,7 @@ import com.liquidtv.app.ui.theme.LiquidTypography
 
 @Composable
 fun FavoritesScreen(
-    onChannelClick: (String) -> Unit,
+    onChannelClick: (String, com.liquidtv.app.domain.model.MediaType) -> Unit,
     viewModel: FavoritesViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -128,7 +128,7 @@ fun FavoritesScreen(
                                     items(uiState.favorites, key = { it.id }) { channel ->
                                         FavoriteChannelCard(
                                             channel = channel,
-                                            onClick = { onChannelClick(channel.id) },
+                                            onClick = { onChannelClick(channel.id, channel.mediaType) },
                                             onToggleFavorite = { viewModel.toggleFavorite(channel.id) },
                                         )
                                     }
@@ -174,7 +174,7 @@ fun FavoritesScreen(
                                     items(uiState.recentlyWatched, key = { it.id }) { channel ->
                                         FavoriteChannelCard(
                                             channel = channel,
-                                            onClick = { onChannelClick(channel.id) },
+                                            onClick = { onChannelClick(channel.id, channel.mediaType) },
                                             onToggleFavorite = { viewModel.toggleFavorite(channel.id) },
                                         )
                                     }

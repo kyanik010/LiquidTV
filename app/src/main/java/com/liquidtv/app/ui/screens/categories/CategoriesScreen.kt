@@ -1,7 +1,5 @@
 package com.liquidtv.app.ui.screens.categories
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,7 +21,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -33,15 +30,23 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.liquidtv.app.domain.model.Category
 import com.liquidtv.app.ui.components.AppBackground
 import com.liquidtv.app.ui.components.LiquidGlassSurface
+import com.liquidtv.app.ui.components.ParentalPinDialog
 import com.liquidtv.app.ui.theme.LiquidColors
 import com.liquidtv.app.ui.theme.LiquidTypography
+import kotlinx.coroutines.launch
 
 @Composable
 fun CategoriesScreen(
     onCategoryClick: (String) -> Unit,
+    onLanguagesClick: () -> Unit = {},
+    onCountriesClick: () -> Unit = {},
     viewModel: CategoriesViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val scope = rememberCoroutineScope()
+
+    var pendingProtectedCategory by remember { mutableStateOf<Category?>(null) }
+    var pinError by remember { mutableStateOf<String?>(null) }
 
     AppBackground(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -49,7 +54,6 @@ fun CategoriesScreen(
                 .fillMaxSize()
                 .padding(top = 88.dp, start = 36.dp, end = 36.dp),
         ) {
-            // Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -57,7 +61,7 @@ fun CategoriesScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Browse Categories",
                         style = LiquidTypography.HeadlineMedium.copy(
@@ -67,9 +71,22 @@ fun CategoriesScreen(
                         ),
                     )
                     Text(
-                        text = if (uiState.isLoading) (uiState.loadingMessage ?: "Loading categories...") else "${uiState.categories.size} genres available",
+                        text = if (uiState.isLoading) (uiState.loadingMessage ?: "Loading categories...") else "${uiState.categories.size} categories available",
                         style = LiquidTypography.BodySmall,
                         color = LiquidColors.TextTertiary,
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    HeaderQuickPill(
+                        label = "Languages",
+                        icon = Icons.Filled.Language,
+                        onClick = onLanguagesClick,
+                    )
+                    HeaderQuickPill(
+                        label = "Countries",
+                        icon = Icons.Filled.Public,
+                        onClick = onCountriesClick,
                     )
                 }
             }
@@ -79,7 +96,7 @@ fun CategoriesScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         CircularProgressIndicator(color = LiquidColors.AccentBlue)
                         Text(
-                            text = uiState.loadingMessage ?: "Fetching & indexing categories...",
+                            text = uiState.loadingMessage ?: "Indexing categories...",
                             style = LiquidTypography.BodyMedium,
                             color = LiquidColors.TextSecondary,
                         )
@@ -89,7 +106,7 @@ fun CategoriesScreen(
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         Text(
-                            text = "No categories cached yet",
+                            text = "No categories available in active playlist",
                             style = LiquidTypography.HeadlineSmall,
                             color = LiquidColors.TextSecondary,
                         )
@@ -101,26 +118,88 @@ fun CategoriesScreen(
                             glassAlpha = 0.25f,
                             borderColor = LiquidColors.AccentBlue,
                         ) {
-                            Text("Fetch Streams", style = LiquidTypography.LabelLarge, color = LiquidColors.AccentBlue)
+                            Text("Refresh Playlist", style = LiquidTypography.LabelLarge, color = LiquidColors.AccentBlue)
                         }
                     }
                 }
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(4),
+                    columns = GridCells.Adaptive(minSize = 230.dp),
                     contentPadding = PaddingValues(bottom = 32.dp, top = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    items(uiState.categories, key = { it.name }) { category ->
+                    items(uiState.categories, key = { it.id }) { category ->
+                        val isLocked = viewModel.isCategoryLocked(category)
                         CategoryGridTile(
                             category = category,
-                            onClick = { onCategoryClick(category.name) },
+                            isLocked = isLocked,
+                            onClick = {
+                                if (isLocked) {
+                                    pinError = null
+                                    pendingProtectedCategory = category
+                                } else {
+                                    onCategoryClick(category.name)
+                                }
+                            },
                         )
                     }
                 }
             }
+        }
+
+        ParentalPinDialog(
+            visible = pendingProtectedCategory != null,
+            title = "Category Locked",
+            subtitle = "Enter Parental Control PIN to open \"${pendingProtectedCategory?.name.orEmpty()}\"",
+            confirmLabel = "Unlock",
+            errorMessage = pinError,
+            onConfirm = { enteredPin ->
+                val target = pendingProtectedCategory ?: return@ParentalPinDialog
+                scope.launch {
+                    if (viewModel.verifyPin(enteredPin)) {
+                        pendingProtectedCategory = null
+                        pinError = null
+                        onCategoryClick(target.name)
+                    } else {
+                        pinError = "Incorrect PIN. Try again."
+                    }
+                }
+            },
+            onDismiss = {
+                pendingProtectedCategory = null
+                pinError = null
+            },
+        )
+    }
+}
+
+@Composable
+private fun HeaderQuickPill(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    LiquidGlassSurface(
+        modifier = Modifier
+            .height(48.dp)
+            .clickable(interactionSource, null, onClick = onClick)
+            .focusable(interactionSource = interactionSource),
+        cornerRadius = 24.dp,
+        glassAlpha = if (isFocused) 0.28f else 0.14f,
+        borderAlpha = if (isFocused) 0.8f else 0.25f,
+        isFocused = isFocused,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(icon, contentDescription = label, tint = LiquidColors.AccentBlueLight, modifier = Modifier.size(18.dp))
+            Text(label, style = LiquidTypography.LabelMedium, color = LiquidColors.TextPrimary)
         }
     }
 }
@@ -128,6 +207,7 @@ fun CategoriesScreen(
 @Composable
 private fun CategoryGridTile(
     category: Category,
+    isLocked: Boolean,
     onClick: () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -157,7 +237,6 @@ private fun CategoryGridTile(
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
     ) {
-        // Specular top highlight
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -169,17 +248,33 @@ private fun CategoryGridTile(
                 ),
         )
 
-        // Large watermark icon in bottom-right
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.BottomEnd,
         ) {
             Icon(
-                imageVector = icon,
+                imageVector = if (isLocked) Icons.Filled.Lock else icon,
                 contentDescription = null,
                 tint = Color.White.copy(alpha = 0.06f),
                 modifier = Modifier.size(72.dp).padding(end = 8.dp, bottom = 8.dp),
             )
+        }
+
+        if (isLocked) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(10.dp)
+                    .background(LiquidColors.ErrorRed.copy(alpha = 0.85f), CircleShape)
+                    .padding(6.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Lock,
+                    contentDescription = "Locked Category",
+                    tint = Color.White,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
         }
 
         Row(
@@ -189,7 +284,6 @@ private fun CategoryGridTile(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // Icon circle
             Box(
                 modifier = Modifier
                     .size(58.dp)
@@ -206,7 +300,7 @@ private fun CategoryGridTile(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = icon,
+                    imageVector = if (isLocked) Icons.Filled.Lock else icon,
                     contentDescription = category.name,
                     tint = Color.White,
                     modifier = Modifier.size(28.dp),
@@ -226,7 +320,7 @@ private fun CategoryGridTile(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "${category.channelCount} channels",
+                    text = if (isLocked) "PIN Protected • ${category.channelCount} ch" else "${category.channelCount} channels",
                     style = LiquidTypography.LabelSmall,
                     color = if (isFocused) Color.White.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.55f),
                 )
@@ -235,7 +329,6 @@ private fun CategoryGridTile(
     }
 }
 
-/** Returns (startColor, endColor) gradient for each category. */
 private fun getCategoryColors(name: String): Pair<Color, Color> = when {
     name.contains("news", ignoreCase = true) -> LiquidColors.CategoryNews to LiquidColors.CategoryNewsEnd
     name.contains("sport", ignoreCase = true) -> LiquidColors.CategorySports to LiquidColors.CategorySportsEnd
@@ -253,22 +346,21 @@ private fun getCategoryColors(name: String): Pair<Color, Color> = when {
     else -> LiquidColors.AccentBlue to LiquidColors.AccentViolet
 }
 
-private fun getCategoryIcon(name: String): ImageVector = when (name.lowercase()) {
-    "news" -> Icons.Filled.Newspaper
-    "sports" -> Icons.Filled.SportsSoccer
-    "movies", "animation" -> Icons.Filled.Movie
-    "music" -> Icons.Filled.MusicNote
-    "documentary" -> Icons.Filled.VideoLibrary
-    "kids" -> Icons.Filled.ChildCare
-    "entertainment" -> Icons.Filled.Celebration
-    "education" -> Icons.Filled.School
-    "business" -> Icons.Filled.Business
-    "lifestyle" -> Icons.Filled.Spa
-    "religious" -> Icons.Filled.Church
-    "cooking" -> Icons.Filled.Restaurant
-    "travel" -> Icons.Filled.Flight
-    "science" -> Icons.Filled.Science
-    "weather" -> Icons.Filled.WbSunny
+private fun getCategoryIcon(name: String): ImageVector = when {
+    name.contains("news", true) -> Icons.Filled.Newspaper
+    name.contains("sport", true) -> Icons.Filled.SportsSoccer
+    name.contains("movie", true) || name.contains("anim", true) -> Icons.Filled.Movie
+    name.contains("music", true) -> Icons.Filled.MusicNote
+    name.contains("doc", true) -> Icons.Filled.VideoLibrary
+    name.contains("kid", true) -> Icons.Filled.ChildCare
+    name.contains("entertain", true) -> Icons.Filled.Celebration
+    name.contains("education", true) -> Icons.Filled.School
+    name.contains("business", true) -> Icons.Filled.Business
+    name.contains("lifestyle", true) -> Icons.Filled.Spa
+    name.contains("religious", true) -> Icons.Filled.Church
+    name.contains("cook", true) -> Icons.Filled.Restaurant
+    name.contains("travel", true) -> Icons.Filled.Flight
+    name.contains("science", true) -> Icons.Filled.Science
+    name.contains("weather", true) -> Icons.Filled.WbSunny
     else -> Icons.Filled.Tv
 }
-

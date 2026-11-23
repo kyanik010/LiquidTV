@@ -1,18 +1,27 @@
 package com.liquidtv.app.data.parser
 
 import com.liquidtv.app.domain.model.Channel
-import java.util.UUID
+import com.liquidtv.app.domain.model.MediaType
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import org.json.JSONObject
+import java.io.BufferedReader
+import java.io.ByteArrayInputStream
+import java.io.InputStream
+import java.io.InputStreamReader
+import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Robust M3U/M3U8 playlist parser for the iptv-org format.
- *
- * Handles EXTINF attributes: tvg-id, tvg-name, tvg-logo, group-title,
- * tvg-country, tvg-language, tvg-chno, and display name after the comma.
- *
- * Resolves country from tvg-country and tvg-id suffixes (e.g. .us, .de, .fr),
- * and language from explicit tags, the language playlist map, or country inference.
+ * Memory-efficient streaming M3U / M3U8 playlist parser supporting:
+ * - Large playlists streamed line-by-line via BufferedReader (no full-file `content.lines()`)
+ * - UTF-8 BOM stripping, CRLF/LF/CR line endings, Arabic and full Unicode
+ * - `#EXTM3U` (`x-tvg-url`, `url-tvg`, `tvg-url` for EPG)
+ * - `#EXTINF` with quoted/unquoted attributes, commas inside quoted attributes AND channel names
+ * - `#EXTGRP`, `#EXTVLCOPT` (`http-user-agent`, `http-referrer`), `#EXTHTTP` JSON headers
+ * - Deterministic stable IDs scoped by subscriptionId (never random UUIDs)
+ * - Cooperative coroutine cancellation & real byte-based progress reporting
  */
 @Singleton
 class M3UParser @Inject constructor() {
@@ -20,69 +29,27 @@ class M3UParser @Inject constructor() {
     companion object {
         private const val EXT_M3U = "#EXTM3U"
         private const val EXT_INF = "#EXTINF:"
-        private val ATTR_REGEX = Regex("""(\S+?)=["']([^"']*)["']""")
+        private const val EXT_GRP = "#EXTGRP:"
+        private const val EXT_VLC_OPT = "#EXTVLCOPT:"
+        private const val EXT_HTTP = "#EXTHTTP:"
+        private val ATTR_REGEX = Regex("""([A-Za-z0-9_-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s,]*))""")
+        private val SUPPORTED_SCHEMES = listOf("http://", "https://", "rtmp://", "rtmps://", "rtsp://", "udp://", "rtp://")
 
-        val COUNTRY_NAMES = mapOf(
-            "us" to "United States", "gb" to "United Kingdom", "uk" to "United Kingdom", "in" to "India",
-            "de" to "Germany", "fr" to "France", "es" to "Spain", "it" to "Italy",
-            "jp" to "Japan", "cn" to "China", "br" to "Brazil", "ru" to "Russia",
-            "ca" to "Canada", "au" to "Australia", "mx" to "Mexico", "kr" to "South Korea",
-            "nl" to "Netherlands", "ar" to "Argentina", "tr" to "Turkey", "sa" to "Saudi Arabia",
-            "ae" to "United Arab Emirates", "eg" to "Egypt", "pk" to "Pakistan",
-            "ng" to "Nigeria", "za" to "South Africa", "th" to "Thailand",
-            "id" to "Indonesia", "pl" to "Poland", "se" to "Sweden", "no" to "Norway",
-            "dk" to "Denmark", "fi" to "Finland", "pt" to "Portugal", "be" to "Belgium",
-            "ch" to "Switzerland", "at" to "Austria", "nz" to "New Zealand",
+        private val COUNTRY_NAMES = mapOf(
+            "us" to "United States", "uk" to "United Kingdom", "gb" to "United Kingdom",
+            "in" to "India", "de" to "Germany", "fr" to "France", "es" to "Spain",
+            "it" to "Italy", "jp" to "Japan", "cn" to "China", "br" to "Brazil",
+            "ru" to "Russia", "ca" to "Canada", "au" to "Australia", "mx" to "Mexico",
+            "kr" to "South Korea", "nl" to "Netherlands", "ar" to "Argentina",
+            "tr" to "Turkey", "sa" to "Saudi Arabia", "ae" to "United Arab Emirates",
+            "eg" to "Egypt", "pk" to "Pakistan", "ng" to "Nigeria", "za" to "South Africa",
+            "ma" to "Morocco", "dz" to "Algeria", "tn" to "Tunisia", "jo" to "Jordan",
+            "kw" to "Kuwait", "qa" to "Qatar", "bh" to "Bahrain", "om" to "Oman",
+            "lb" to "Lebanon", "iq" to "Iraq", "pl" to "Poland", "se" to "Sweden",
+            "no" to "Norway", "dk" to "Denmark", "fi" to "Finland", "pt" to "Portugal",
+            "be" to "Belgium", "ch" to "Switzerland", "at" to "Austria", "nz" to "New Zealand",
             "sg" to "Singapore", "my" to "Malaysia", "ph" to "Philippines",
-            "bd" to "Bangladesh", "lk" to "Sri Lanka", "np" to "Nepal",
-            "ie" to "Ireland", "il" to "Israel", "ua" to "Ukraine", "co" to "Colombia",
-            "cl" to "Chile", "pe" to "Peru", "ve" to "Venezuela", "gr" to "Greece",
-            "cz" to "Czech Republic", "hu" to "Hungary", "ro" to "Romania", "vn" to "Vietnam",
-            "tw" to "Taiwan", "hk" to "Hong Kong", "al" to "Albania", "dz" to "Algeria",
-            "am" to "Armenia", "az" to "Azerbaijan", "bh" to "Bahrain", "by" to "Belarus",
-            "ba" to "Bosnia and Herzegovina", "bg" to "Bulgaria", "hr" to "Croatia",
-            "cy" to "Cyprus", "ec" to "Ecuador", "ee" to "Estonia", "et" to "Ethiopia",
-            "ge" to "Georgia", "gh" to "Ghana", "gt" to "Guatemala", "hn" to "Honduras",
-            "is" to "Iceland", "iq" to "Iraq", "ir" to "Iran", "jo" to "Jordan",
-            "kz" to "Kazakhstan", "ke" to "Kenya", "kw" to "Kuwait", "lv" to "Latvia",
-            "lb" to "Lebanon", "lt" to "Lithuania", "lu" to "Luxembourg", "mk" to "North Macedonia",
-            "mt" to "Malta", "ma" to "Morocco", "om" to "Oman", "pa" to "Panama",
-            "py" to "Paraguay", "qa" to "Qatar", "rs" to "Serbia", "sk" to "Slovakia",
-            "si" to "Slovenia", "tn" to "Tunisia", "uy" to "Uruguay", "uz" to "Uzbekistan"
-        )
-
-        val COUNTRY_TO_LANGUAGE = mapOf(
-            "us" to "English", "gb" to "English", "uk" to "English", "au" to "English",
-            "ca" to "English", "nz" to "English", "ie" to "English",
-            "fr" to "French", "be" to "French",
-            "es" to "Spanish", "mx" to "Spanish", "ar" to "Spanish", "co" to "Spanish",
-            "cl" to "Spanish", "pe" to "Spanish", "ve" to "Spanish",
-            "de" to "German", "at" to "German", "ch" to "German",
-            "it" to "Italian",
-            "in" to "Hindi",
-            "jp" to "Japanese",
-            "cn" to "Chinese", "tw" to "Chinese", "hk" to "Chinese",
-            "ru" to "Russian", "by" to "Russian", "kz" to "Russian", "ua" to "Ukrainian",
-            "br" to "Portuguese", "pt" to "Portuguese",
-            "kr" to "Korean",
-            "sa" to "Arabic", "eg" to "Arabic", "ae" to "Arabic", "qa" to "Arabic",
-            "iq" to "Arabic", "dz" to "Arabic", "ma" to "Arabic",
-            "tr" to "Turkish",
-            "nl" to "Dutch",
-            "pl" to "Polish",
-            "se" to "Swedish",
-            "no" to "Norwegian",
-            "dk" to "Danish",
-            "fi" to "Finnish",
-            "gr" to "Greek",
-            "id" to "Indonesian",
-            "th" to "Thai",
-            "vn" to "Vietnamese",
-            "ph" to "Tagalog",
-            "pk" to "Urdu",
-            "bd" to "Bengali",
-            "ir" to "Persian",
-            "il" to "Hebrew"
+            "id" to "Indonesia", "th" to "Thailand", "vn" to "Vietnam", "gr" to "Greece",
         )
     }
 
@@ -91,158 +58,184 @@ class M3UParser @Inject constructor() {
         val totalLines: Int,
         val parsedEntries: Int,
         val skippedEntries: Int,
+        val xmltvUrl: String? = null,
     )
 
-    /**
-     * Extracts a fast map of streamUrl/tvgId -> group-title from index.language.m3u or index.country.m3u
-     */
-    fun parseLanguageMap(content: String): Map<String, String> = parseGroupTitleMap(content)
-
-    fun parseGroupTitleMap(content: String): Map<String, String> {
-        val map = mutableMapOf<String, String>()
-        val lines = content.lines()
-        var currentGroup: String? = null
-        var currentTvgId: String? = null
-
-        for (line in lines) {
-            val trimmed = line.trim()
-            if (trimmed.startsWith(EXT_INF)) {
-                val groupTitle = ATTR_REGEX.findAll(trimmed)
-                    .firstOrNull { it.groupValues[1].equals("group-title", ignoreCase = true) }
-                    ?.groupValues?.get(2)
-                    ?.takeIf { it.isNotBlank() }
-                val tvgId = ATTR_REGEX.findAll(trimmed)
-                    .firstOrNull { it.groupValues[1].equals("tvg-id", ignoreCase = true) }
-                    ?.groupValues?.get(2)
-                    ?.takeIf { it.isNotBlank() }
-                currentGroup = groupTitle
-                currentTvgId = tvgId
-            } else if (trimmed.startsWith("http") || trimmed.startsWith("rtmp")) {
-                if (currentGroup != null) {
-                    if (!map.containsKey(trimmed)) {
-                        map[trimmed] = currentGroup
-                    }
-                    if (currentTvgId != null && !map.containsKey(currentTvgId)) {
-                        map[currentTvgId] = currentGroup
-                    }
-                }
-                currentGroup = null
-                currentTvgId = null
-            }
-        }
-        return map
+    suspend fun parse(
+        content: String,
+        subscriptionId: String = "",
+        defaultUserAgent: String? = null,
+        defaultReferer: String? = null,
+        onProgress: ((Float) -> Unit)? = null,
+    ): ParseResult {
+        val bytes = content.toByteArray(Charsets.UTF_8)
+        return parseStream(
+            inputStream = ByteArrayInputStream(bytes),
+            contentLengthBytes = bytes.size.toLong(),
+            subscriptionId = subscriptionId,
+            defaultUserAgent = defaultUserAgent,
+            defaultReferer = defaultReferer,
+            onProgress = onProgress,
+        )
     }
 
-    /**
-     * Parse a full M3U playlist string into Channel domain objects.
-     */
-    fun parse(
-        content: String,
-        languageMap: Map<String, String> = emptyMap(),
-        countryMap: Map<String, String> = emptyMap(),
-        onProgress: ((Int, Int) -> Unit)? = null,
+    suspend fun parseStream(
+        inputStream: InputStream,
+        contentLengthBytes: Long = -1L,
+        subscriptionId: String = "",
+        defaultUserAgent: String? = null,
+        defaultReferer: String? = null,
+        onProgress: ((Float) -> Unit)? = null,
     ): ParseResult {
-        val lines = content.lines()
-        val totalLines = lines.size
-        val channels = mutableListOf<Channel>()
-        val seenUrls = mutableSetOf<String>()
+        val channels = ArrayList<Channel>(256)
+        val seenIds = HashMap<String, Int>()
+        val seenUrls = HashSet<String>()
+        var totalLines = 0
         var parsedEntries = 0
         var skippedEntries = 0
+        var xmltvUrl: String? = null
+
         var pendingExtInf: String? = null
-        var lineIndex = 0
+        var pendingExtGrp: String? = null
+        val pendingHeaders = LinkedHashMap<String, String>()
+        var bytesReadApprox = 0L
 
-        for (line in lines) {
-            lineIndex++
-            if (lineIndex % 1000 == 0) {
-                onProgress?.invoke(lineIndex, totalLines)
-            }
-
-            val trimmed = line.trim()
-
-            when {
-                trimmed.isEmpty() -> continue
-                trimmed.startsWith(EXT_M3U) -> continue
-                trimmed.startsWith("#EXTVLCOPT") -> continue
-                trimmed.startsWith("#EXTGRP") -> continue
-                trimmed.startsWith(EXT_INF) -> {
-                    pendingExtInf = trimmed
-                }
-                trimmed.startsWith("#") -> continue
-                trimmed.startsWith("http") || trimmed.startsWith("rtmp") ||
-                        trimmed.startsWith("rtsp") || trimmed.startsWith("udp") ||
-                        trimmed.startsWith("rtp") -> {
-                    val streamUrl = trimmed
-                    if (streamUrl in seenUrls) {
-                        skippedEntries++
-                        pendingExtInf = null
-                        continue
+        BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8), 32 * 1024).use { reader ->
+            var rawLine: String? = reader.readLine()
+            while (rawLine != null) {
+                totalLines++
+                if (totalLines % 250 == 0) {
+                    currentCoroutineContext().ensureActive()
+                    if (contentLengthBytes > 0L) {
+                        val frac = (bytesReadApprox.toFloat() / contentLengthBytes.toFloat()).coerceIn(0f, 0.99f)
+                        onProgress?.invoke(frac)
                     }
-                    if (pendingExtInf != null) {
-                        try {
-                            val channel = parseEntry(pendingExtInf!!, streamUrl, languageMap, countryMap)
-                            channels.add(channel)
-                            seenUrls.add(streamUrl)
-                            parsedEntries++
-                        } catch (e: Exception) {
-                            skippedEntries++
+                }
+
+                bytesReadApprox += rawLine.length + 1L
+                val line = if (totalLines == 1) rawLine.removePrefix("\uFEFF").trim() else rawLine.trim()
+
+                when {
+                    line.isEmpty() -> Unit
+                    line.startsWith(EXT_M3U, ignoreCase = true) -> {
+                        if (xmltvUrl == null) {
+                            xmltvUrl = extractXmltvUrl(line)
                         }
-                    } else {
-                        val channel = Channel(
-                            id = UUID.randomUUID().toString(),
-                            name = extractChannelNameFromUrl(streamUrl),
-                            streamUrl = streamUrl,
-                        )
-                        channels.add(channel)
-                        seenUrls.add(streamUrl)
-                        parsedEntries++
                     }
-                    pendingExtInf = null
-                }
-                else -> {
-                    if (pendingExtInf != null && !trimmed.startsWith("#")) {
-                        skippedEntries++
+                    line.startsWith(EXT_INF, ignoreCase = true) -> {
+                        pendingExtInf = line
+                    }
+                    line.startsWith(EXT_GRP, ignoreCase = true) -> {
+                        pendingExtGrp = line.substring(EXT_GRP.length).trim().takeIf { it.isNotEmpty() }
+                    }
+                    line.startsWith(EXT_VLC_OPT, ignoreCase = true) -> {
+                        parseVlcOption(line.substring(EXT_VLC_OPT.length).trim(), pendingHeaders)
+                    }
+                    line.startsWith(EXT_HTTP, ignoreCase = true) -> {
+                        parseExtHttpJson(line.substring(EXT_HTTP.length).trim(), pendingHeaders)
+                    }
+                    line.startsWith("#") -> Unit
+                    isStreamUrl(line) -> {
+                        val streamUrl = line
+                        if (!seenUrls.add(streamUrl)) {
+                            skippedEntries++
+                        } else {
+                            val mergedHeaders = LinkedHashMap<String, String>()
+                            if (!defaultUserAgent.isNullOrBlank()) mergedHeaders["User-Agent"] = defaultUserAgent
+                            if (!defaultReferer.isNullOrBlank()) mergedHeaders["Referer"] = defaultReferer
+                            mergedHeaders.putAll(pendingHeaders)
+
+                            val channel = try {
+                                if (pendingExtInf != null) {
+                                    parseEntry(
+                                        extInf = pendingExtInf,
+                                        streamUrl = streamUrl,
+                                        subscriptionId = subscriptionId,
+                                        fallbackGroup = pendingExtGrp,
+                                        httpHeaders = mergedHeaders,
+                                        seenIds = seenIds,
+                                    )
+                                } else {
+                                    val name = extractChannelNameFromUrl(streamUrl)
+                                    val stableId = makeUniqueStableId(
+                                        subscriptionId = subscriptionId,
+                                        baseKey = sha256Short("$name|$streamUrl"),
+                                        seenIds = seenIds,
+                                    )
+                                    Channel(
+                                        id = stableId,
+                                        subscriptionId = subscriptionId,
+                                        mediaType = MediaType.LIVE,
+                                        name = name,
+                                        streamUrl = streamUrl,
+                                        groupTitle = pendingExtGrp,
+                                        httpHeaders = mergedHeaders,
+                                    )
+                                }
+                            } catch (_: Exception) {
+                                skippedEntries++
+                                null
+                            }
+
+                            if (channel != null) {
+                                channels.add(channel)
+                                parsedEntries++
+                            }
+                        }
                         pendingExtInf = null
+                        pendingExtGrp = null
+                        pendingHeaders.clear()
+                    }
+                    else -> {
+                        if (pendingExtInf != null) {
+                            skippedEntries++
+                            pendingExtInf = null
+                            pendingExtGrp = null
+                            pendingHeaders.clear()
+                        }
                     }
                 }
+                rawLine = reader.readLine()
             }
         }
 
-        onProgress?.invoke(totalLines, totalLines)
-
+        onProgress?.invoke(1f)
         return ParseResult(
             channels = channels,
             totalLines = totalLines,
             parsedEntries = parsedEntries,
             skippedEntries = skippedEntries,
+            xmltvUrl = xmltvUrl,
         )
+    }
+
+    private fun extractXmltvUrl(extM3uLine: String): String? {
+        val attrs = parseAttributes(extM3uLine.removePrefix(EXT_M3U))
+        return (attrs["x-tvg-url"] ?: attrs["url-tvg"] ?: attrs["tvg-url"])
+            ?.split(",")
+            ?.firstOrNull()
+            ?.trim()
+            ?.takeIf { it.startsWith("http://", true) || it.startsWith("https://", true) }
     }
 
     private fun parseEntry(
         extInf: String,
         streamUrl: String,
-        languageMap: Map<String, String>,
-        countryMap: Map<String, String>,
+        subscriptionId: String,
+        fallbackGroup: String?,
+        httpHeaders: Map<String, String>,
+        seenIds: MutableMap<String, Int>,
     ): Channel {
-        val afterPrefix = extInf.removePrefix(EXT_INF)
+        val afterPrefix = extInf.substring(EXT_INF.length)
+        val splitIndex = findDisplayNameCommaIndex(afterPrefix)
+        val attrSection = if (splitIndex >= 0) afterPrefix.substring(0, splitIndex) else afterPrefix
+        val displayName = if (splitIndex >= 0) afterPrefix.substring(splitIndex + 1).trim() else ""
 
-        val commaIndex = afterPrefix.lastIndexOf(',')
-        val displayName = if (commaIndex >= 0) {
-            afterPrefix.substring(commaIndex + 1).trim()
-        } else {
-            ""
-        }
-
-        val attrSection = if (commaIndex >= 0) afterPrefix.substring(0, commaIndex) else afterPrefix
-
-        val attrs = mutableMapOf<String, String>()
-        ATTR_REGEX.findAll(attrSection).forEach { match ->
-            attrs[match.groupValues[1].lowercase()] = match.groupValues[2]
-        }
-
+        val attrs = parseAttributes(attrSection)
         val tvgId = attrs["tvg-id"]?.takeIf { it.isNotBlank() }
         val tvgName = attrs["tvg-name"]?.takeIf { it.isNotBlank() }
         val tvgLogo = attrs["tvg-logo"]?.takeIf { it.isNotBlank() }
-        val groupTitle = attrs["group-title"]?.takeIf { it.isNotBlank() }
+        val groupTitle = attrs["group-title"]?.takeIf { it.isNotBlank() } ?: fallbackGroup
         val tvgCountry = attrs["tvg-country"]?.takeIf { it.isNotBlank() }?.lowercase()
         val tvgLanguage = attrs["tvg-language"]?.takeIf { it.isNotBlank() }
         val tvgChno = attrs["tvg-chno"]?.toIntOrNull()
@@ -251,33 +244,26 @@ class M3UParser @Inject constructor() {
             ?: tvgName?.takeIf { it.isNotBlank() }
             ?: extractChannelNameFromUrl(streamUrl)
 
-        val id = tvgId?.takeIf { it.isNotBlank() }
-            ?: "${name.lowercase().replace(" ", "_")}_${streamUrl.hashCode().toUInt()}"
+        val baseStableKey = if (tvgId != null) {
+            sha256Short("tvgid:${tvgId.lowercase()}|$streamUrl")
+        } else {
+            sha256Short("name:${name.lowercase()}|$streamUrl")
+        }
+        val stableId = makeUniqueStableId(subscriptionId, baseStableKey, seenIds)
 
-        // Extract country code from tvg-id if not explicit (e.g. 00sReplay.us@SD -> us)
         val countryCodeFromId = tvgId
             ?.substringBefore("@")
             ?.substringAfterLast(".", "")
             ?.takeIf { it.length == 2 && it.all { c -> c.isLetter() } }
             ?.lowercase()
-
         val resolvedCountryCode = tvgCountry ?: countryCodeFromId
-        val fallbackCountry = resolvedCountryCode?.let {
-            COUNTRY_NAMES[it] ?: it.uppercase()
-        }
-        val mappedCountry = countryMap[streamUrl] ?: (if (tvgId != null) countryMap[tvgId] else null)
-        val finalCountry = mappedCountry ?: fallbackCountry
-
-        // Language resolution priority:
-        // 1. Language playlist map (exact authoritative mapping)
-        // 2. tvg-language attribute
-        // 3. Country-to-language inference
-        val mappedLanguage = languageMap[streamUrl] ?: (if (tvgId != null) languageMap[tvgId] else null)
-        val inferredLanguage = resolvedCountryCode?.let { COUNTRY_TO_LANGUAGE[it] }
-        val finalLanguage = mappedLanguage ?: tvgLanguage ?: inferredLanguage
+        val finalCountry = resolvedCountryCode?.let { COUNTRY_NAMES[it] ?: it.uppercase() }
 
         return Channel(
-            id = id,
+            id = stableId,
+            subscriptionId = subscriptionId,
+            externalId = tvgId ?: baseStableKey,
+            mediaType = MediaType.LIVE,
             name = name,
             streamUrl = streamUrl,
             logoUrl = tvgLogo,
@@ -285,19 +271,99 @@ class M3UParser @Inject constructor() {
             tvgId = tvgId,
             tvgName = tvgName,
             country = finalCountry,
-            language = finalLanguage,
+            language = tvgLanguage,
             channelNumber = tvgChno,
-            addedAt = System.currentTimeMillis(),
+            httpHeaders = httpHeaders,
         )
+    }
+
+    /**
+     * Scans `#EXTINF` after prefix, ignoring commas inside single or double quotes,
+     * and returns the comma index separating attributes from the channel display name.
+     */
+    private fun findDisplayNameCommaIndex(text: String): Int {
+        var inDoubleQuotes = false
+        var inSingleQuotes = false
+        for (i in text.indices) {
+            when (val ch = text[i]) {
+                '"' -> if (!inSingleQuotes) inDoubleQuotes = !inDoubleQuotes
+                '\'' -> if (!inDoubleQuotes) inSingleQuotes = !inSingleQuotes
+                ',' -> if (!inDoubleQuotes && !inSingleQuotes) return i
+            }
+        }
+        return -1
+    }
+
+    private fun parseAttributes(segment: String): Map<String, String> {
+        val attrs = HashMap<String, String>()
+        ATTR_REGEX.findAll(segment).forEach { match ->
+            val key = match.groupValues[1].lowercase()
+            val value = match.groupValues[2].ifEmpty {
+                match.groupValues[3].ifEmpty { match.groupValues[4] }
+            }.trim()
+            if (key.isNotEmpty() && value.isNotEmpty()) {
+                attrs[key] = value
+            }
+        }
+        return attrs
+    }
+
+    private fun parseVlcOption(opt: String, outHeaders: MutableMap<String, String>) {
+        val eqIdx = opt.indexOf('=')
+        if (eqIdx <= 0) return
+        val key = opt.substring(0, eqIdx).trim().lowercase()
+        val value = opt.substring(eqIdx + 1).trim()
+        if (value.isEmpty()) return
+        when (key) {
+            "http-user-agent" -> outHeaders["User-Agent"] = value
+            "http-referrer", "http-referer" -> outHeaders["Referer"] = value
+            "http-origin" -> outHeaders["Origin"] = value
+        }
+    }
+
+    private fun parseExtHttpJson(raw: String, outHeaders: MutableMap<String, String>) {
+        if (!raw.startsWith("{")) return
+        try {
+            val json = JSONObject(raw)
+            val keys = json.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val value = json.optString(key).trim()
+                if (value.isNotEmpty()) {
+                    outHeaders[key] = value
+                }
+            }
+        } catch (_: Exception) {
+            // Malformed #EXTHTTP line — ignore gracefully
+        }
+    }
+
+    private fun isStreamUrl(line: String): Boolean =
+        SUPPORTED_SCHEMES.any { line.startsWith(it, ignoreCase = true) }
+
+    private fun makeUniqueStableId(
+        subscriptionId: String,
+        baseKey: String,
+        seenIds: MutableMap<String, Int>,
+    ): String {
+        val prefix = if (subscriptionId.isNotBlank()) "${subscriptionId}_live_$baseKey" else "live_$baseKey"
+        val count = seenIds.getOrDefault(prefix, 0)
+        seenIds[prefix] = count + 1
+        return if (count == 0) prefix else "${prefix}_$count"
+    }
+
+    private fun sha256Short(input: String): String {
+        val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
+        return bytes.take(12).joinToString("") { "%02x".format(it) }
     }
 
     private fun extractChannelNameFromUrl(url: String): String {
         return try {
             val path = url.substringAfter("://").substringAfter("/")
-            val last = path.substringAfterLast("/").substringBeforeLast(".")
+            val last = path.substringAfterLast("/").substringBefore("?").substringBeforeLast(".")
             last.replace(Regex("[_\\-+]"), " ").trim().takeIf { it.isNotBlank() }
                 ?: "Unknown Channel"
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             "Unknown Channel"
         }
     }

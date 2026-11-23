@@ -87,7 +87,7 @@ fun LanguagesScreen(
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         Text(
-                            text = "No languages cached yet",
+                            text = "No language tags found in active playlist",
                             style = LiquidTypography.HeadlineSmall,
                             color = LiquidColors.TextSecondary,
                         )
@@ -99,13 +99,13 @@ fun LanguagesScreen(
                             glassAlpha = 0.25f,
                             borderColor = LiquidColors.AccentBlue,
                         ) {
-                            Text("Fetch Streams", style = LiquidTypography.LabelLarge, color = LiquidColors.AccentBlue)
+                            Text("Refresh Playlist", style = LiquidTypography.LabelLarge, color = LiquidColors.AccentBlue)
                         }
                     }
                 }
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(4),
+                    columns = GridCells.Adaptive(minSize = 230.dp),
                     contentPadding = PaddingValues(bottom = 32.dp, top = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),

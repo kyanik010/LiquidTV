@@ -16,10 +16,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -172,7 +172,7 @@ fun LiveTVScreen(
                     ) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Icon(
-                                Icons.Filled.List,
+                                Icons.AutoMirrored.Filled.List,
                                 contentDescription = "List View",
                                 tint = if (uiState.viewMode == ViewMode.LIST) LiquidColors.AccentBlue else LiquidColors.TextSecondary,
                                 modifier = Modifier.size(18.dp),
@@ -209,7 +209,7 @@ fun LiveTVScreen(
                 when (uiState.viewMode) {
                     ViewMode.GRID -> {
                         LazyVerticalGrid(
-                            columns = GridCells.Fixed(5),
+                            columns = GridCells.Adaptive(minSize = 185.dp),
                             contentPadding = PaddingValues(horizontal = 36.dp, vertical = 12.dp),
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp),

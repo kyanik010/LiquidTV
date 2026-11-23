@@ -7,6 +7,7 @@ import com.liquidtv.app.domain.model.Channel
 import com.liquidtv.app.domain.model.ChannelFilter
 import com.liquidtv.app.domain.model.SortOrder
 import com.liquidtv.app.domain.repository.ChannelRepository
+import com.liquidtv.app.domain.repository.UserPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -24,6 +25,7 @@ data class LiveTVUiState(
 @HiltViewModel
 class LiveTVViewModel @Inject constructor(
     private val channelRepository: ChannelRepository,
+    userPreferencesRepository: UserPreferencesRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -45,8 +47,24 @@ class LiveTVViewModel @Inject constructor(
         channelRepository.getAllChannels(),
         _filter,
         _viewMode,
-    ) { allChannels, filter, viewMode ->
-        val filtered = applyFilter(allChannels, filter)
+        channelRepository.getLockedCategoryNames(),
+        userPreferencesRepository.userPreferences,
+    ) { allChannels, filter, viewMode, lockedCategories, prefs ->
+        val protectCategories = prefs.parentalControlEnabled &&
+            prefs.hasParentalPin &&
+            filter.category.isNullOrBlank() &&
+            lockedCategories.isNotEmpty()
+
+        val base = if (protectCategories) {
+            allChannels.filter { ch ->
+                val cat = ch.groupTitle?.trim()?.lowercase()
+                cat == null || cat !in lockedCategories
+            }
+        } else {
+            allChannels
+        }
+
+        val filtered = applyFilter(base, filter)
         LiveTVUiState(
             channels = filtered,
             filter = filter,
@@ -82,9 +100,9 @@ class LiveTVViewModel @Inject constructor(
             result = result.filter { ch ->
                 val chLang = ch.language?.trim()?.lowercase() ?: return@filter false
                 chLang == cleanLang ||
-                chLang.contains(cleanLang) ||
-                cleanLang.contains(chLang) ||
-                chLang.split(";", ",", "/", " ").any { it.trim() == cleanLang }
+                    chLang.contains(cleanLang) ||
+                    cleanLang.contains(chLang) ||
+                    chLang.split(";", ",", "/", " ").any { it.trim() == cleanLang }
             }
         }
 
@@ -93,8 +111,8 @@ class LiveTVViewModel @Inject constructor(
             result = result.filter { ch ->
                 val chCountry = ch.country?.trim()?.lowercase() ?: return@filter false
                 chCountry == cleanCountry ||
-                chCountry.contains(cleanCountry) ||
-                cleanCountry.contains(chCountry)
+                    chCountry.contains(cleanCountry) ||
+                    cleanCountry.contains(chCountry)
             }
         }
 
@@ -103,12 +121,12 @@ class LiveTVViewModel @Inject constructor(
         }
 
         result = when (filter.sortOrder) {
-            SortOrder.NAME_ASC -> result.sortedBy { it.name }
-            SortOrder.NAME_DESC -> result.sortedByDescending { it.name }
+            SortOrder.NAME_ASC -> result.sortedBy { it.name.lowercase() }
+            SortOrder.NAME_DESC -> result.sortedByDescending { it.name.lowercase() }
             SortOrder.RECENTLY_WATCHED -> result.sortedByDescending { it.lastWatchedAt ?: 0L }
-            SortOrder.CATEGORY -> result.sortedBy { it.groupTitle ?: "" }
-            SortOrder.LANGUAGE -> result.sortedBy { it.language ?: "" }
-            SortOrder.COUNTRY -> result.sortedBy { it.country ?: "" }
+            SortOrder.CATEGORY -> result.sortedBy { it.groupTitle?.lowercase() ?: "" }
+            SortOrder.LANGUAGE -> result.sortedBy { it.language?.lowercase() ?: "" }
+            SortOrder.COUNTRY -> result.sortedBy { it.country?.lowercase() ?: "" }
             SortOrder.FAVORITES_FIRST -> result.sortedByDescending { it.isFavorite }
         }
 

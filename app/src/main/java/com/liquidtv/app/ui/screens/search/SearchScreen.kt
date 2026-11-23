@@ -20,15 +20,14 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
@@ -37,6 +36,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.liquidtv.app.domain.model.Channel
+import com.liquidtv.app.domain.model.MediaType
+import com.liquidtv.app.domain.model.SeriesItem
 import com.liquidtv.app.ui.components.AppBackground
 import com.liquidtv.app.ui.components.LiquidGlassSurface
 import com.liquidtv.app.ui.components.LiveBadge
@@ -45,7 +46,8 @@ import com.liquidtv.app.ui.theme.LiquidTypography
 
 @Composable
 fun SearchScreen(
-    onChannelClick: (String) -> Unit,
+    onChannelClick: (String, MediaType) -> Unit,
+    onSeriesClick: (String) -> Unit,
     onBack: () -> Unit,
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
@@ -58,15 +60,12 @@ fun SearchScreen(
         } catch (_: Exception) {}
     }
 
-    AppBackground(
-        modifier = Modifier.fillMaxSize(),
-    ) {
+    AppBackground(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = 88.dp, start = 36.dp, end = 36.dp),
         ) {
-            // Search Input Container
             LiquidGlassSurface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -100,7 +99,7 @@ fun SearchScreen(
                         decorationBox = { innerTextField ->
                             if (uiState.query.isEmpty()) {
                                 Text(
-                                    text = "Search channels by name, genre, country, or language...",
+                                    text = "Search channels, movies, or series...",
                                     style = LiquidTypography.BodyLarge,
                                     color = LiquidColors.TextDisabled,
                                 )
@@ -125,7 +124,6 @@ fun SearchScreen(
 
             when {
                 uiState.query.isEmpty() -> {
-                    // Recent searches & Discovery suggestions
                     if (uiState.searchHistory.isNotEmpty()) {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Row(
@@ -186,12 +184,12 @@ fun SearchScreen(
                         ) {
                             Icon(Icons.Filled.Search, null, tint = LiquidColors.TextDisabled, modifier = Modifier.size(56.dp))
                             Text(
-                                "Explore Global Live Television",
+                                "Search Live TV, Movies & Series",
                                 style = LiquidTypography.TitleMedium,
                                 color = LiquidColors.TextSecondary,
                             )
                             Text(
-                                "Type any keyword on your remote or on-screen keyboard",
+                                "Type any name, category, country, or language",
                                 style = LiquidTypography.BodySmall,
                                 color = LiquidColors.TextTertiary,
                             )
@@ -203,7 +201,7 @@ fun SearchScreen(
                         CircularProgressIndicator(color = LiquidColors.AccentBlue)
                     }
                 }
-                uiState.results.isEmpty() -> {
+                !uiState.hasResults -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
@@ -219,12 +217,12 @@ fun SearchScreen(
                             ) {
                                 Icon(Icons.Filled.Tv, null, tint = LiquidColors.TextTertiary, modifier = Modifier.size(48.dp))
                                 Text(
-                                    "No channels found for \"${uiState.query}\"",
+                                    "No results found for \"${uiState.query}\"",
                                     style = LiquidTypography.TitleMedium,
                                     color = LiquidColors.TextPrimary,
                                 )
                                 Text(
-                                    "Check your spelling or search by country code, genre, or language",
+                                    "Check your spelling or try a broader search term",
                                     style = LiquidTypography.BodySmall,
                                     color = LiquidColors.TextTertiary,
                                 )
@@ -233,23 +231,30 @@ fun SearchScreen(
                     }
                 }
                 else -> {
+                    val total = uiState.results.size + uiState.seriesResults.size
                     Text(
-                        text = "${uiState.results.size} channels found",
+                        text = "$total matches found",
                         style = LiquidTypography.LabelMedium,
                         color = LiquidColors.TextSecondary,
                         modifier = Modifier.padding(bottom = 12.dp),
                     )
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(4),
+                        columns = GridCells.Adaptive(minSize = 190.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                         contentPadding = PaddingValues(bottom = 32.dp),
                         modifier = Modifier.fillMaxSize(),
                     ) {
-                        items(uiState.results, key = { it.id }) { channel ->
+                        items(uiState.results, key = { "ch_${it.id}" }) { channel ->
                             SearchResultGridCard(
                                 channel = channel,
-                                onClick = { onChannelClick(channel.id) },
+                                onClick = { onChannelClick(channel.id, channel.mediaType) },
+                            )
+                        }
+                        items(uiState.seriesResults, key = { "sr_${it.id}" }) { series ->
+                            SeriesSearchGridCard(
+                                series = series,
+                                onClick = { onSeriesClick(series.id) },
                             )
                         }
                     }
@@ -267,7 +272,7 @@ private fun SearchResultGridCard(
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.07f else 1f,
+        targetValue = if (isFocused) 1.05f else 1f,
         animationSpec = spring(dampingRatio = 0.6f, stiffness = 300f),
         label = "searchCardScale",
     )
@@ -309,7 +314,11 @@ private fun SearchResultGridCard(
                     Icon(Icons.Filled.Tv, null, tint = LiquidColors.TextTertiary, modifier = Modifier.size(32.dp))
                 }
                 Box(Modifier.fillMaxSize().padding(6.dp), contentAlignment = Alignment.TopEnd) {
-                    LiveBadge()
+                    if (channel.mediaType == MediaType.LIVE) {
+                        LiveBadge()
+                    } else {
+                        MediaKindBadge("MOVIE", LiquidColors.AccentViolet)
+                    }
                 }
             }
 
@@ -330,5 +339,90 @@ private fun SearchResultGridCard(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun SeriesSearchGridCard(
+    series: SeriesItem,
+    onClick: () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isFocused) 1.05f else 1f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = 300f),
+        label = "seriesSearchScale",
+    )
+
+    LiquidGlassSurface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(180.dp)
+            .scale(scale)
+            .clickable(interactionSource, null, onClick = onClick)
+            .focusable(interactionSource = interactionSource),
+        cornerRadius = 16.dp,
+        glassAlpha = if (isFocused) 0.25f else 0.12f,
+        borderAlpha = if (isFocused) 0.7f else 0.18f,
+        borderColor = if (isFocused) LiquidColors.AccentViolet else Color.White,
+        isFocused = isFocused,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(90.dp)
+                    .background(LiquidColors.GlassTertiary, RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (!series.coverUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = series.coverUrl,
+                        contentDescription = series.name,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                } else {
+                    Icon(Icons.Filled.VideoLibrary, null, tint = LiquidColors.AccentVioletLight, modifier = Modifier.size(32.dp))
+                }
+                Box(Modifier.fillMaxSize().padding(6.dp), contentAlignment = Alignment.TopEnd) {
+                    MediaKindBadge("SERIES", LiquidColors.AccentCyan)
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = series.name,
+                    style = LiquidTypography.TitleSmall,
+                    color = LiquidColors.TextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = series.categoryName ?: series.genre ?: "Series",
+                    style = LiquidTypography.LabelSmall,
+                    color = LiquidColors.TextTertiary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MediaKindBadge(label: String, color: Color) {
+    Box(
+        modifier = Modifier
+            .background(color.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    ) {
+        Text(label, style = LiquidTypography.LabelSmall, color = Color.White)
     }
 }

@@ -6,9 +6,11 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -27,6 +29,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.liquidtv.app.ui.theme.LiquidColors
@@ -41,9 +44,9 @@ enum class NavDestination(
 ) {
     Home("Home", Icons.Default.Home),
     LiveTV("Live TV", Icons.Default.LiveTv),
+    Movies("Movies", Icons.Default.Movie),
+    Series("Series", Icons.Default.VideoLibrary),
     Categories("Categories", Icons.Default.GridView),
-    Languages("Languages", Icons.Default.Language),
-    Countries("Countries", Icons.Default.Public),
     Favorites("Favorites", Icons.Default.Favorite),
     Search("Search", Icons.Default.Search),
     Settings("Settings", Icons.Default.Settings),
@@ -60,9 +63,12 @@ fun MirrorBubbleNavigation(
     onDestinationSelected: (NavDestination) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val scrollState = rememberScrollState()
+
     // Outer glass pill
     Box(
         modifier = modifier
+            .padding(horizontal = 12.dp)
             .wrapContentWidth()
             .height(64.dp)
             .drawBehind {
@@ -105,6 +111,7 @@ fun MirrorBubbleNavigation(
         Row(
             modifier = Modifier
                 .wrapContentWidth()
+                .horizontalScroll(scrollState)
                 .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -135,7 +142,7 @@ private fun NavTab(
     )
 
     val tabWidth: Dp by animateDpAsState(
-        targetValue = if (isSelected) 110.dp else if (isFocused) 72.dp else 56.dp,
+        targetValue = if (isSelected) 114.dp else if (isFocused) 72.dp else 56.dp,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "tabWidth_${destination.name}",
     )
@@ -204,7 +211,8 @@ private fun NavTab(
                 indication = null,
                 onClick = onSelected,
             )
-            .focusable(interactionSource = interactionSource),
+            .focusable(interactionSource = interactionSource)
+            .testTag("nav_tab_${destination.name.lowercase()}"),
         contentAlignment = Alignment.Center,
     ) {
         Row(
@@ -230,4 +238,3 @@ private fun NavTab(
         }
     }
 }
-
