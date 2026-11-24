@@ -33,6 +33,7 @@ import com.liquidtv.app.domain.model.Category
 import com.liquidtv.app.domain.model.Channel
 import com.liquidtv.app.ui.components.AppBackground
 import com.liquidtv.app.ui.components.LiquidGlassSurface
+import com.liquidtv.app.ui.theme.AppTheme
 import com.liquidtv.app.ui.theme.LiquidColors
 import com.liquidtv.app.ui.theme.LiquidTypography
 
@@ -79,6 +80,7 @@ fun MoviesScreen(
                 verticalArrangement = Arrangement.spacedBy(if (isCompactHeight) 5.dp else 6.dp),
             ) {
                 // Single-line compact header: Title + inline count pill (+ filter button on narrow portrait)
+                val colors = AppTheme.colors
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -97,7 +99,7 @@ fun MoviesScreen(
                                 ?: if (uiState.favoritesOnly) "الأفلام المفضلة" else "الأفلام",
                             style = (if (isCompactHeight) LiquidTypography.TitleMedium else LiquidTypography.TitleLarge).copy(
                                 brush = Brush.linearGradient(
-                                    listOf(LiquidColors.TextPrimary, LiquidColors.AccentBlueLight),
+                                    listOf(colors.text, colors.accentText),
                                 ),
                             ),
                             maxLines = 1,
@@ -106,13 +108,13 @@ fun MoviesScreen(
                         )
                         LiquidGlassSurface(
                             cornerRadius = 12.dp,
-                            glassAlpha = 0.14f,
-                            borderAlpha = 0.22f,
+                            glassAlpha = 0.22f,
+                            borderAlpha = 0.28f,
                         ) {
                             Text(
                                 text = "${uiState.movies.size} فيلم متاح",
                                 style = LiquidTypography.LabelSmall,
-                                color = LiquidColors.TextSecondary,
+                                color = colors.textSecondary,
                                 maxLines = 1,
                                 modifier = Modifier
                                     .padding(horizontal = 9.dp, vertical = 4.dp)
@@ -128,16 +130,16 @@ fun MoviesScreen(
                                 .height(38.dp)
                                 .clickable { showCategoriesSheet = true },
                             cornerRadius = 19.dp,
-                            glassAlpha = 0.20f,
-                            borderColor = LiquidColors.AccentBlueLight,
+                            glassAlpha = 0.28f,
+                            borderColor = colors.accent,
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(5.dp),
                             ) {
-                                Icon(Icons.Filled.FilterList, contentDescription = "التصنيفات", tint = LiquidColors.AccentBlueLight, modifier = Modifier.size(16.dp))
-                                Text("التصنيفات", style = LiquidTypography.LabelMedium, color = Color.White)
+                                Icon(Icons.Filled.FilterList, contentDescription = "التصنيفات", tint = colors.accentText, modifier = Modifier.size(16.dp))
+                                Text("التصنيفات", style = LiquidTypography.LabelMedium, color = colors.text)
                             }
                         }
                     }
@@ -171,19 +173,22 @@ fun MoviesScreen(
 
                 if (uiState.isLoading && uiState.movies.isEmpty()) {
                     Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = LiquidColors.AccentBlue)
+                        CircularProgressIndicator(color = colors.accent)
                     }
                 } else if (uiState.error != null && uiState.movies.isEmpty()) {
                     Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        LiquidGlassSurface(cornerRadius = 20.dp, glassAlpha = 0.16f) {
+                        LiquidGlassSurface(cornerRadius = 20.dp, glassAlpha = 0.18f) {
                             Column(
                                 modifier = Modifier.padding(28.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
-                                Icon(Icons.Filled.ErrorOutline, null, tint = LiquidColors.ErrorRed, modifier = Modifier.size(44.dp))
-                                Text(uiState.error.orEmpty(), style = LiquidTypography.TitleMedium, color = LiquidColors.TextPrimary)
-                                Button(onClick = viewModel::refresh) {
+                                Icon(Icons.Filled.ErrorOutline, null, tint = colors.danger, modifier = Modifier.size(44.dp))
+                                Text(uiState.error.orEmpty(), style = LiquidTypography.TitleMedium, color = colors.text)
+                                Button(
+                                    onClick = viewModel::refresh,
+                                    colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = colors.onAccent),
+                                ) {
                                     Text("إعادة المحاولة")
                                 }
                             }
@@ -242,9 +247,11 @@ fun MoviesScreen(
         }
 
         if (showCategoriesSheet) {
+            val colors = AppTheme.colors
             ModalBottomSheet(
                 onDismissRequest = { showCategoriesSheet = false },
-                containerColor = LiquidColors.DeepSurface,
+                containerColor = colors.panel,
+                contentColor = colors.text,
             ) {
                 Column(
                     modifier = Modifier
@@ -252,7 +259,7 @@ fun MoviesScreen(
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Text("تصنيفات الأفلام", style = LiquidTypography.TitleLarge, color = LiquidColors.TextPrimary)
+                    Text("تصنيفات الأفلام", style = LiquidTypography.TitleLarge, color = colors.text)
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -316,11 +323,12 @@ private fun MoviesCategoriesSidebar(
     onSelectCategory: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val colors = AppTheme.colors
     LiquidGlassSurface(
         modifier = modifier,
         cornerRadius = 20.dp,
-        glassAlpha = 0.14f,
-        borderAlpha = 0.22f,
+        glassAlpha = 0.18f,
+        borderAlpha = 0.28f,
     ) {
         Column(
             modifier = Modifier
@@ -331,7 +339,7 @@ private fun MoviesCategoriesSidebar(
             Text(
                 text = "التصنيفات",
                 style = if (compactHeight) LiquidTypography.TitleSmall else LiquidTypography.TitleMedium,
-                color = LiquidColors.TextPrimary,
+                color = colors.text,
                 modifier = Modifier.padding(horizontal = 6.dp, vertical = if (compactHeight) 0.dp else 2.dp),
             )
             LazyColumn(
@@ -381,6 +389,7 @@ private fun MovieSidebarRow(
     compact: Boolean,
     onClick: () -> Unit,
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
@@ -391,9 +400,10 @@ private fun MovieSidebarRow(
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
         cornerRadius = 11.dp,
-        glassAlpha = if (isSelected) 0.34f else if (isFocused) 0.22f else 0.08f,
-        borderAlpha = if (isFocused) 0.85f else if (isSelected) 0.55f else 0.14f,
-        borderColor = if (isSelected || isFocused) LiquidColors.AccentBlueLight else Color.White,
+        glassColor = if (isSelected) colors.selected else colors.surface,
+        glassAlpha = if (isSelected) 0.92f else if (isFocused) 0.80f else 0.55f,
+        borderAlpha = if (isFocused) 0.95f else if (isSelected) 0.75f else 0.28f,
+        borderColor = if (isFocused) colors.focus else if (isSelected) colors.accent else colors.border,
         isFocused = isFocused,
     ) {
         Row(
@@ -406,7 +416,7 @@ private fun MovieSidebarRow(
             Text(
                 text = label,
                 style = LiquidTypography.LabelLarge,
-                color = if (isSelected) Color.White else LiquidColors.TextSecondary,
+                color = if (isSelected) colors.text else colors.textSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -415,7 +425,7 @@ private fun MovieSidebarRow(
             Text(
                 text = count.toString(),
                 style = LiquidTypography.LabelSmall,
-                color = if (isSelected) LiquidColors.AccentBlueLight else LiquidColors.TextTertiary,
+                color = if (isSelected) colors.accentText else colors.muted,
             )
         }
     }
@@ -431,24 +441,25 @@ private fun MoviesGridArea(
     compactHeight: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val colors = AppTheme.colors
     if (movies.isEmpty()) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
             LiquidGlassSurface(
                 modifier = Modifier.padding(24.dp),
                 cornerRadius = 20.dp,
-                glassAlpha = 0.16f,
+                glassAlpha = 0.18f,
             ) {
                 Column(
                     modifier = Modifier.padding(28.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Icon(Icons.Filled.Movie, null, tint = LiquidColors.AccentBlueLight, modifier = Modifier.size(46.dp))
-                    Text("لا توجد أفلام متاحة", style = LiquidTypography.TitleLarge, color = LiquidColors.TextPrimary)
+                    Icon(Icons.Filled.Movie, null, tint = colors.accentText, modifier = Modifier.size(46.dp))
+                    Text("لا توجد أفلام متاحة", style = LiquidTypography.TitleLarge, color = colors.text)
                     Text(
                         text = "لا يحتوي هذا الاشتراك على أفلام، أو لا توجد نتائج ضمن التصنيف المختار.",
                         style = LiquidTypography.BodySmall,
-                        color = LiquidColors.TextSecondary,
+                        color = colors.textSecondary,
                     )
                 }
             }
@@ -481,6 +492,7 @@ private fun MovieFilterPill(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     LiquidGlassSurface(
@@ -489,9 +501,10 @@ private fun MovieFilterPill(
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
         cornerRadius = 18.dp,
-        glassAlpha = if (selected) 0.35f else if (isFocused) 0.24f else 0.12f,
-        borderAlpha = if (isFocused) 0.8f else if (selected) 0.55f else 0.18f,
-        borderColor = if (selected || isFocused) LiquidColors.AccentBlueLight else Color.White,
+        glassColor = if (selected) colors.selected else colors.surface,
+        glassAlpha = if (selected) 0.92f else if (isFocused) 0.80f else 0.65f,
+        borderAlpha = if (isFocused) 0.95f else if (selected) 0.75f else 0.35f,
+        borderColor = if (isFocused) colors.focus else if (selected) colors.accent else colors.border,
         isFocused = isFocused,
     ) {
         Box(
@@ -501,7 +514,7 @@ private fun MovieFilterPill(
             Text(
                 text = label,
                 style = LiquidTypography.LabelMedium,
-                color = if (selected) Color.White else LiquidColors.TextPrimary,
+                color = if (selected) colors.text else colors.textSecondary,
             )
         }
     }
@@ -514,6 +527,7 @@ private fun MovieCinemaPosterCard(
     onClick: () -> Unit,
     onFavoriteToggle: () -> Unit,
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
@@ -523,9 +537,10 @@ private fun MovieCinemaPosterCard(
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
         cornerRadius = 16.dp,
-        glassAlpha = if (isFocused) 0.30f else 0.15f,
-        borderAlpha = if (isFocused) 0.90f else 0.22f,
-        borderColor = if (isFocused) LiquidColors.AccentBlueLight else Color.White,
+        glassColor = colors.card,
+        glassAlpha = if (isFocused) 0.94f else 0.80f,
+        borderAlpha = if (isFocused) 0.95f else 0.40f,
+        borderColor = if (isFocused) colors.focus else colors.border,
         isFocused = isFocused,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -535,7 +550,7 @@ private fun MovieCinemaPosterCard(
                     .fillMaxWidth()
                     .aspectRatio(2f / 3f)
                     .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                    .background(LiquidColors.GlassTertiary),
+                    .background(colors.surface.copy(alpha = 0.85f)),
                 contentAlignment = Alignment.Center,
             ) {
                 if (!movie.logoUrl.isNullOrBlank()) {
@@ -549,12 +564,12 @@ private fun MovieCinemaPosterCard(
                     Icon(
                         imageVector = Icons.Filled.Movie,
                         contentDescription = null,
-                        tint = LiquidColors.AccentBlueLight.copy(alpha = 0.45f),
+                        tint = colors.accentText.copy(alpha = 0.55f),
                         modifier = Modifier.size(44.dp),
                     )
                 }
 
-                // Bottom Cinema Gradient Scrim
+                // Bottom Cinema Gradient Scrim (kept dark for poster legibility)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -592,7 +607,7 @@ private fun MovieCinemaPosterCard(
                     Icon(
                         imageVector = if (movie.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                         contentDescription = if (movie.isFavorite) "إزالة من المفضلة" else "إضافة إلى المفضلة",
-                        tint = if (movie.isFavorite) LiquidColors.LiveRed else Color.White,
+                        tint = if (movie.isFavorite) colors.danger else Color.White,
                     )
                 }
 
@@ -601,13 +616,13 @@ private fun MovieCinemaPosterCard(
                         modifier = Modifier
                             .align(Alignment.BottomStart)
                             .padding(7.dp)
-                            .background(LiquidColors.AccentBlue.copy(alpha = 0.90f), RoundedCornerShape(8.dp))
+                            .background(colors.accent.copy(alpha = 0.94f), RoundedCornerShape(8.dp))
                             .padding(horizontal = 7.dp, vertical = 3.dp),
                     ) {
                         Text(
                             text = "متابعة",
                             style = LiquidTypography.LabelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = Color.White,
+                            color = colors.onAccent,
                         )
                     }
                 }
@@ -636,7 +651,7 @@ private fun MovieCinemaPosterCard(
                 Text(
                     text = movie.name,
                     style = LiquidTypography.TitleSmall,
-                    color = LiquidColors.TextPrimary,
+                    color = colors.text,
                     maxLines = if (compactHeight) 1 else 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -644,7 +659,7 @@ private fun MovieCinemaPosterCard(
                     Text(
                         text = group,
                         style = LiquidTypography.LabelSmall,
-                        color = LiquidColors.AccentBlueLight,
+                        color = colors.accentText,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )

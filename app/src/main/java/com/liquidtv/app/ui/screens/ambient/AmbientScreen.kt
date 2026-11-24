@@ -197,8 +197,10 @@ fun AmbientScreen(
                 ) {
                     LiquidGlassSurface(
                         cornerRadius = 24.dp,
-                        glassAlpha = 0.15f,
+                        glassAlpha = 0.45f,
                         borderAlpha = 0.25f,
+                        glassColor = Color(0xFF0E1624),
+                        borderColor = Color.White,
                     ) {
                         AsyncImage(
                             model = featured.logoUrl,
@@ -242,8 +244,10 @@ fun AmbientScreen(
         ) {
             LiquidGlassSurface(
                 cornerRadius = 20.dp,
-                glassAlpha = 0.10f,
-                borderAlpha = 0.15f,
+                glassAlpha = 0.45f,
+                borderAlpha = 0.20f,
+                glassColor = Color(0xFF0E1624),
+                borderColor = Color.White,
             ) {
                 Text(
                     text = "اضغط في أي مكان للعودة",

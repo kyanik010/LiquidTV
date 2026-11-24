@@ -16,14 +16,15 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.liquidtv.app.ui.theme.LiquidColors
+import com.liquidtv.app.ui.theme.AppTheme
 import com.liquidtv.app.ui.theme.LocalLiquidGlassTokens
 
 /**
- * Highly-optimized Liquid Glass surface composable for Android TV.
+ * Highly-optimized Liquid Glass surface composable for Android TV & Mobile.
  *
- * Designed for 60fps performance on TV hardware by minimizing object allocations
- * in DrawScope and using snappy TV-friendly animations.
+ * Resolves colors dynamically from [AppTheme.colors] when parameters are omitted
+ * (`Color.Unspecified`), adapting seamlessly across both dark obsidian/jewel themes
+ * and light marble themes.
  */
 @Composable
 fun LiquidGlassSurface(
@@ -33,9 +34,9 @@ fun LiquidGlassSurface(
     borderAlpha: Float = 0.25f,
     highlightAlpha: Float = 0.45f,
     shadowAlpha: Float = 0.3f,
-    glassColor: Color = Color.White,
-    borderColor: Color = Color.White,
-    accentGlowColor: Color = LiquidColors.AccentBlue,
+    glassColor: Color = Color.Unspecified,
+    borderColor: Color = Color.Unspecified,
+    accentGlowColor: Color = Color.Unspecified,
     isFocused: Boolean = false,
     isPressed: Boolean = false,
     onClick: (() -> Unit)? = null,
@@ -43,6 +44,27 @@ fun LiquidGlassSurface(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val tokens = LocalLiquidGlassTokens.current
+    val colors = AppTheme.colors
+    val isLight = colors.isLight
+
+    val resolvedGlassColor = if (glassColor != Color.Unspecified) glassColor else colors.card
+    val resolvedBaseBorder = if (borderColor != Color.Unspecified) borderColor else colors.border
+    val resolvedFocusBorder = colors.focus
+    val resolvedGlowColor = if (accentGlowColor != Color.Unspecified) accentGlowColor else colors.focusGlow
+
+    // Scale glass & border opacity smoothly so palette tokens (`card`, `border`) carry real depth
+    val scaledBaseGlassAlpha = if (glassColor != Color.Unspecified) {
+        glassAlpha.coerceIn(0f, 1f)
+    } else {
+        (glassAlpha * if (isLight) 3.4f else 2.6f).coerceIn(
+            if (isLight) 0.56f else 0.34f,
+            if (isLight) 0.94f else 0.78f,
+        )
+    }
+    val scaledBaseBorderAlpha = (borderAlpha * if (isLight) 2.2f else 1.85f).coerceIn(
+        if (isLight) 0.45f else 0.35f,
+        0.92f,
+    )
 
     // Snappy animations to avoid multi-second frame drops during D-pad navigation
     val focusProgress by animateFloatAsState(
@@ -61,9 +83,9 @@ fun LiquidGlassSurface(
         label = "glass_scale",
     )
 
-    val activeBorderAlpha = borderAlpha + focusProgress * (tokens.focusBorderAlpha - borderAlpha)
-    val activeGlassAlpha = glassAlpha + focusProgress * 0.10f
-    val activeHighlightAlpha = highlightAlpha + focusProgress * 0.2f
+    val activeBorderAlpha = scaledBaseBorderAlpha + focusProgress * (tokens.focusBorderAlpha - scaledBaseBorderAlpha)
+    val activeGlassAlpha = (scaledBaseGlassAlpha + focusProgress * 0.14f).coerceIn(0f, 0.96f)
+    val activeHighlightAlpha = highlightAlpha + focusProgress * 0.18f
 
     val shape = remember(cornerRadius) { RoundedCornerShape(cornerRadius) }
 
@@ -73,15 +95,17 @@ fun LiquidGlassSurface(
             .clip(shape)
             .drawBehind {
                 drawOptimizedLiquidGlass(
-                    glassColor = glassColor,
+                    glassColor = resolvedGlassColor,
                     glassAlpha = activeGlassAlpha,
-                    borderColor = if (isFocused) LiquidColors.AccentBlue else borderColor,
+                    borderColor = if (isFocused) resolvedFocusBorder else resolvedBaseBorder,
                     borderAlpha = activeBorderAlpha,
                     highlightAlpha = activeHighlightAlpha,
+                    depthColor = if (isLight) colors.muted.copy(alpha = 0.14f) else Color.Black.copy(alpha = 0.22f),
+                    sheenAlphaScale = if (isLight) 0.72f else 0.38f,
                     cornerRadius = cornerRadius.toPx(),
                     isFocused = isFocused,
                     focusProgress = focusProgress,
-                    accentGlowColor = accentGlowColor,
+                    accentGlowColor = resolvedGlowColor,
                 )
             }
             .then(
@@ -124,16 +148,20 @@ fun LiquidGlassSurfaceFocusable(
         interactionSource = interactionSource,
         content = content,
     )
-}private fun DrawScope.drawOptimizedLiquidGlass(
+}
+
+private fun DrawScope.drawOptimizedLiquidGlass(
     glassColor: Color,
     glassAlpha: Float,
     borderColor: Color,
     borderAlpha: Float,
     highlightAlpha: Float,
+    depthColor: Color,
+    sheenAlphaScale: Float,
     cornerRadius: Float,
     isFocused: Boolean,
     focusProgress: Float = 0f,
-    accentGlowColor: Color = LiquidColors.AccentBlue,
+    accentGlowColor: Color,
 ) {
     val w = size.width
     val h = size.height
@@ -145,31 +173,31 @@ fun LiquidGlassSurfaceFocusable(
         val glowSpread = 12.dp.toPx() * focusProgress
         val glowCr = CornerRadius(cr + glowSpread * 0.5f)
         drawRoundRect(
-            color = accentGlowColor.copy(alpha = 0.22f * focusProgress),
+            color = accentGlowColor.copy(alpha = 0.24f * focusProgress),
             topLeft = Offset(-glowSpread, -glowSpread),
             size = Size(w + glowSpread * 2f, h + glowSpread * 2f),
             cornerRadius = glowCr,
         )
-        // inner glow ring
         drawRoundRect(
-            color = accentGlowColor.copy(alpha = 0.12f * focusProgress),
+            color = accentGlowColor.copy(alpha = 0.14f * focusProgress),
             topLeft = Offset(-glowSpread * 0.5f, -glowSpread * 0.5f),
             size = Size(w + glowSpread, h + glowSpread),
             cornerRadius = CornerRadius(cr + glowSpread * 0.25f),
         )
     }
 
-    // 1. Translucent glass fill with subtle diagonal shimmer
+    // 1. Translucent theme-tinted glass fill
     drawRoundRect(
         color = glassColor.copy(alpha = glassAlpha.coerceIn(0f, 1f)),
         cornerRadius = cRadius,
     )
 
-    // 2. Specular top highlight (simulates glass refraction) — richer
+    // 2. Specular top highlight (simulates glass refraction)
+    val topSheen = (highlightAlpha * sheenAlphaScale).coerceIn(0f, 0.65f)
     drawRoundRect(
         brush = Brush.verticalGradient(
-            0.0f to Color.White.copy(alpha = highlightAlpha.coerceIn(0f, 0.65f)),
-            0.35f to Color.White.copy(alpha = (highlightAlpha * 0.15f).coerceIn(0f, 0.15f)),
+            0.0f to Color.White.copy(alpha = topSheen),
+            0.35f to Color.White.copy(alpha = (topSheen * 0.25f).coerceIn(0f, 0.22f)),
             0.6f to Color.Transparent,
             startY = 0f,
             endY = h,
@@ -177,11 +205,11 @@ fun LiquidGlassSurfaceFocusable(
         cornerRadius = cRadius,
     )
 
-    // 3. Bottom edge subtle dark gradient (depth)
+    // 3. Bottom edge subtle depth gradient
     drawRoundRect(
         brush = Brush.verticalGradient(
-            0.7f to Color.Transparent,
-            1.0f to Color.Black.copy(alpha = 0.18f),
+            0.68f to Color.Transparent,
+            1.0f to depthColor,
             startY = 0f,
             endY = h,
         ),

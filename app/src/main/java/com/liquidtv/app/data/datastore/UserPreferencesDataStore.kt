@@ -7,6 +7,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.liquidtv.app.data.security.PinHasher
 import com.liquidtv.app.domain.model.UserPreferences
 import com.liquidtv.app.domain.repository.UserPreferencesRepository
+import com.liquidtv.app.ui.theme.AppThemeCatalog
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -27,6 +28,7 @@ class UserPreferencesDataStore @Inject constructor(
         val GLASS_INTENSITY = floatPreferencesKey("glass_intensity")
         val BLUR_INTENSITY = floatPreferencesKey("blur_intensity")
         val ANIMATION_INTENSITY = floatPreferencesKey("animation_intensity")
+        val APP_THEME = stringPreferencesKey("app_theme")
         val AMBIENT_THEME = stringPreferencesKey("ambient_theme")
         val AMBIENT_ENABLED = booleanPreferencesKey("ambient_enabled")
         val AMBIENT_IDLE_DURATION = longPreferencesKey("ambient_idle_duration")
@@ -62,6 +64,7 @@ class UserPreferencesDataStore @Inject constructor(
                 glassIntensity = (prefs[Keys.GLASS_INTENSITY] ?: 0.8f).coerceIn(0.2f, 1.0f),
                 blurIntensity = (prefs[Keys.BLUR_INTENSITY] ?: 0.6f).coerceIn(0f, 1.0f),
                 animationIntensity = (prefs[Keys.ANIMATION_INTENSITY] ?: 1.0f).coerceIn(0f, 1.5f),
+                appTheme = AppThemeCatalog.resolve(prefs[Keys.APP_THEME]).id,
                 theme = prefs[Keys.AMBIENT_THEME] ?: "midnight_glass",
                 ambientEnabled = prefs[Keys.AMBIENT_ENABLED] ?: true,
                 ambientIdleDuration = prefs[Keys.AMBIENT_IDLE_DURATION] ?: (screensaverMin * 60_000L),
@@ -100,6 +103,11 @@ class UserPreferencesDataStore @Inject constructor(
     override fun getAnimationIntensity(): Flow<Float> =
         store.data.safeMap(1.0f) { it[Keys.ANIMATION_INTENSITY] ?: 1.0f }
 
+    override fun getAppTheme(): Flow<String> =
+        store.data.safeMap(AppThemeCatalog.DEFAULT_THEME_ID) {
+            AppThemeCatalog.resolve(it[Keys.APP_THEME]).id
+        }
+
     override fun getAmbientTheme(): Flow<String> =
         store.data.safeMap("midnight_glass") { it[Keys.AMBIENT_THEME] ?: "midnight_glass" }
 
@@ -134,6 +142,11 @@ class UserPreferencesDataStore @Inject constructor(
 
     override suspend fun setAnimationIntensity(value: Float) =
         store.edit { it[Keys.ANIMATION_INTENSITY] = value.coerceIn(0f, 1.5f) }
+
+    override suspend fun setAppTheme(themeId: String) {
+        val resolvedId = AppThemeCatalog.resolve(themeId).id
+        store.edit { it[Keys.APP_THEME] = resolvedId }
+    }
 
     override suspend fun setAmbientTheme(theme: String) =
         store.edit { it[Keys.AMBIENT_THEME] = theme }

@@ -9,6 +9,7 @@ interface UserPreferencesRepository {
     fun getGlassIntensity(): Flow<Float>
     fun getBlurIntensity(): Flow<Float>
     fun getAnimationIntensity(): Flow<Float>
+    fun getAppTheme(): Flow<String>
     fun getAmbientTheme(): Flow<String>
     fun getAmbientEnabled(): Flow<Boolean>
     fun getAmbientIdleDuration(): Flow<Long>
@@ -21,6 +22,7 @@ interface UserPreferencesRepository {
     suspend fun setGlassIntensity(value: Float)
     suspend fun setBlurIntensity(value: Float)
     suspend fun setAnimationIntensity(value: Float)
+    suspend fun setAppTheme(themeId: String)
     suspend fun setAmbientTheme(theme: String)
     suspend fun setAmbientEnabled(enabled: Boolean)
     suspend fun setAmbientIdleDuration(ms: Long)

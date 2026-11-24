@@ -27,7 +27,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.liquidtv.app.ui.theme.LiquidColors
+import com.liquidtv.app.ui.theme.AppTheme
 import com.liquidtv.app.ui.theme.LiquidTypography
 
 /**
@@ -56,7 +56,7 @@ fun GlassSearchBar(
         label = "searchBarWidth",
     )
 
-    val borderColor = if (isFocused) LiquidColors.GlassBorderFocused else LiquidColors.GlassBorder
+    val colors = AppTheme.colors
     val placeholderAlpha by animateFloatAsState(
         targetValue = if (query.isEmpty()) 1f else 0f,
         label = "placeholderAlpha",
@@ -65,7 +65,9 @@ fun GlassSearchBar(
     LiquidGlassSurface(
         modifier = modifier.widthIn(max = barWidth).fillMaxWidth(),
         cornerRadius = 50.dp,
-        borderColor = borderColor,
+        glassColor = colors.surface,
+        glassAlpha = 0.86f,
+        isFocused = isFocused,
         onClick = { focusRequester.requestFocus() },
         interactionSource = interactionSource,
     ) {
@@ -81,7 +83,7 @@ fun GlassSearchBar(
             Icon(
                 imageVector = Icons.Default.Search,
                 contentDescription = "بحث",
-                tint = if (isFocused) LiquidColors.AccentBlue else LiquidColors.TextSecondary,
+                tint = if (isFocused) colors.accent else colors.textSecondary,
                 modifier = Modifier.size(20.dp),
             )
 
@@ -92,7 +94,7 @@ fun GlassSearchBar(
                     Text(
                         text = placeholder,
                         style = LiquidTypography.BodySmall,
-                        color = LiquidColors.TextTertiary,
+                        color = colors.muted,
                         modifier = Modifier.alpha(placeholderAlpha),
                     )
                 }
@@ -101,8 +103,8 @@ fun GlassSearchBar(
                     value = query,
                     onValueChange = onQueryChange,
                     singleLine = true,
-                    textStyle = LiquidTypography.BodySmall.copy(color = LiquidColors.TextPrimary),
-                    cursorBrush = SolidColor(LiquidColors.AccentBlue),
+                    textStyle = LiquidTypography.BodySmall.copy(color = colors.text),
+                    cursorBrush = SolidColor(colors.accent),
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Text,
                         imeAction = ImeAction.Search,
@@ -130,7 +132,7 @@ fun GlassSearchBar(
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "مسح البحث",
-                        tint = LiquidColors.TextSecondary,
+                        tint = colors.textSecondary,
                         modifier = Modifier.size(16.dp),
                     )
                 }

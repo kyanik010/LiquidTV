@@ -56,7 +56,7 @@ import com.liquidtv.app.domain.model.TrackInfo
 import com.liquidtv.app.player.PlayerViewModel
 import com.liquidtv.app.ui.components.LiquidGlassSurface
 import com.liquidtv.app.ui.components.LiveBadge
-import com.liquidtv.app.ui.theme.LiquidColors
+import com.liquidtv.app.ui.theme.AppTheme
 import com.liquidtv.app.ui.theme.LiquidTypography
 import kotlinx.coroutines.delay
 import java.util.Locale
@@ -72,6 +72,7 @@ fun PlayerScreen(
 ) {
     val uiState by viewModel.state.collectAsState()
     val boundPlayer by viewModel.boundPlayer.collectAsState()
+    val colors = AppTheme.colors
 
     val screenFocusRequester = remember { FocusRequester() }
     val playPauseFocusRequester = remember { FocusRequester() }
@@ -234,8 +235,9 @@ fun PlayerScreen(
             ) {
                 LiquidGlassSurface(
                     cornerRadius = 24.dp,
-                    glassAlpha = 0.28f,
-                    borderAlpha = 0.5f,
+                    glassAlpha = 0.88f,
+                    borderAlpha = 0.65f,
+                    borderColor = colors.border,
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 28.dp, vertical = 20.dp),
@@ -243,7 +245,7 @@ fun PlayerScreen(
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         CircularProgressIndicator(
-                            color = LiquidColors.AccentBlue,
+                            color = colors.accent,
                             modifier = Modifier.size(28.dp),
                             strokeWidth = 3.dp,
                         )
@@ -254,7 +256,7 @@ fun PlayerScreen(
                                 "جارٍ تحميل البث…"
                             },
                             style = LiquidTypography.TitleMedium,
-                            color = LiquidColors.TextPrimary,
+                            color = colors.text,
                         )
                     }
                 }
@@ -270,10 +272,10 @@ fun PlayerScreen(
                 LiquidGlassSurface(
                     modifier = Modifier.widthIn(min = 300.dp, max = 520.dp).padding(20.dp),
                     cornerRadius = 24.dp,
-                    glassAlpha = 0.35f,
-                    glassColor = Color(0xFF1E0A0A),
-                    borderAlpha = 0.6f,
-                    borderColor = LiquidColors.ErrorRed,
+                    glassAlpha = 0.94f,
+                    glassColor = colors.panel,
+                    borderAlpha = 0.85f,
+                    borderColor = colors.danger,
                 ) {
                     Column(
                         modifier = Modifier.padding(28.dp),
@@ -283,18 +285,18 @@ fun PlayerScreen(
                         Icon(
                             imageVector = Icons.Filled.Warning,
                             contentDescription = null,
-                            tint = LiquidColors.WarningAmber,
+                            tint = colors.warning,
                             modifier = Modifier.size(48.dp),
                         )
                         Text(
                             text = "مشكلة في التشغيل",
                             style = LiquidTypography.TitleLarge,
-                            color = LiquidColors.TextPrimary,
+                            color = colors.text,
                         )
                         Text(
                             text = uiState.errorMessage ?: "رابط البث غير متاح أو تعذر الوصول إليه.",
                             style = LiquidTypography.BodySmall,
-                            color = LiquidColors.TextSecondary,
+                            color = colors.textSecondary,
                             textAlign = TextAlign.Center,
                         )
                         Row(
@@ -341,8 +343,9 @@ fun PlayerScreen(
                             .padding(horizontal = 24.dp, vertical = 20.dp)
                             .widthIn(max = 660.dp),
                         cornerRadius = 20.dp,
-                        glassAlpha = 0.35f,
-                        borderAlpha = 0.45f,
+                        glassAlpha = 0.88f,
+                        borderAlpha = 0.65f,
+                        borderColor = colors.border,
                     ) {
                         Column(
                             modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
@@ -370,7 +373,7 @@ fun PlayerScreen(
                                         Text(
                                             text = channel.name,
                                             style = LiquidTypography.TitleMedium,
-                                            color = LiquidColors.TextPrimary,
+                                            color = colors.text,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                         )
@@ -380,13 +383,13 @@ fun PlayerScreen(
                                     }
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         channel.groupTitle?.let {
-                                            Text(it, style = LiquidTypography.LabelSmall, color = LiquidColors.AccentBlue)
+                                            Text(it, style = LiquidTypography.LabelSmall, color = colors.accentText)
                                         }
                                         channel.country?.let {
-                                            Text("• $it", style = LiquidTypography.LabelSmall, color = LiquidColors.TextTertiary)
+                                            Text("• $it", style = LiquidTypography.LabelSmall, color = colors.muted)
                                         }
                                         channel.language?.let {
-                                            Text("• $it", style = LiquidTypography.LabelSmall, color = LiquidColors.TextTertiary)
+                                            Text("• $it", style = LiquidTypography.LabelSmall, color = colors.muted)
                                         }
                                     }
                                 }
@@ -401,14 +404,14 @@ fun PlayerScreen(
                                         Text(
                                             text = "الآن: ${curr.title}",
                                             style = LiquidTypography.BodySmall,
-                                            color = LiquidColors.AccentBlueLight,
+                                            color = colors.accentText,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                         )
                                         LinearProgressIndicator(
                                             progress = { curr.progressFraction() },
-                                            color = LiquidColors.AccentBlueLight,
-                                            trackColor = Color.White.copy(alpha = 0.16f),
+                                            color = colors.accent,
+                                            trackColor = colors.border.copy(alpha = 0.40f),
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .height(4.dp)
@@ -419,7 +422,7 @@ fun PlayerScreen(
                                         Text(
                                             text = "التالي: ${nxt.title}",
                                             style = LiquidTypography.LabelSmall,
-                                            color = LiquidColors.TextSecondary,
+                                            color = colors.textSecondary,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                         )
@@ -441,30 +444,35 @@ fun PlayerScreen(
                     // VOD / Episode seek bar
                     if (uiState.mediaType != MediaType.LIVE && uiState.durationMs > 0L) {
                         Row(
-                            modifier = Modifier.widthIn(max = 620.dp).fillMaxWidth(),
+                            modifier = Modifier
+                                .widthIn(max = 620.dp)
+                                .fillMaxWidth()
+                                .background(colors.panel.copy(alpha = 0.84f), RoundedCornerShape(16.dp))
+                                .border(1.dp, colors.border.copy(alpha = 0.50f), RoundedCornerShape(16.dp))
+                                .padding(horizontal = 14.dp, vertical = 2.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             Text(
                                 text = formatDuration(uiState.currentPositionMs),
                                 style = LiquidTypography.LabelSmall,
-                                color = Color.White,
+                                color = colors.text,
                             )
                             Slider(
                                 value = uiState.currentPositionMs.toFloat(),
                                 onValueChange = { viewModel.seekTo(it.toLong()) },
                                 valueRange = 0f..uiState.durationMs.toFloat().coerceAtLeast(1f),
                                 colors = SliderDefaults.colors(
-                                    thumbColor = Color.White,
-                                    activeTrackColor = LiquidColors.AccentBlueLight,
-                                    inactiveTrackColor = Color.White.copy(alpha = 0.25f),
+                                    thumbColor = colors.accent,
+                                    activeTrackColor = colors.accent,
+                                    inactiveTrackColor = colors.border.copy(alpha = 0.45f),
                                 ),
                                 modifier = Modifier.weight(1f),
                             )
                             Text(
                                 text = formatDuration(uiState.durationMs),
                                 style = LiquidTypography.LabelSmall,
-                                color = Color.White,
+                                color = colors.text,
                             )
                         }
                     }
@@ -473,16 +481,16 @@ fun PlayerScreen(
                         Box(
                             modifier = Modifier
                                 .background(
-                                    color = Color(0xDD000000),
+                                    color = colors.panel.copy(alpha = 0.92f),
                                     shape = RoundedCornerShape(20.dp),
                                 )
-                                .border(1.dp, LiquidColors.AccentBlue.copy(alpha = 0.6f), RoundedCornerShape(20.dp))
+                                .border(1.dp, colors.focus.copy(alpha = 0.75f), RoundedCornerShape(20.dp))
                                 .padding(horizontal = 16.dp, vertical = 5.dp),
                         ) {
                             Text(
                                 text = actionText,
                                 style = LiquidTypography.LabelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
-                                color = Color.White,
+                                color = colors.text,
                             )
                         }
                     }
@@ -490,8 +498,9 @@ fun PlayerScreen(
                     LiquidGlassSurface(
                         modifier = Modifier.wrapContentWidth(),
                         cornerRadius = 40.dp,
-                        glassAlpha = 0.38f,
-                        borderAlpha = 0.50f,
+                        glassAlpha = 0.88f,
+                        borderAlpha = 0.65f,
+                        borderColor = colors.border,
                     ) {
                         Row(
                             modifier = Modifier
@@ -556,7 +565,7 @@ fun PlayerScreen(
                                 PlayerControlButton(
                                     icon = if (uiState.channel?.isFavorite == true) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                                     description = if (uiState.channel?.isFavorite == true) "إزالة من المفضلة" else "إضافة للمفضلة",
-                                    iconTint = if (uiState.channel?.isFavorite == true) LiquidColors.LiveRed else LiquidColors.TextPrimary,
+                                    iconTint = if (uiState.channel?.isFavorite == true) colors.danger else colors.text,
                                     onFocused = {
                                         focusedActionText = if (uiState.channel?.isFavorite == true) "إزالة من المفضلة" else "إضافة للمفضلة"
                                     },
@@ -604,12 +613,13 @@ private fun TrackSelectionOverlay(
     onLoadExternalSubtitle: (String, String) -> Unit,
     onClose: () -> Unit,
 ) {
+    val colors = AppTheme.colors
     var externalSubUrl by remember { mutableStateOf("") }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.65f))
+            .background(colors.dialogScrim)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -628,8 +638,10 @@ private fun TrackSelectionOverlay(
                     onClick = {},
                 ),
             cornerRadius = 24.dp,
-            glassAlpha = 0.30f,
-            borderAlpha = 0.55f,
+            glassAlpha = 0.94f,
+            glassColor = colors.panel,
+            borderAlpha = 0.75f,
+            borderColor = colors.border,
         ) {
             Column(
                 modifier = Modifier
@@ -642,9 +654,9 @@ private fun TrackSelectionOverlay(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("الصوت والترجمة", style = LiquidTypography.TitleLarge, color = LiquidColors.TextPrimary)
+                    Text("الصوت والترجمة", style = LiquidTypography.TitleLarge, color = colors.text)
                     IconButton(onClick = onClose) {
-                        Icon(Icons.Filled.Close, contentDescription = "إغلاق", tint = Color.White)
+                        Icon(Icons.Filled.Close, contentDescription = "إغلاق", tint = colors.text)
                     }
                 }
 
@@ -653,11 +665,11 @@ private fun TrackSelectionOverlay(
                     modifier = Modifier.weight(1f, fill = false),
                 ) {
                     item {
-                        Text("مسارات الصوت", style = LiquidTypography.TitleSmall, color = LiquidColors.AccentBlueLight)
+                        Text("مسارات الصوت", style = LiquidTypography.TitleSmall, color = colors.accentText)
                     }
                     if (audioTracks.isEmpty()) {
                         item {
-                            Text("لا توجد مسارات صوتية إضافية في هذا البث.", style = LiquidTypography.BodySmall, color = LiquidColors.TextTertiary)
+                            Text("لا توجد مسارات صوتية إضافية في هذا البث.", style = LiquidTypography.BodySmall, color = colors.muted)
                         }
                     } else {
                         items(audioTracks, key = { "a_${it.groupIndex}_${it.trackIndex}" }) { track ->
@@ -671,7 +683,7 @@ private fun TrackSelectionOverlay(
 
                     item {
                         Spacer(Modifier.height(6.dp))
-                        Text("الترجمة والشرح", style = LiquidTypography.TitleSmall, color = LiquidColors.AccentVioletLight)
+                        Text("الترجمة والشرح", style = LiquidTypography.TitleSmall, color = colors.accentText)
                     }
                     item {
                         TrackOptionRow(
@@ -682,7 +694,7 @@ private fun TrackSelectionOverlay(
                     }
                     if (subtitleTracks.isEmpty()) {
                         item {
-                            Text("لا توجد مسارات ترجمة مدمجة في هذا البث.", style = LiquidTypography.BodySmall, color = LiquidColors.TextTertiary)
+                            Text("لا توجد مسارات ترجمة مدمجة في هذا البث.", style = LiquidTypography.BodySmall, color = colors.muted)
                         }
                     } else {
                         items(subtitleTracks, key = { "s_${it.groupIndex}_${it.trackIndex}" }) { track ->
@@ -696,7 +708,7 @@ private fun TrackSelectionOverlay(
 
                     item {
                         Spacer(Modifier.height(6.dp))
-                        Text("رابط ترجمة خارجية (.srt / .vtt)", style = LiquidTypography.TitleSmall, color = LiquidColors.AccentCyan)
+                        Text("رابط ترجمة خارجية (.srt / .vtt)", style = LiquidTypography.TitleSmall, color = colors.accentText)
                         Spacer(Modifier.height(6.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -707,17 +719,22 @@ private fun TrackSelectionOverlay(
                                 value = externalSubUrl,
                                 onValueChange = { externalSubUrl = it },
                                 singleLine = true,
-                                placeholder = { Text("http://.../subs.srt", color = LiquidColors.TextDisabled) },
+                                placeholder = { Text("http://.../subs.srt", color = colors.muted) },
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White,
-                                    focusedBorderColor = LiquidColors.AccentBlueLight,
-                                    unfocusedBorderColor = Color.White.copy(alpha = 0.25f),
+                                    focusedTextColor = colors.text,
+                                    unfocusedTextColor = colors.text,
+                                    cursorColor = colors.accent,
+                                    focusedBorderColor = colors.focus,
+                                    unfocusedBorderColor = colors.border,
                                 ),
                                 modifier = Modifier.weight(1f),
                             )
                             Button(
                                 onClick = { onLoadExternalSubtitle(externalSubUrl, "und") },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = colors.accent,
+                                    contentColor = colors.onAccent,
+                                ),
                                 modifier = Modifier.height(48.dp),
                             ) {
                                 Text("تحميل")
@@ -725,7 +742,7 @@ private fun TrackSelectionOverlay(
                         }
                         externalSubtitleError?.let { err ->
                             Spacer(Modifier.height(4.dp))
-                            Text(err, style = LiquidTypography.LabelSmall, color = LiquidColors.ErrorRed)
+                            Text(err, style = LiquidTypography.LabelSmall, color = colors.danger)
                         }
                     }
                 }
@@ -740,6 +757,7 @@ private fun TrackOptionRow(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     Row(
@@ -749,14 +767,18 @@ private fun TrackOptionRow(
             .clip(RoundedCornerShape(12.dp))
             .background(
                 when {
-                    selected -> LiquidColors.AccentBlue.copy(alpha = 0.25f)
-                    isFocused -> Color.White.copy(alpha = 0.16f)
-                    else -> Color.White.copy(alpha = 0.08f)
+                    selected -> colors.selected
+                    isFocused -> colors.surface
+                    else -> colors.card.copy(alpha = 0.65f)
                 },
             )
             .border(
                 width = if (isFocused) 2.dp else 1.dp,
-                color = if (isFocused) Color.White else if (selected) LiquidColors.AccentBlueLight else Color.White.copy(alpha = 0.18f),
+                color = when {
+                    isFocused -> colors.focus
+                    selected -> colors.accent
+                    else -> colors.border.copy(alpha = 0.55f)
+                },
                 shape = RoundedCornerShape(12.dp),
             )
             .clickable(interactionSource, null, onClick = onClick)
@@ -765,9 +787,9 @@ private fun TrackOptionRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = LiquidTypography.BodyMedium, color = Color.White, modifier = Modifier.weight(1f))
+        Text(label, style = LiquidTypography.BodyMedium, color = colors.text, modifier = Modifier.weight(1f))
         if (selected) {
-            Icon(Icons.Filled.Check, contentDescription = "محدد", tint = LiquidColors.AccentBlueLight)
+            Icon(Icons.Filled.Check, contentDescription = "محدد", tint = colors.accentText)
         }
     }
 }
@@ -789,12 +811,14 @@ private fun PlayerControlButton(
     icon: ImageVector,
     description: String,
     isPrimary: Boolean = false,
-    iconTint: Color = LiquidColors.TextPrimary,
+    iconTint: Color = Color.Unspecified,
     focusRequester: FocusRequester? = null,
     onFocused: () -> Unit = {},
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val colors = AppTheme.colors
+    val resolvedTint = if (iconTint != Color.Unspecified) iconTint else colors.text
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
@@ -823,18 +847,18 @@ private fun PlayerControlButton(
                     Modifier
                         .background(
                             brush = Brush.linearGradient(
-                                colors = listOf(LiquidColors.AccentBlue, LiquidColors.AccentBlueLight)
+                                colors = listOf(colors.accent, colors.accentSecondary)
                             )
                         )
-                        .border(BorderStroke(3.5.dp, Color.White), CircleShape)
+                        .border(BorderStroke(3.5.dp, colors.focus), CircleShape)
                 } else if (isPrimary) {
                     Modifier
-                        .background(LiquidColors.AccentBlue.copy(alpha = 0.85f))
-                        .border(BorderStroke(1.5.dp, Color.White.copy(alpha = 0.4f)), CircleShape)
+                        .background(colors.accent.copy(alpha = 0.90f))
+                        .border(BorderStroke(1.5.dp, colors.focus.copy(alpha = 0.55f)), CircleShape)
                 } else {
                     Modifier
-                        .background(Color.White.copy(alpha = 0.12f))
-                        .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)), CircleShape)
+                        .background(colors.surface.copy(alpha = 0.88f))
+                        .border(BorderStroke(1.dp, colors.border.copy(alpha = 0.65f)), CircleShape)
                 }
             ),
         contentAlignment = Alignment.Center,
@@ -842,7 +866,7 @@ private fun PlayerControlButton(
         Icon(
             imageVector = icon,
             contentDescription = description,
-            tint = if (isFocused || isPrimary) Color.White else iconTint,
+            tint = if (isFocused || isPrimary) colors.onAccent else resolvedTint,
             modifier = Modifier.size(if (isPrimary) 28.dp else 22.dp),
         )
     }
@@ -854,6 +878,7 @@ private fun HighVisButton(
     text: String,
     onClick: () -> Unit,
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
@@ -866,12 +891,12 @@ private fun HighVisButton(
             .then(
                 if (isFocused) {
                     Modifier
-                        .background(LiquidColors.AccentBlue)
-                        .border(BorderStroke(3.dp, Color.White), RoundedCornerShape(20.dp))
+                        .background(colors.accent)
+                        .border(BorderStroke(3.dp, colors.focus), RoundedCornerShape(20.dp))
                 } else {
                     Modifier
-                        .background(Color.White.copy(alpha = 0.15f))
-                        .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)), RoundedCornerShape(20.dp))
+                        .background(colors.surface)
+                        .border(BorderStroke(1.dp, colors.border), RoundedCornerShape(20.dp))
                 }
             )
             .padding(horizontal = 18.dp, vertical = 12.dp),
@@ -881,11 +906,12 @@ private fun HighVisButton(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(icon, null, tint = Color.White, modifier = Modifier.size(20.dp))
+            val fg = if (isFocused) colors.onAccent else colors.text
+            Icon(icon, null, tint = fg, modifier = Modifier.size(20.dp))
             Text(
                 text = text,
                 style = LiquidTypography.LabelMedium.copy(fontWeight = FontWeight.Bold),
-                color = Color.White,
+                color = fg,
             )
         }
     }

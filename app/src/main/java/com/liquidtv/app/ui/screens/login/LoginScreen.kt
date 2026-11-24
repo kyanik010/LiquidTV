@@ -43,7 +43,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.liquidtv.app.domain.model.SubscriptionType
 import com.liquidtv.app.ui.components.AppBackground
 import com.liquidtv.app.ui.components.LiquidGlassSurface
-import com.liquidtv.app.ui.theme.LiquidColors
+import com.liquidtv.app.ui.theme.AppTheme
 import com.liquidtv.app.ui.theme.LiquidTypography
 
 @Composable
@@ -105,14 +105,15 @@ fun LoginScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 // Note: widthIn BEFORE fillMaxWidth so the card container itself stays strictly capped
+                val colors = AppTheme.colors
                 LiquidGlassSurface(
                     modifier = Modifier
                         .widthIn(max = maxCardWidth)
                         .fillMaxWidth()
                         .testTag("login_card"),
                     cornerRadius = 20.dp,
-                    glassAlpha = 0.22f,
-                    borderAlpha = 0.36f,
+                    glassAlpha = 0.24f,
+                    borderAlpha = 0.38f,
                 ) {
                     Column(
                         modifier = Modifier
@@ -135,12 +136,13 @@ fun LoginScreen(
                                     modifier = Modifier
                                         .size(36.dp)
                                         .clip(CircleShape)
-                                        .background(Color.White.copy(alpha = 0.10f)),
+                                        .background(colors.surface.copy(alpha = 0.82f))
+                                        .border(1.dp, colors.border.copy(alpha = 0.55f), CircleShape),
                                 ) {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                         contentDescription = "رجوع",
-                                        tint = Color.White,
+                                        tint = colors.text,
                                         modifier = Modifier.size(18.dp),
                                     )
                                 }
@@ -151,7 +153,7 @@ fun LoginScreen(
                                     .clip(RoundedCornerShape(10.dp))
                                     .background(
                                         Brush.linearGradient(
-                                            listOf(LiquidColors.AccentBlue, LiquidColors.AccentViolet),
+                                            listOf(colors.accent, colors.waveOne),
                                         ),
                                     ),
                                 contentAlignment = Alignment.Center,
@@ -159,7 +161,7 @@ fun LoginScreen(
                                 Icon(
                                     imageVector = Icons.Filled.LiveTv,
                                     contentDescription = "LIQUID TV",
-                                    tint = Color.White,
+                                    tint = colors.onAccent,
                                     modifier = Modifier.size(18.dp),
                                 )
                             }
@@ -168,7 +170,7 @@ fun LoginScreen(
                                     text = if (editingSubscriptionId != null) "تعديل الاشتراك" else "LIQUID TV",
                                     style = LiquidTypography.TitleMedium.copy(
                                         brush = Brush.linearGradient(
-                                            listOf(LiquidColors.TextPrimary, LiquidColors.AccentBlueLight),
+                                            listOf(colors.text, colors.accentText),
                                         ),
                                     ),
                                     maxLines = 1,
@@ -177,7 +179,7 @@ fun LoginScreen(
                                 Text(
                                     text = "تسجيل الدخول عبر Xtream أو M3U",
                                     style = LiquidTypography.LabelSmall,
-                                    color = LiquidColors.TextSecondary,
+                                    color = colors.textSecondary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
@@ -189,8 +191,8 @@ fun LoginScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(50))
-                                .background(Color.White.copy(alpha = 0.08f))
-                                .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(50))
+                                .background(colors.panel.copy(alpha = 0.82f))
+                                .border(1.dp, colors.border.copy(alpha = 0.55f), RoundedCornerShape(50))
                                 .padding(2.dp),
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
@@ -286,7 +288,7 @@ fun LoginScreen(
                                                     Icon(
                                                         imageVector = if (state.showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
                                                         contentDescription = if (state.showPassword) "إخفاء كلمة المرور" else "إظهار كلمة المرور",
-                                                        tint = LiquidColors.TextSecondary,
+                                                        tint = colors.textSecondary,
                                                         modifier = Modifier.size(16.dp),
                                                     )
                                                 }
@@ -330,7 +332,7 @@ fun LoginScreen(
                                                     Icon(
                                                         imageVector = if (state.showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
                                                         contentDescription = if (state.showPassword) "إخفاء كلمة المرور" else "إظهار كلمة المرور",
-                                                        tint = LiquidColors.TextSecondary,
+                                                        tint = colors.textSecondary,
                                                         modifier = Modifier.size(16.dp),
                                                     )
                                                 }
@@ -371,12 +373,12 @@ fun LoginScreen(
                                 Text(
                                     text = "ترويسات HTTP إضافية (اختياري)",
                                     style = LiquidTypography.LabelSmall,
-                                    color = LiquidColors.AccentBlueLight,
+                                    color = colors.accentText,
                                 )
                                 Icon(
                                     imageVector = if (state.showAdvancedHeaders) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
                                     contentDescription = "تبديل خيارات الترويسات",
-                                    tint = LiquidColors.AccentBlueLight,
+                                    tint = colors.accentText,
                                     modifier = Modifier.size(16.dp),
                                 )
                             }
@@ -415,9 +417,10 @@ fun LoginScreen(
                         AnimatedVisibility(visible = state.isConnecting) {
                             LiquidGlassSurface(
                                 cornerRadius = 12.dp,
-                                glassAlpha = 0.16f,
-                                borderAlpha = 0.3f,
-                                glassColor = LiquidColors.AccentBlue,
+                                glassAlpha = 0.72f,
+                                borderAlpha = 0.45f,
+                                glassColor = colors.surface,
+                                borderColor = colors.accent,
                             ) {
                                 Column(
                                     modifier = Modifier
@@ -430,20 +433,20 @@ fun LoginScreen(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     ) {
                                         CircularProgressIndicator(
-                                            color = LiquidColors.AccentBlueLight,
+                                            color = colors.accent,
                                             strokeWidth = 2.dp,
                                             modifier = Modifier.size(16.dp),
                                         )
                                         Text(
                                             text = state.statusMessage ?: "جارٍ الاتصال...",
                                             style = LiquidTypography.LabelMedium,
-                                            color = LiquidColors.TextPrimary,
+                                            color = colors.text,
                                         )
                                     }
                                     LinearProgressIndicator(
                                         progress = { state.progress.coerceIn(0.05f, 1f) },
-                                        color = LiquidColors.AccentBlueLight,
-                                        trackColor = Color.White.copy(alpha = 0.15f),
+                                        color = colors.accent,
+                                        trackColor = colors.border.copy(alpha = 0.30f),
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(4.dp)
@@ -460,8 +463,8 @@ fun LoginScreen(
                                 cornerRadius = 10.dp,
                                 glassAlpha = 0.25f,
                                 borderAlpha = 0.55f,
-                                glassColor = LiquidColors.ErrorRed,
-                                borderColor = LiquidColors.ErrorRed,
+                                glassColor = colors.danger,
+                                borderColor = colors.danger,
                             ) {
                                 Row(
                                     modifier = Modifier
@@ -473,13 +476,13 @@ fun LoginScreen(
                                     Icon(
                                         imageVector = Icons.Filled.ErrorOutline,
                                         contentDescription = "خطأ",
-                                        tint = LiquidColors.ErrorRed,
+                                        tint = colors.danger,
                                         modifier = Modifier.size(16.dp),
                                     )
                                     Text(
                                         text = state.errorMessage.orEmpty(),
                                         style = LiquidTypography.LabelMedium,
-                                        color = LiquidColors.TextPrimary,
+                                        color = colors.text,
                                         modifier = Modifier.weight(1f),
                                     )
                                 }
@@ -502,20 +505,11 @@ fun LoginScreen(
                                 .scale(connectScale)
                                 .clip(RoundedCornerShape(50))
                                 .background(
-                                    Brush.horizontalGradient(
-                                        if (state.isConnecting) {
-                                            listOf(
-                                                LiquidColors.AccentBlue.copy(alpha = 0.45f),
-                                                LiquidColors.AccentViolet.copy(alpha = 0.45f),
-                                            )
-                                        } else {
-                                            listOf(LiquidColors.AccentBlue, LiquidColors.AccentViolet)
-                                        },
-                                    ),
+                                    if (state.isConnecting) colors.accent.copy(alpha = 0.55f) else colors.accent,
                                 )
                                 .border(
                                     width = if (connectFocused) 2.5.dp else 1.dp,
-                                    color = if (connectFocused) Color.White else Color.White.copy(alpha = 0.35f),
+                                    color = if (connectFocused) colors.focus else colors.border.copy(alpha = 0.55f),
                                     shape = RoundedCornerShape(50),
                                 )
                                 .clickable(
@@ -537,7 +531,7 @@ fun LoginScreen(
                                     "اتصال ومزامنة"
                                 },
                                 style = LiquidTypography.TitleSmall.copy(fontWeight = FontWeight.Bold),
-                                color = Color.White,
+                                color = colors.onAccent,
                             )
                         }
                     }
@@ -556,26 +550,17 @@ private fun LoginModeTab(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     Box(
         modifier = modifier
             .height(34.dp)
             .clip(RoundedCornerShape(50))
-            .background(
-                when {
-                    selected -> Brush.horizontalGradient(
-                        listOf(
-                            LiquidColors.AccentBlue.copy(alpha = 0.45f),
-                            LiquidColors.AccentViolet.copy(alpha = 0.35f),
-                        ),
-                    )
-                    else -> Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent))
-                },
-            )
+            .background(if (selected) colors.selected else Color.Transparent)
             .border(
                 width = if (isFocused) 2.dp else if (selected) 1.dp else 0.dp,
-                color = if (isFocused) Color.White else if (selected) LiquidColors.AccentBlueLight else Color.Transparent,
+                color = if (isFocused) colors.focus else if (selected) colors.accent else Color.Transparent,
                 shape = RoundedCornerShape(50),
             )
             .clickable(
@@ -594,13 +579,13 @@ private fun LoginModeTab(
             Icon(
                 imageVector = icon,
                 contentDescription = title,
-                tint = if (selected) Color.White else LiquidColors.TextSecondary,
+                tint = if (selected) colors.text else colors.textSecondary,
                 modifier = Modifier.size(15.dp),
             )
             Text(
                 text = title,
                 style = LiquidTypography.LabelMedium,
-                color = if (selected) Color.White else LiquidColors.TextSecondary,
+                color = if (selected) colors.text else colors.textSecondary,
             )
         }
     }
@@ -623,6 +608,7 @@ private fun CompactGlassTextField(
     modifier: Modifier = Modifier,
     fieldModifier: Modifier = Modifier,
 ) {
+    val colors = AppTheme.colors
     var isFocused by remember { mutableStateOf(false) }
 
     Column(
@@ -632,7 +618,7 @@ private fun CompactGlassTextField(
         Text(
             text = label,
             style = LiquidTypography.LabelSmall,
-            color = if (isFocused) LiquidColors.AccentBlueLight else LiquidColors.TextSecondary,
+            color = if (isFocused) colors.accentText else colors.textSecondary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 4.dp),
@@ -643,10 +629,10 @@ private fun CompactGlassTextField(
                 .fillMaxWidth()
                 .height(inputHeight)
                 .clip(RoundedCornerShape(10.dp))
-                .background(Color.White.copy(alpha = if (isFocused) 0.10f else 0.06f))
+                .background(colors.surface.copy(alpha = if (isFocused) 0.92f else 0.72f))
                 .border(
                     width = if (isFocused) 1.5.dp else 1.dp,
-                    color = if (isFocused) LiquidColors.AccentBlueLight else Color.White.copy(alpha = 0.22f),
+                    color = if (isFocused) colors.focus else colors.border,
                     shape = RoundedCornerShape(10.dp),
                 )
                 .padding(horizontal = 10.dp),
@@ -656,7 +642,7 @@ private fun CompactGlassTextField(
             Icon(
                 imageVector = leadingIcon,
                 contentDescription = null,
-                tint = LiquidColors.AccentBlueLight,
+                tint = colors.accentText,
                 modifier = Modifier.size(16.dp),
             )
 
@@ -668,7 +654,7 @@ private fun CompactGlassTextField(
                     Text(
                         text = placeholder,
                         style = LiquidTypography.BodySmall,
-                        color = LiquidColors.TextDisabled,
+                        color = colors.muted,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -679,9 +665,9 @@ private fun CompactGlassTextField(
                     enabled = enabled,
                     singleLine = true,
                     textStyle = LiquidTypography.BodySmall.copy(
-                        color = if (enabled) LiquidColors.TextPrimary else LiquidColors.TextTertiary,
+                        color = if (enabled) colors.text else colors.muted,
                     ),
-                    cursorBrush = SolidColor(LiquidColors.AccentBlueLight),
+                    cursorBrush = SolidColor(colors.accent),
                     visualTransformation = visualTransformation,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = keyboardType,

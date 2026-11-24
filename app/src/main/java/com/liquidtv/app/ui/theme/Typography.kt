@@ -26,7 +26,6 @@ object LiquidTypography {
         fontSize = 64.sp,
         lineHeight = 76.sp,
         letterSpacing = (-0.5).sp,
-        color = LiquidColors.TextPrimary,
     )
     val DisplayMedium = TextStyle(
         fontFamily = AppFontFamily,
@@ -34,7 +33,6 @@ object LiquidTypography {
         fontSize = 46.sp,
         lineHeight = 56.sp,
         letterSpacing = 0.sp,
-        color = LiquidColors.TextPrimary,
     )
 
     // Headlines
@@ -44,7 +42,6 @@ object LiquidTypography {
         fontSize = 32.sp,
         lineHeight = 42.sp,
         letterSpacing = 0.sp,
-        color = LiquidColors.TextPrimary,
     )
     val HeadlineMedium = TextStyle(
         fontFamily = AppFontFamily,
@@ -52,7 +49,6 @@ object LiquidTypography {
         fontSize = 26.sp,
         lineHeight = 36.sp,
         letterSpacing = 0.sp,
-        color = LiquidColors.TextPrimary,
     )
     val HeadlineSmall = TextStyle(
         fontFamily = AppFontFamily,
@@ -60,7 +56,6 @@ object LiquidTypography {
         fontSize = 20.sp,
         lineHeight = 28.sp,
         letterSpacing = 0.sp,
-        color = LiquidColors.TextPrimary,
     )
 
     // Title
@@ -70,7 +65,6 @@ object LiquidTypography {
         fontSize = 19.sp,
         lineHeight = 28.sp,
         letterSpacing = 0.sp,
-        color = LiquidColors.TextPrimary,
     )
     val TitleMedium = TextStyle(
         fontFamily = AppFontFamily,
@@ -78,7 +72,6 @@ object LiquidTypography {
         fontSize = 15.sp,
         lineHeight = 22.sp,
         letterSpacing = 0.sp,
-        color = LiquidColors.TextPrimary,
     )
     val TitleSmall = TextStyle(
         fontFamily = AppFontFamily,
@@ -86,7 +79,6 @@ object LiquidTypography {
         fontSize = 13.sp,
         lineHeight = 19.sp,
         letterSpacing = 0.sp,
-        color = LiquidColors.TextSecondary,
     )
 
     // Body
@@ -96,7 +88,6 @@ object LiquidTypography {
         fontSize = 15.sp,
         lineHeight = 24.sp,
         letterSpacing = 0.sp,
-        color = LiquidColors.TextSecondary,
     )
     val BodyMedium = TextStyle(
         fontFamily = AppFontFamily,
@@ -104,7 +95,6 @@ object LiquidTypography {
         fontSize = 13.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.sp,
-        color = LiquidColors.TextSecondary,
     )
     val BodySmall = TextStyle(
         fontFamily = AppFontFamily,
@@ -112,7 +102,6 @@ object LiquidTypography {
         fontSize = 12.sp,
         lineHeight = 18.sp,
         letterSpacing = 0.sp,
-        color = LiquidColors.TextTertiary,
     )
 
     // Label
@@ -122,7 +111,6 @@ object LiquidTypography {
         fontSize = 13.sp,
         lineHeight = 18.sp,
         letterSpacing = 0.sp,
-        color = LiquidColors.TextPrimary,
     )
     val LabelMedium = TextStyle(
         fontFamily = AppFontFamily,
@@ -130,7 +118,6 @@ object LiquidTypography {
         fontSize = 12.sp,
         lineHeight = 16.sp,
         letterSpacing = 0.sp,
-        color = LiquidColors.TextSecondary,
     )
     val LabelSmall = TextStyle(
         fontFamily = AppFontFamily,
@@ -138,7 +125,6 @@ object LiquidTypography {
         fontSize = 10.sp,
         lineHeight = 14.sp,
         letterSpacing = 0.sp,
-        color = LiquidColors.TextTertiary,
     )
 
     // Navigation
@@ -157,7 +143,6 @@ object LiquidTypography {
         fontSize = 90.sp,
         lineHeight = 96.sp,
         letterSpacing = (-2).sp,
-        color = LiquidColors.TextPrimary,
     )
     val ClockSmall = TextStyle(
         fontFamily = AppFontFamily,
@@ -165,7 +150,6 @@ object LiquidTypography {
         fontSize = 22.sp,
         lineHeight = 30.sp,
         letterSpacing = 0.sp,
-        color = LiquidColors.TextSecondary,
     )
 }
 

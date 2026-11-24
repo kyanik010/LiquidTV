@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
 import com.liquidtv.app.domain.model.Channel
-import com.liquidtv.app.ui.theme.LiquidColors
+import com.liquidtv.app.ui.theme.AppTheme
 import com.liquidtv.app.ui.theme.LiquidTypography
 
 /**
@@ -48,9 +48,7 @@ fun GlassChannelCard(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
-    val isPressed by interactionSource.collectIsPressedAsState()
-
-    val borderColor = if (isFocused) LiquidColors.GlassBorderFocused else LiquidColors.GlassBorder
+    val colors = AppTheme.colors
 
     LiquidGlassSurface(
         modifier = modifier
@@ -61,7 +59,6 @@ fun GlassChannelCard(
         cornerRadius = 18.dp,
         glassAlpha = if (isFocused) 0.32f else 0.16f,
         borderAlpha = if (isFocused) 0.85f else 0.22f,
-        borderColor = borderColor,
         isFocused = isFocused,
         onClick = onClick,
         interactionSource = interactionSource,
@@ -75,8 +72,8 @@ fun GlassChannelCard(
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                LiquidColors.AccentBlue.copy(alpha = if (isFocused) 0.22f else 0.08f),
-                                LiquidColors.GlassTertiary,
+                                colors.accent.copy(alpha = if (isFocused) 0.22f else 0.10f),
+                                colors.surface,
                             )
                         ),
                         RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
@@ -94,7 +91,7 @@ fun GlassChannelCard(
                             contentAlignment = Alignment.Center,
                         ) {
                             CircularProgressIndicator(
-                                color = LiquidColors.AccentBlue,
+                                color = colors.accent,
                                 strokeWidth = 2.dp,
                                 modifier = Modifier.size(24.dp),
                             )
@@ -108,7 +105,7 @@ fun GlassChannelCard(
                             Icon(
                                 imageVector = Icons.Default.BrokenImage,
                                 contentDescription = null,
-                                tint = LiquidColors.TextTertiary,
+                                tint = colors.muted,
                                 modifier = Modifier.size(36.dp),
                             )
                         }
@@ -123,7 +120,7 @@ fun GlassChannelCard(
                         .height(30.dp)
                         .background(
                             Brush.verticalGradient(
-                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.45f))
+                                listOf(Color.Transparent, colors.background.copy(alpha = 0.40f))
                             )
                         ),
                 )
@@ -145,7 +142,7 @@ fun GlassChannelCard(
                     Icon(
                         imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         contentDescription = if (isFavorite) "إزالة من المفضلة" else "إضافة إلى المفضلة",
-                        tint = if (isFavorite) LiquidColors.LiveRed else LiquidColors.TextSecondary,
+                        tint = if (isFavorite) colors.danger else colors.textSecondary,
                         modifier = Modifier.size(18.dp),
                     )
                 }
@@ -161,7 +158,7 @@ fun GlassChannelCard(
                 Text(
                     text = channel.name,
                     style = LiquidTypography.TitleMedium,
-                    color = LiquidColors.TextPrimary,
+                    color = colors.text,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -170,7 +167,7 @@ fun GlassChannelCard(
                     Text(
                         text = channel.groupTitle,
                         style = LiquidTypography.BodySmall,
-                        color = LiquidColors.TextSecondary,
+                        color = colors.textSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -187,7 +184,7 @@ fun GlassChannelCard(
                         Text(
                             text = channel.country,
                             style = LiquidTypography.LabelSmall,
-                            color = LiquidColors.TextTertiary,
+                            color = colors.muted,
                         )
                     }
                 }
@@ -214,9 +211,7 @@ fun GlassChannelListItem(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
-    val isPressed by interactionSource.collectIsPressedAsState()
-
-    val borderColor = if (isFocused) LiquidColors.GlassBorderFocused else LiquidColors.GlassBorder
+    val colors = AppTheme.colors
 
     LiquidGlassSurface(
         modifier = modifier
@@ -226,7 +221,6 @@ fun GlassChannelListItem(
         cornerRadius = 16.dp,
         glassAlpha = if (isFocused) 0.32f else 0.14f,
         borderAlpha = if (isFocused) 0.85f else 0.20f,
-        borderColor = borderColor,
         isFocused = isFocused,
         onClick = onClick,
         interactionSource = interactionSource,
@@ -243,7 +237,7 @@ fun GlassChannelListItem(
                 Text(
                     text = num.toString().padStart(3, '0'),
                     style = LiquidTypography.LabelSmall,
-                    color = if (isFocused) LiquidColors.AccentBlueLight else LiquidColors.TextTertiary,
+                    color = if (isFocused) colors.accentText else colors.muted,
                     modifier = Modifier.width(36.dp),
                 )
             }
@@ -255,8 +249,8 @@ fun GlassChannelListItem(
                     .background(
                         Brush.linearGradient(
                             listOf(
-                                LiquidColors.AccentBlue.copy(alpha = if (isFocused) 0.25f else 0.12f),
-                                LiquidColors.GlassTertiary,
+                                colors.accent.copy(alpha = if (isFocused) 0.24f else 0.12f),
+                                colors.surface,
                             )
                         ),
                         RoundedCornerShape(10.dp),
@@ -281,7 +275,7 @@ fun GlassChannelListItem(
                 Text(
                     text = channel.name,
                     style = LiquidTypography.TitleMedium,
-                    color = LiquidColors.TextPrimary,
+                    color = colors.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -296,7 +290,7 @@ fun GlassChannelListItem(
                         Text(
                             text = channel.country,
                             style = LiquidTypography.LabelSmall,
-                            color = LiquidColors.TextTertiary,
+                            color = colors.muted,
                         )
                     }
                 }
@@ -313,7 +307,7 @@ fun GlassChannelListItem(
                 Icon(
                     imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     contentDescription = if (isFavorite) "إزالة من المفضلة" else "إضافة إلى المفضلة",
-                    tint = if (isFavorite) LiquidColors.LiveRed else LiquidColors.TextSecondary,
+                    tint = if (isFavorite) colors.danger else colors.textSecondary,
                     modifier = Modifier.size(18.dp),
                 )
             }
@@ -327,15 +321,16 @@ fun GlassChannelListItem(
 
 @Composable
 private fun LanguageTag(language: String, modifier: Modifier = Modifier) {
+    val colors = AppTheme.colors
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(4.dp),
-        color = LiquidColors.AccentBlue.copy(alpha = 0.18f),
+        color = colors.accent.copy(alpha = 0.18f),
     ) {
         Text(
             text = language.uppercase(),
             style = LiquidTypography.LabelSmall,
-            color = LiquidColors.AccentBlue,
+            color = colors.accentText,
             modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
         )
     }

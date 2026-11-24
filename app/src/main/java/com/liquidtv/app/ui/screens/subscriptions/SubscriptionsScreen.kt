@@ -32,7 +32,7 @@ import com.liquidtv.app.domain.model.SubscriptionStatus
 import com.liquidtv.app.domain.model.SubscriptionType
 import com.liquidtv.app.ui.components.AppBackground
 import com.liquidtv.app.ui.components.LiquidGlassSurface
-import com.liquidtv.app.ui.theme.LiquidColors
+import com.liquidtv.app.ui.theme.AppTheme
 import com.liquidtv.app.ui.theme.LiquidTypography
 import com.liquidtv.app.ui.utils.localizedSubscriptionStatusAr
 import com.liquidtv.app.ui.utils.localizedSubscriptionTypeAr
@@ -60,6 +60,7 @@ fun SubscriptionsScreen(
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.safeDrawing),
         ) {
+            val colors = AppTheme.colors
             val isCompact = maxWidth < 600.dp
             val hPad = if (isCompact) 16.dp else 32.dp
 
@@ -83,12 +84,13 @@ fun SubscriptionsScreen(
                             modifier = Modifier
                                 .size(48.dp)
                                 .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.10f)),
+                                .background(colors.surface.copy(alpha = 0.82f))
+                                .border(1.dp, colors.border.copy(alpha = 0.55f), CircleShape),
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "رجوع",
-                                tint = Color.White,
+                                tint = colors.text,
                             )
                         }
                         Column {
@@ -96,14 +98,14 @@ fun SubscriptionsScreen(
                                 text = "اشتراكات IPTV",
                                 style = LiquidTypography.HeadlineMedium.copy(
                                     brush = Brush.linearGradient(
-                                        listOf(LiquidColors.TextPrimary, LiquidColors.AccentBlueLight),
+                                        listOf(colors.text, colors.accentText),
                                     ),
                                 ),
                             )
                             Text(
                                 text = "إدارة حسابات Xtream وملفات M3U",
                                 style = LiquidTypography.BodySmall,
-                                color = LiquidColors.TextSecondary,
+                                color = colors.textSecondary,
                             )
                         }
                     }
@@ -122,7 +124,8 @@ fun SubscriptionsScreen(
                         cornerRadius = 14.dp,
                         glassAlpha = 0.22f,
                         borderAlpha = 0.45f,
-                        glassColor = LiquidColors.SuccessGreen,
+                        glassColor = colors.success,
+                        borderColor = colors.success,
                     ) {
                         Row(
                             modifier = Modifier
@@ -131,9 +134,9 @@ fun SubscriptionsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
-                            Text(msg, style = LiquidTypography.BodySmall, color = Color.White, modifier = Modifier.weight(1f))
+                            Text(msg, style = LiquidTypography.BodySmall, color = colors.text, modifier = Modifier.weight(1f))
                             TextButton(onClick = viewModel::clearFeedback) {
-                                Text("إغلاق", color = Color.White)
+                                Text("إغلاق", color = colors.accentText)
                             }
                         }
                     }
@@ -144,7 +147,8 @@ fun SubscriptionsScreen(
                         cornerRadius = 14.dp,
                         glassAlpha = 0.25f,
                         borderAlpha = 0.5f,
-                        glassColor = LiquidColors.ErrorRed,
+                        glassColor = colors.danger,
+                        borderColor = colors.danger,
                     ) {
                         Row(
                             modifier = Modifier
@@ -153,9 +157,9 @@ fun SubscriptionsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
-                            Text(err, style = LiquidTypography.BodySmall, color = Color.White, modifier = Modifier.weight(1f))
+                            Text(err, style = LiquidTypography.BodySmall, color = colors.text, modifier = Modifier.weight(1f))
                             TextButton(onClick = viewModel::clearFeedback) {
-                                Text("إغلاق", color = Color.White)
+                                Text("إغلاق", color = colors.text)
                             }
                         }
                     }
@@ -165,7 +169,7 @@ fun SubscriptionsScreen(
                     LiquidGlassSurface(
                         modifier = Modifier.fillMaxWidth(),
                         cornerRadius = 24.dp,
-                        glassAlpha = 0.16f,
+                        glassAlpha = 0.18f,
                     ) {
                         Column(
                             modifier = Modifier
@@ -177,14 +181,14 @@ fun SubscriptionsScreen(
                             Icon(
                                 imageVector = Icons.Filled.Subscriptions,
                                 contentDescription = null,
-                                tint = LiquidColors.AccentBlueLight,
+                                tint = colors.accentText,
                                 modifier = Modifier.size(48.dp),
                             )
-                            Text("لا توجد اشتراكات محفوظة", style = LiquidTypography.TitleMedium, color = Color.White)
+                            Text("لا توجد اشتراكات محفوظة", style = LiquidTypography.TitleMedium, color = colors.text)
                             Text(
                                 "أضف حساب Xtream Codes أو رابط قائمة M3U لتحميل القنوات والمحتوى.",
                                 style = LiquidTypography.BodySmall,
-                                color = LiquidColors.TextSecondary,
+                                color = colors.textSecondary,
                             )
                         }
                     }
@@ -214,11 +218,11 @@ fun SubscriptionsScreen(
             pendingDelete?.let { sub ->
                 AlertDialog(
                     onDismissRequest = { pendingDelete = null },
-                    title = { Text("حذف الاشتراك", color = Color.White) },
+                    title = { Text("حذف الاشتراك", color = colors.text) },
                     text = {
                         Text(
                             "هل تريد حذف \"${sub.name}\" وجميع قنواته وتصنيفاته ومفضلته ودليل البرامج المخزن؟",
-                            color = LiquidColors.TextSecondary,
+                            color = colors.textSecondary,
                         )
                     },
                     confirmButton = {
@@ -228,15 +232,17 @@ fun SubscriptionsScreen(
                                 pendingDelete = null
                             },
                         ) {
-                            Text("حذف", color = LiquidColors.ErrorRed)
+                            Text("حذف", color = colors.danger)
                         }
                     },
                     dismissButton = {
                         TextButton(onClick = { pendingDelete = null }) {
-                            Text("إلغاء", color = LiquidColors.TextSecondary)
+                            Text("إلغاء", color = colors.textSecondary)
                         }
                     },
-                    containerColor = LiquidColors.DeepSurface,
+                    containerColor = colors.panel,
+                    titleContentColor = colors.text,
+                    textContentColor = colors.textSecondary,
                 )
             }
         }
@@ -253,11 +259,12 @@ private fun SubscriptionCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val colors = AppTheme.colors
     val statusColor = when (subscription.connectionStatus) {
-        SubscriptionStatus.CONNECTED -> LiquidColors.SuccessGreen
-        SubscriptionStatus.EXPIRED -> LiquidColors.WarningAmber
-        SubscriptionStatus.ERROR -> LiquidColors.ErrorRed
-        SubscriptionStatus.DISCONNECTED -> LiquidColors.TextTertiary
+        SubscriptionStatus.CONNECTED -> colors.success
+        SubscriptionStatus.EXPIRED -> colors.warning
+        SubscriptionStatus.ERROR -> colors.danger
+        SubscriptionStatus.DISCONNECTED -> colors.muted
     }
 
     LiquidGlassSurface(
@@ -265,9 +272,10 @@ private fun SubscriptionCard(
             .fillMaxWidth()
             .testTag("subscription_card_${subscription.id}"),
         cornerRadius = 20.dp,
-        glassAlpha = if (subscription.isActive) 0.24f else 0.14f,
-        borderAlpha = if (subscription.isActive) 0.65f else 0.22f,
-        borderColor = if (subscription.isActive) LiquidColors.AccentBlueLight else Color.White,
+        glassColor = if (subscription.isActive) colors.selected else colors.card,
+        glassAlpha = if (subscription.isActive) 0.90f else 0.78f,
+        borderAlpha = if (subscription.isActive) 0.85f else 0.40f,
+        borderColor = if (subscription.isActive) colors.accent else colors.border,
     ) {
         Column(
             modifier = Modifier
@@ -288,18 +296,18 @@ private fun SubscriptionCard(
                         Text(
                             text = subscription.name,
                             style = LiquidTypography.TitleMedium,
-                            color = Color.White,
+                            color = colors.text,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                         BadgeChip(
                             text = localizedSubscriptionTypeAr(subscription.type),
-                            color = LiquidColors.AccentVioletLight,
+                            color = colors.accentText,
                         )
                         if (subscription.isActive) {
                             BadgeChip(
                                 text = "نشط",
-                                color = LiquidColors.AccentBlueLight,
+                                color = colors.success,
                             )
                         }
                     }
@@ -307,7 +315,7 @@ private fun SubscriptionCard(
                     Text(
                         text = subscription.serverUrl,
                         style = LiquidTypography.BodySmall,
-                        color = LiquidColors.TextSecondary,
+                        color = colors.textSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -315,7 +323,7 @@ private fun SubscriptionCard(
                         Text(
                             text = "المستخدم: $user",
                             style = LiquidTypography.LabelSmall,
-                            color = LiquidColors.TextTertiary,
+                            color = colors.muted,
                         )
                     }
                 }
@@ -339,17 +347,17 @@ private fun SubscriptionCard(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     subscription.accountStatus?.let {
-                        Text("الحالة: $it", style = LiquidTypography.LabelSmall, color = LiquidColors.TextSecondary)
+                        Text("الحالة: $it", style = LiquidTypography.LabelSmall, color = colors.textSecondary)
                     }
                     subscription.expDateEpochSec?.let { exp ->
                         val dateText = DateFormat.getDateInstance(DateFormat.MEDIUM, Locale("ar")).format(Date(exp * 1000L))
-                        Text("ينتهي في: $dateText", style = LiquidTypography.LabelSmall, color = LiquidColors.TextSecondary)
+                        Text("ينتهي في: $dateText", style = LiquidTypography.LabelSmall, color = colors.textSecondary)
                     }
                     if (subscription.activeConnections != null || subscription.maxConnections != null) {
                         Text(
                             "الاتصالات: ${subscription.activeConnections ?: "؟"} / ${subscription.maxConnections ?: "؟"}",
                             style = LiquidTypography.LabelSmall,
-                            color = LiquidColors.TextSecondary,
+                            color = colors.textSecondary,
                         )
                     }
                 }
@@ -359,7 +367,7 @@ private fun SubscriptionCard(
                 Text(
                     text = err,
                     style = LiquidTypography.BodySmall,
-                    color = LiquidColors.ErrorRed,
+                    color = colors.danger,
                 )
             }
 
@@ -396,7 +404,7 @@ private fun SubscriptionCard(
                     icon = Icons.Filled.Delete,
                     isPrimary = false,
                     enabled = !isBusy,
-                    tint = LiquidColors.ErrorRed,
+                    tint = colors.danger,
                     onClick = onDelete,
                 )
             }
@@ -409,7 +417,7 @@ private fun BadgeChip(text: String, color: Color) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
-            .background(color.copy(alpha = 0.20f))
+            .background(color.copy(alpha = 0.18f))
             .border(1.dp, color.copy(alpha = 0.55f), RoundedCornerShape(50))
             .padding(horizontal = 10.dp, vertical = 3.dp),
     ) {
@@ -427,31 +435,29 @@ private fun GlassActionPill(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     isPrimary: Boolean,
     enabled: Boolean = true,
-    tint: Color = Color.White,
+    tint: Color? = null,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
+    val resolvedTint = if (isPrimary) colors.onAccent else (tint ?: colors.text)
+
     Box(
         modifier = modifier
             .height(48.dp)
             .clip(RoundedCornerShape(50))
             .background(
-                if (isPrimary) {
-                    Brush.horizontalGradient(listOf(LiquidColors.AccentBlue, LiquidColors.AccentViolet))
-                } else {
-                    Brush.horizontalGradient(
-                        listOf(
-                            Color.White.copy(alpha = if (isFocused) 0.22f else 0.10f),
-                            Color.White.copy(alpha = if (isFocused) 0.22f else 0.10f),
-                        ),
-                    )
+                when {
+                    isPrimary -> colors.accent
+                    isFocused -> colors.selected
+                    else -> colors.surface.copy(alpha = 0.80f)
                 },
             )
             .border(
                 width = if (isFocused) 2.dp else 1.dp,
-                color = if (isFocused) Color.White else Color.White.copy(alpha = 0.25f),
+                color = if (isFocused) colors.focus else if (isPrimary) colors.border.copy(alpha = 0.5f) else colors.border,
                 shape = RoundedCornerShape(50),
             )
             .clickable(
@@ -468,8 +474,8 @@ private fun GlassActionPill(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Icon(icon, contentDescription = null, tint = if (isPrimary) Color.White else tint, modifier = Modifier.size(18.dp))
-            Text(text, style = LiquidTypography.LabelLarge, color = if (isPrimary) Color.White else tint)
+            Icon(icon, contentDescription = null, tint = resolvedTint, modifier = Modifier.size(18.dp))
+            Text(text, style = LiquidTypography.LabelLarge, color = resolvedTint)
         }
     }
 }

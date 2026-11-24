@@ -48,6 +48,7 @@ import com.liquidtv.app.domain.model.SubscriptionStatus
 import com.liquidtv.app.ui.components.AppBackground
 import com.liquidtv.app.ui.components.LiquidGlassSurface
 import com.liquidtv.app.ui.components.LiveBadge
+import com.liquidtv.app.ui.theme.AppTheme
 import com.liquidtv.app.ui.theme.LiquidColors
 import com.liquidtv.app.ui.theme.LiquidTypography
 import java.text.SimpleDateFormat
@@ -136,6 +137,7 @@ fun HomeScreen(
                     }
                 } else if (state.allChannels.isEmpty() && state.featuredMovies.isEmpty() && state.featuredSeries.isEmpty()) {
                     item {
+                        val colors = AppTheme.colors
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -144,8 +146,8 @@ fun HomeScreen(
                         ) {
                             LiquidGlassSurface(
                                 cornerRadius = 24.dp,
-                                glassAlpha = 0.18f,
-                                borderAlpha = 0.35f,
+                                glassAlpha = 0.22f,
+                                borderAlpha = 0.40f,
                             ) {
                                 Column(
                                     modifier = Modifier.padding(28.dp),
@@ -155,18 +157,18 @@ fun HomeScreen(
                                     Icon(
                                         imageVector = Icons.Filled.LiveTv,
                                         contentDescription = null,
-                                        tint = LiquidColors.AccentBlueLight,
+                                        tint = colors.accentText,
                                         modifier = Modifier.size(48.dp),
                                     )
                                     Text(
                                         text = "لا توجد قنوات محمّلة لهذا الاشتراك",
                                         style = LiquidTypography.TitleMedium,
-                                        color = LiquidColors.TextPrimary,
+                                        color = colors.text,
                                     )
                                     Text(
                                         text = state.error ?: "قم بتحديث الاشتراك النشط أو إدارة حسابات IPTV الخاصة بك.",
                                         style = LiquidTypography.BodySmall,
-                                        color = LiquidColors.TextSecondary,
+                                        color = colors.textSecondary,
                                     )
                                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                         GlassButton(
@@ -297,6 +299,7 @@ private fun HomeHeader(
         }
     }
 
+    val colors = AppTheme.colors
     FlowRow(
         modifier = modifier,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -309,7 +312,7 @@ private fun HomeHeader(
                         .size(if (isCompact) 44.dp else 52.dp)
                         .background(
                             Brush.radialGradient(
-                                listOf(LiquidColors.AccentBlue.copy(alpha = 0.4f), Color.Transparent)
+                                listOf(colors.accent.copy(alpha = 0.38f), Color.Transparent)
                             ),
                             CircleShape,
                         ),
@@ -319,14 +322,14 @@ private fun HomeHeader(
                         .size(if (isCompact) 38.dp else 42.dp)
                         .background(
                             Brush.linearGradient(
-                                listOf(LiquidColors.AccentBlue, LiquidColors.AccentViolet)
+                                listOf(colors.accent, colors.waveOne)
                             ),
                             CircleShape,
                         )
-                        .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape),
+                        .border(1.dp, colors.border.copy(alpha = 0.7f), CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Filled.LiveTv, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Filled.LiveTv, contentDescription = null, tint = colors.onAccent, modifier = Modifier.size(20.dp))
                 }
             }
             Column {
@@ -335,9 +338,8 @@ private fun HomeHeader(
                     style = (if (isCompact) LiquidTypography.HeadlineMedium else LiquidTypography.HeadlineLarge).copy(
                         brush = Brush.linearGradient(
                             listOf(
-                                LiquidColors.TextPrimary,
-                                LiquidColors.AccentBlueLight,
-                                LiquidColors.AccentVioletLight,
+                                colors.text,
+                                colors.accentText,
                             )
                         )
                     ),
@@ -345,7 +347,7 @@ private fun HomeHeader(
                 Text(
                     text = "الإصدار ${BuildConfig.VERSION_NAME} • تجربة IPTV زجاجية",
                     style = LiquidTypography.LabelSmall,
-                    color = LiquidColors.AccentBlue.copy(alpha = 0.75f),
+                    color = colors.accentText.copy(alpha = 0.88f),
                 )
             }
         }
@@ -356,10 +358,10 @@ private fun HomeHeader(
         ) {
             subscription?.let { sub ->
                 val statusColor = when (sub.connectionStatus) {
-                    SubscriptionStatus.CONNECTED -> LiquidColors.SuccessGreen
-                    SubscriptionStatus.EXPIRED -> LiquidColors.WarningAmber
-                    SubscriptionStatus.ERROR -> LiquidColors.ErrorRed
-                    SubscriptionStatus.DISCONNECTED -> LiquidColors.TextTertiary
+                    SubscriptionStatus.CONNECTED -> colors.success
+                    SubscriptionStatus.EXPIRED -> colors.warning
+                    SubscriptionStatus.ERROR -> colors.danger
+                    SubscriptionStatus.DISCONNECTED -> colors.muted
                 }
                 val subInteraction = remember { MutableInteractionSource() }
                 val subFocused by subInteraction.collectIsFocusedAsState()
@@ -370,8 +372,8 @@ private fun HomeHeader(
                         .focusable(interactionSource = subInteraction)
                         .testTag("home_subscription_pill"),
                     cornerRadius = 24.dp,
-                    glassAlpha = if (subFocused) 0.28f else 0.16f,
-                    borderAlpha = if (subFocused) 0.8f else 0.3f,
+                    glassAlpha = if (subFocused) 0.34f else 0.20f,
+                    borderAlpha = if (subFocused) 0.85f else 0.35f,
                     isFocused = subFocused,
                 ) {
                     Row(
@@ -387,7 +389,7 @@ private fun HomeHeader(
                         Text(
                             text = sub.name,
                             style = LiquidTypography.LabelMedium,
-                            color = LiquidColors.TextPrimary,
+                            color = colors.text,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.widthIn(max = 150.dp),
@@ -395,7 +397,7 @@ private fun HomeHeader(
                         Icon(
                             imageVector = Icons.Filled.SwapHoriz,
                             contentDescription = "إدارة الاشتراكات",
-                            tint = LiquidColors.AccentBlueLight,
+                            tint = colors.accentText,
                             modifier = Modifier.size(16.dp),
                         )
                     }
@@ -404,8 +406,8 @@ private fun HomeHeader(
 
             if (clockVisible && !isCompact) {
                 Column(horizontalAlignment = Alignment.End) {
-                    Text(currentTime, style = LiquidTypography.HeadlineMedium, color = LiquidColors.TextPrimary)
-                    Text(dateFormat.format(Calendar.getInstance().time), style = LiquidTypography.BodySmall, color = LiquidColors.TextSecondary)
+                    Text(currentTime, style = LiquidTypography.HeadlineMedium, color = colors.text)
+                    Text(dateFormat.format(Calendar.getInstance().time), style = LiquidTypography.BodySmall, color = colors.textSecondary)
                 }
             }
         }
@@ -423,23 +425,24 @@ private fun HeroPanel(
     focusRequester: FocusRequester,
 ) {
     val watchInteraction = remember { MutableInteractionSource() }
+    val colors = AppTheme.colors
 
     LiquidGlassSurface(
         modifier = modifier,
         cornerRadius = 24.dp,
-        glassAlpha = 0.18f,
-        borderAlpha = 0.3f,
-        highlightAlpha = 0.55f,
-        accentGlowColor = LiquidColors.AccentBlue,
+        glassAlpha = 0.22f,
+        borderAlpha = 0.35f,
+        highlightAlpha = 0.45f,
+        accentGlowColor = colors.accent,
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
                     Brush.horizontalGradient(
-                        0.0f to Color.Black.copy(alpha = 0.0f),
-                        0.4f to Color.Black.copy(alpha = 0.0f),
-                        1.0f to Color.Black.copy(alpha = 0.35f),
+                        0.0f to Color.Transparent,
+                        0.45f to Color.Transparent,
+                        1.0f to colors.panel.copy(alpha = if (colors.isLight) 0.42f else 0.55f),
                     )
                 ),
         ) {
@@ -468,7 +471,7 @@ private fun HeroPanel(
                             Text(
                                 text = channel.name,
                                 style = LiquidTypography.TitleLarge,
-                                color = LiquidColors.TextPrimary,
+                                color = colors.text,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -478,7 +481,7 @@ private fun HeroPanel(
                         Text(
                             text = "الآن: ${nowProg.title}",
                             style = LiquidTypography.BodySmall,
-                            color = LiquidColors.AccentBlueLight,
+                            color = colors.accentText,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -524,7 +527,7 @@ private fun HeroPanel(
                         Text(
                             text = channel.name,
                             style = LiquidTypography.DisplayMedium,
-                            color = LiquidColors.TextPrimary,
+                            color = colors.text,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -532,7 +535,7 @@ private fun HeroPanel(
                             Text(
                                 text = "الآن: ${nowProg.title}",
                                 style = LiquidTypography.BodySmall,
-                                color = LiquidColors.AccentBlueLight,
+                                color = colors.accentText,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -569,13 +572,14 @@ private fun HeroPanel(
 
 @Composable
 private fun HeroLogoBox(channel: Channel, size: Dp) {
+    val colors = AppTheme.colors
     Box(contentAlignment = Alignment.Center) {
         Box(
             modifier = Modifier
                 .size(size + 24.dp)
                 .background(
                     Brush.radialGradient(
-                        listOf(LiquidColors.AccentBlue.copy(alpha = 0.28f), Color.Transparent)
+                        listOf(colors.accent.copy(alpha = 0.28f), Color.Transparent)
                     ),
                     CircleShape,
                 ),
@@ -586,13 +590,13 @@ private fun HeroLogoBox(channel: Channel, size: Dp) {
                 .background(
                     Brush.radialGradient(
                         listOf(
-                            LiquidColors.AccentBlue.copy(alpha = 0.18f),
-                            LiquidColors.GlassPrimary,
+                            colors.accent.copy(alpha = 0.18f),
+                            colors.surface.copy(alpha = 0.85f),
                         )
                     ),
                     RoundedCornerShape(22.dp),
                 )
-                .border(1.dp, LiquidColors.GlassBorder, RoundedCornerShape(22.dp))
+                .border(1.dp, colors.border.copy(alpha = 0.7f), RoundedCornerShape(22.dp))
                 .padding(10.dp),
             contentAlignment = Alignment.Center,
         ) {
@@ -604,7 +608,7 @@ private fun HeroLogoBox(channel: Channel, size: Dp) {
                     contentScale = ContentScale.Fit,
                 )
             } else {
-                Icon(Icons.Filled.LiveTv, null, tint = LiquidColors.AccentBlue.copy(alpha = 0.5f), modifier = Modifier.size(size * 0.44f))
+                Icon(Icons.Filled.LiveTv, null, tint = colors.accentText.copy(alpha = 0.6f), modifier = Modifier.size(size * 0.44f))
             }
         }
     }
@@ -612,16 +616,17 @@ private fun HeroLogoBox(channel: Channel, size: Dp) {
 
 @Composable
 private fun HeroCategoryPill(group: String) {
+    val colors = AppTheme.colors
     Box(
         modifier = Modifier
-            .background(LiquidColors.AccentBlue.copy(alpha = 0.18f), RoundedCornerShape(50.dp))
-            .border(1.dp, LiquidColors.AccentBlue.copy(alpha = 0.4f), RoundedCornerShape(50.dp))
+            .background(colors.accent.copy(alpha = if (colors.isLight) 0.18f else 0.22f), RoundedCornerShape(50.dp))
+            .border(1.dp, colors.accent.copy(alpha = 0.55f), RoundedCornerShape(50.dp))
             .padding(horizontal = 10.dp, vertical = 3.dp),
     ) {
         Text(
             text = group,
             style = LiquidTypography.LabelMedium,
-            color = LiquidColors.AccentBlueLight,
+            color = colors.accentText,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -630,12 +635,14 @@ private fun HeroCategoryPill(group: String) {
 
 @Composable
 private fun InfoChip(text: String) {
+    val colors = AppTheme.colors
     Box(
         modifier = Modifier
-            .background(LiquidColors.GlassPrimary, RoundedCornerShape(20.dp))
+            .background(colors.surface.copy(alpha = 0.85f), RoundedCornerShape(20.dp))
+            .border(1.dp, colors.border.copy(alpha = 0.45f), RoundedCornerShape(20.dp))
             .padding(horizontal = 10.dp, vertical = 4.dp),
     ) {
-        Text(text, style = LiquidTypography.LabelSmall, color = LiquidColors.TextSecondary)
+        Text(text, style = LiquidTypography.LabelSmall, color = colors.textSecondary)
     }
 }
 
@@ -648,8 +655,10 @@ private fun GlassButton(
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     modifier: Modifier = Modifier,
 ) {
+    val colors = AppTheme.colors
     val isFocused by interactionSource.collectIsFocusedAsState()
     val scale by animateFloatAsState(if (isFocused) 1.05f else 1f, label = "btn_scale")
+    val fgColor = if (isPrimary) colors.onAccent else colors.text
 
     Box(
         modifier = modifier
@@ -658,18 +667,27 @@ private fun GlassButton(
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
             .focusable(interactionSource = interactionSource)
             .then(
-                if (isPrimary) Modifier.background(
-                    Brush.linearGradient(listOf(LiquidColors.AccentBlue, LiquidColors.AccentViolet)),
-                    RoundedCornerShape(50.dp),
-                ) else Modifier.background(LiquidColors.GlassPrimary, RoundedCornerShape(50.dp))
-                    .border(1.dp, if (isFocused) LiquidColors.GlassBorderFocused else LiquidColors.GlassBorder, RoundedCornerShape(50.dp))
+                if (isPrimary) Modifier
+                    .background(colors.accent, RoundedCornerShape(50.dp))
+                    .border(
+                        width = if (isFocused) 2.5.dp else 1.dp,
+                        color = if (isFocused) colors.focus else colors.border.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(50.dp),
+                    )
+                else Modifier
+                    .background(colors.surface.copy(alpha = if (isFocused) 0.95f else 0.82f), RoundedCornerShape(50.dp))
+                    .border(
+                        width = if (isFocused) 2.dp else 1.dp,
+                        color = if (isFocused) colors.focus else colors.border,
+                        shape = RoundedCornerShape(50.dp),
+                    )
             )
             .padding(horizontal = 18.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, tint = LiquidColors.TextPrimary, modifier = Modifier.size(18.dp))
-            Text(text, style = LiquidTypography.LabelLarge, color = LiquidColors.TextPrimary, maxLines = 1)
+            Icon(icon, null, tint = fgColor, modifier = Modifier.size(18.dp))
+            Text(text, style = LiquidTypography.LabelLarge, color = fgColor, maxLines = 1)
         }
     }
 }
@@ -681,6 +699,7 @@ private fun ChannelRow(
     horizontalPadding: Dp,
     onChannelClick: (Channel) -> Unit,
 ) {
+    val colors = AppTheme.colors
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Row(
             modifier = Modifier.padding(horizontal = horizontalPadding),
@@ -692,14 +711,14 @@ private fun ChannelRow(
                     .width(4.dp)
                     .height(22.dp)
                     .background(
-                        Brush.verticalGradient(listOf(LiquidColors.AccentBlue, LiquidColors.AccentViolet)),
+                        Brush.verticalGradient(listOf(colors.accent, colors.waveOne)),
                         RoundedCornerShape(2.dp),
                     ),
             )
             Text(
                 text = title,
                 style = LiquidTypography.HeadlineSmall,
-                color = LiquidColors.TextPrimary,
+                color = colors.text,
             )
         }
         LazyRow(
@@ -723,6 +742,7 @@ private fun SeriesRow(
     horizontalPadding: Dp,
     onSeriesClick: (String) -> Unit,
 ) {
+    val colors = AppTheme.colors
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Row(
             modifier = Modifier.padding(horizontal = horizontalPadding),
@@ -734,14 +754,14 @@ private fun SeriesRow(
                     .width(4.dp)
                     .height(22.dp)
                     .background(
-                        Brush.verticalGradient(listOf(LiquidColors.AccentViolet, LiquidColors.AccentCyan)),
+                        Brush.verticalGradient(listOf(colors.waveTwo, colors.accent)),
                         RoundedCornerShape(2.dp),
                     ),
             )
             Text(
                 text = title,
                 style = LiquidTypography.HeadlineSmall,
-                color = LiquidColors.TextPrimary,
+                color = colors.text,
             )
         }
         LazyRow(
@@ -758,8 +778,8 @@ private fun SeriesRow(
                         .clickable(interactionSource = interactionSource, indication = null) { onSeriesClick(item.id) }
                         .focusable(interactionSource = interactionSource),
                     cornerRadius = 18.dp,
-                    glassAlpha = if (isFocused) 0.30f else 0.16f,
-                    borderAlpha = if (isFocused) 0.85f else 0.25f,
+                    glassAlpha = if (isFocused) 0.34f else 0.18f,
+                    borderAlpha = if (isFocused) 0.90f else 0.28f,
                     isFocused = isFocused,
                 ) {
                     Column(modifier = Modifier.fillMaxSize()) {
@@ -767,7 +787,7 @@ private fun SeriesRow(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(155.dp)
-                                .background(LiquidColors.GlassTertiary),
+                                .background(colors.surface.copy(alpha = 0.85f)),
                             contentAlignment = Alignment.Center,
                         ) {
                             if (!item.coverUrl.isNullOrBlank()) {
@@ -778,7 +798,7 @@ private fun SeriesRow(
                                     contentScale = ContentScale.Crop,
                                 )
                             } else {
-                                Icon(Icons.Filled.VideoLibrary, null, tint = LiquidColors.AccentViolet.copy(alpha = 0.6f), modifier = Modifier.size(40.dp))
+                                Icon(Icons.Filled.VideoLibrary, null, tint = colors.accentText.copy(alpha = 0.65f), modifier = Modifier.size(40.dp))
                             }
                         }
                         Column(
@@ -788,12 +808,12 @@ private fun SeriesRow(
                             Text(
                                 text = item.name,
                                 style = LiquidTypography.TitleSmall,
-                                color = LiquidColors.TextPrimary,
+                                color = colors.text,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                             )
                             item.categoryName?.let {
-                                Text(it, style = LiquidTypography.LabelSmall, color = LiquidColors.AccentVioletLight, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(it, style = LiquidTypography.LabelSmall, color = colors.accentText, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }
@@ -810,6 +830,7 @@ private fun CategoryRow(
     horizontalPadding: Dp,
     onCategoryClick: (String) -> Unit,
 ) {
+    val colors = AppTheme.colors
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Row(
             modifier = Modifier.padding(horizontal = horizontalPadding),
@@ -821,11 +842,11 @@ private fun CategoryRow(
                     .width(4.dp)
                     .height(22.dp)
                     .background(
-                        Brush.verticalGradient(listOf(LiquidColors.AccentCyan, LiquidColors.AccentBlue)),
+                        Brush.verticalGradient(listOf(colors.waveOne, colors.accent)),
                         RoundedCornerShape(2.dp),
                     ),
             )
-            Text(title, style = LiquidTypography.HeadlineSmall, color = LiquidColors.TextPrimary)
+            Text(title, style = LiquidTypography.HeadlineSmall, color = colors.text)
         }
         LazyRow(
             contentPadding = PaddingValues(horizontal = horizontalPadding),
@@ -843,6 +864,7 @@ private fun MiniChannelCard(
     channel: Channel,
     onClick: () -> Unit,
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
@@ -853,8 +875,8 @@ private fun MiniChannelCard(
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
         cornerRadius = 18.dp,
-        glassAlpha = if (isFocused) 0.30f else 0.16f,
-        borderAlpha = if (isFocused) 0.85f else 0.25f,
+        glassAlpha = if (isFocused) 0.34f else 0.18f,
+        borderAlpha = if (isFocused) 0.90f else 0.28f,
         isFocused = isFocused,
     ) {
         Column(
@@ -868,8 +890,8 @@ private fun MiniChannelCard(
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                LiquidColors.AccentBlue.copy(alpha = if (isFocused) 0.20f else 0.08f),
-                                LiquidColors.GlassTertiary,
+                                colors.accent.copy(alpha = if (isFocused) 0.22f else 0.10f),
+                                colors.surface.copy(alpha = 0.85f),
                             )
                         ),
                         RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
@@ -885,7 +907,7 @@ private fun MiniChannelCard(
                         contentScale = ContentScale.Fit,
                     )
                 } else {
-                    Icon(Icons.Filled.LiveTv, null, tint = LiquidColors.AccentBlue.copy(alpha = 0.4f), modifier = Modifier.size(36.dp))
+                    Icon(Icons.Filled.LiveTv, null, tint = colors.accentText.copy(alpha = 0.55f), modifier = Modifier.size(36.dp))
                 }
                 if (channel.mediaType == MediaType.LIVE) {
                     LiveBadge(modifier = Modifier.align(Alignment.TopStart))
@@ -893,10 +915,10 @@ private fun MiniChannelCard(
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopStart)
-                            .background(LiquidColors.AccentViolet.copy(alpha = 0.78f), RoundedCornerShape(6.dp))
+                            .background(colors.accent, RoundedCornerShape(6.dp))
                             .padding(horizontal = 6.dp, vertical = 2.dp),
                     ) {
-                        Text("فيلم", style = LiquidTypography.LabelSmall, color = Color.White)
+                        Text("فيلم", style = LiquidTypography.LabelSmall, color = colors.onAccent)
                     }
                 }
             }
@@ -905,9 +927,9 @@ private fun MiniChannelCard(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Text(channel.name, style = LiquidTypography.TitleSmall, color = LiquidColors.TextPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(channel.name, style = LiquidTypography.TitleSmall, color = colors.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 channel.groupTitle?.let {
-                    Text(it, style = LiquidTypography.LabelSmall, color = LiquidColors.AccentBlue.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(it, style = LiquidTypography.LabelSmall, color = colors.accentText, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
@@ -916,46 +938,42 @@ private fun MiniChannelCard(
 
 @Composable
 private fun MiniCategoryCard(category: Category, onClick: () -> Unit) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
-    val colors = getCategoryCardColors(category.name)
+    val catColors = getCategoryCardColors(category.name)
 
     Box(
         modifier = Modifier
             .width(150.dp)
             .height(90.dp)
             .clip(RoundedCornerShape(16.dp))
+            .background(colors.card.copy(alpha = if (colors.isLight) 0.94f else 0.78f))
             .background(
                 Brush.linearGradient(
-                    listOf(colors.first.copy(alpha = if (isFocused) 0.55f else 0.30f), colors.second.copy(alpha = if (isFocused) 0.45f else 0.20f))
+                    listOf(
+                        catColors.first.copy(alpha = if (isFocused) 0.36f else 0.18f),
+                        catColors.second.copy(alpha = if (isFocused) 0.28f else 0.12f),
+                    )
                 )
             )
             .border(
-                1.dp,
-                if (isFocused) colors.first.copy(alpha = 0.9f) else colors.first.copy(alpha = 0.35f),
-                RoundedCornerShape(16.dp),
+                width = if (isFocused) 2.dp else 1.dp,
+                color = if (isFocused) colors.focus else colors.border.copy(alpha = 0.6f),
+                shape = RoundedCornerShape(16.dp),
             )
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
         contentAlignment = Alignment.Center,
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color.White.copy(alpha = if (isFocused) 0.18f else 0.08f), Color.Transparent)
-                    )
-                ),
-        )
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.padding(horizontal = 10.dp),
         ) {
-            Text(category.name, style = LiquidTypography.TitleSmall, color = LiquidColors.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("${category.channelCount} قناة", style = LiquidTypography.LabelSmall, color = Color.White.copy(alpha = 0.7f))
+            Text(category.name, style = LiquidTypography.TitleSmall, color = colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("${category.channelCount} قناة", style = LiquidTypography.LabelSmall, color = colors.textSecondary)
         }
     }
 }
@@ -973,21 +991,22 @@ private fun getCategoryCardColors(name: String): Pair<Color, Color> = when {
 
 @Composable
 private fun LoadingIndicator(message: String, progress: Float) {
+    val colors = AppTheme.colors
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         CircularProgressIndicator(
             progress = { if (progress > 0f) progress else 0f },
-            color = LiquidColors.AccentBlue,
+            color = colors.accent,
             modifier = Modifier.size(48.dp),
         )
-        Text(message, style = LiquidTypography.BodyMedium, color = LiquidColors.TextSecondary)
+        Text(message, style = LiquidTypography.BodyMedium, color = colors.textSecondary)
         if (progress > 0f) {
             LinearProgressIndicator(
                 progress = { progress },
-                color = LiquidColors.AccentBlue,
-                trackColor = LiquidColors.GlassPrimary,
+                color = colors.accent,
+                trackColor = colors.surface.copy(alpha = 0.65f),
                 modifier = Modifier.width(200.dp),
             )
         }
@@ -1001,25 +1020,27 @@ private fun GlassErrorBanner(
     onSubscriptions: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val colors = AppTheme.colors
     LiquidGlassSurface(
         modifier = modifier,
         cornerRadius = 14.dp,
         glassAlpha = 0.25f,
-        borderAlpha = 0.4f,
-        glassColor = LiquidColors.ErrorRed,
+        borderAlpha = 0.45f,
+        glassColor = colors.danger,
+        borderColor = colors.danger,
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Filled.ErrorOutline, null, tint = LiquidColors.ErrorRed)
-            Text(message, style = LiquidTypography.BodyMedium, color = LiquidColors.TextPrimary, modifier = Modifier.weight(1f))
+            Icon(Icons.Filled.ErrorOutline, null, tint = colors.danger)
+            Text(message, style = LiquidTypography.BodyMedium, color = colors.text, modifier = Modifier.weight(1f))
             TextButton(onClick = onSubscriptions) {
-                Text("الحسابات", color = LiquidColors.TextPrimary)
+                Text("الحسابات", color = colors.text)
             }
             TextButton(onClick = onRetry) {
-                Text("إعادة المحاولة", color = LiquidColors.AccentBlueLight)
+                Text("إعادة المحاولة", color = colors.accentText)
             }
         }
     }

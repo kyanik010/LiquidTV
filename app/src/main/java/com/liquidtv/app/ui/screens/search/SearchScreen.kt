@@ -44,7 +44,7 @@ import com.liquidtv.app.domain.model.SeriesItem
 import com.liquidtv.app.ui.components.AppBackground
 import com.liquidtv.app.ui.components.LiquidGlassSurface
 import com.liquidtv.app.ui.components.LiveBadge
-import com.liquidtv.app.ui.theme.LiquidColors
+import com.liquidtv.app.ui.theme.AppTheme
 import com.liquidtv.app.ui.theme.LiquidTypography
 
 @Composable
@@ -55,6 +55,7 @@ fun SearchScreen(
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val colors = AppTheme.colors
     val searchFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
@@ -82,8 +83,9 @@ fun SearchScreen(
                         .fillMaxWidth()
                         .height(56.dp),
                     cornerRadius = 50.dp,
-                    glassAlpha = 0.20f,
-                    borderAlpha = 0.40f,
+                    glassAlpha = 0.85f,
+                    borderAlpha = 0.65f,
+                    borderColor = colors.border,
                 ) {
                     Row(
                         modifier = Modifier
@@ -95,7 +97,7 @@ fun SearchScreen(
                         Icon(
                             imageVector = Icons.Filled.Search,
                             contentDescription = "بحث",
-                            tint = LiquidColors.AccentBlue,
+                            tint = colors.accentText,
                             modifier = Modifier.size(24.dp),
                         )
                         BasicTextField(
@@ -104,15 +106,15 @@ fun SearchScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .focusRequester(searchFocusRequester),
-                            textStyle = LiquidTypography.BodyLarge.copy(color = LiquidColors.TextPrimary),
-                            cursorBrush = SolidColor(LiquidColors.AccentBlue),
+                            textStyle = LiquidTypography.BodyLarge.copy(color = colors.text),
+                            cursorBrush = SolidColor(colors.accent),
                             singleLine = true,
                             decorationBox = { innerTextField ->
                                 if (uiState.query.isEmpty()) {
                                     Text(
                                         text = "ابحث عن قناة أو فيلم أو مسلسل…",
                                         style = LiquidTypography.BodyLarge,
-                                        color = LiquidColors.TextDisabled,
+                                        color = colors.muted,
                                     )
                                 }
                                 innerTextField()
@@ -123,7 +125,7 @@ fun SearchScreen(
                                 Icon(
                                     imageVector = Icons.Filled.Close,
                                     contentDescription = "مسح",
-                                    tint = LiquidColors.TextSecondary,
+                                    tint = colors.textSecondary,
                                     modifier = Modifier.size(20.dp),
                                 )
                             }
@@ -145,12 +147,12 @@ fun SearchScreen(
                                     Text(
                                         "عمليات البحث الأخيرة",
                                         style = LiquidTypography.TitleSmall,
-                                        color = LiquidColors.TextSecondary,
+                                        color = colors.textSecondary,
                                     )
                                     Text(
                                         "مسح الكل",
                                         style = LiquidTypography.LabelSmall,
-                                        color = LiquidColors.AccentBlue,
+                                        color = colors.accentText,
                                         modifier = Modifier
                                             .clickable { viewModel.clearHistory() }
                                             .padding(4.dp),
@@ -167,8 +169,9 @@ fun SearchScreen(
                                                 .clickable(interactionSource, null) { viewModel.setQuery(historyItem) }
                                                 .focusable(interactionSource = interactionSource),
                                             cornerRadius = 20.dp,
-                                            glassAlpha = if (isFocused) 0.3f else 0.12f,
-                                            borderAlpha = if (isFocused) 0.6f else 0.18f,
+                                            glassAlpha = if (isFocused) 0.92f else 0.78f,
+                                            borderAlpha = if (isFocused) 0.90f else 0.45f,
+                                            borderColor = if (isFocused) colors.focus else colors.border,
                                             isFocused = isFocused,
                                         ) {
                                             Row(
@@ -176,8 +179,8 @@ fun SearchScreen(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                             ) {
-                                                Icon(Icons.Filled.History, null, tint = LiquidColors.TextTertiary, modifier = Modifier.size(14.dp))
-                                                Text(historyItem, style = LiquidTypography.BodySmall, color = LiquidColors.TextPrimary)
+                                                Icon(Icons.Filled.History, null, tint = colors.muted, modifier = Modifier.size(14.dp))
+                                                Text(historyItem, style = LiquidTypography.BodySmall, color = colors.text)
                                             }
                                         }
                                     }
@@ -195,23 +198,23 @@ fun SearchScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
-                                Icon(Icons.Filled.Search, null, tint = LiquidColors.TextDisabled, modifier = Modifier.size(56.dp))
+                                Icon(Icons.Filled.Search, null, tint = colors.muted, modifier = Modifier.size(56.dp))
                                 Text(
                                     "ابحث في البث المباشر والأفلام والمسلسلات",
                                     style = LiquidTypography.TitleMedium,
-                                    color = LiquidColors.TextSecondary,
+                                    color = colors.textSecondary,
                                 )
                                 Text(
                                     "اكتب أي اسم أو تصنيف أو دولة أو لغة",
                                     style = LiquidTypography.BodySmall,
-                                    color = LiquidColors.TextTertiary,
+                                    color = colors.muted,
                                 )
                             }
                         }
                     }
                     uiState.isSearching -> {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(color = LiquidColors.AccentBlue)
+                            CircularProgressIndicator(color = colors.accent)
                         }
                     }
                     !uiState.hasResults -> {
@@ -221,23 +224,24 @@ fun SearchScreen(
                         ) {
                             LiquidGlassSurface(
                                 cornerRadius = 20.dp,
-                                glassAlpha = 0.15f,
+                                glassAlpha = 0.80f,
+                                borderColor = colors.border,
                             ) {
                                 Column(
                                     modifier = Modifier.padding(32.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.spacedBy(10.dp),
                                 ) {
-                                    Icon(Icons.Filled.Tv, null, tint = LiquidColors.TextTertiary, modifier = Modifier.size(48.dp))
+                                    Icon(Icons.Filled.Tv, null, tint = colors.muted, modifier = Modifier.size(48.dp))
                                     Text(
                                         "لا توجد نتائج مطابقة لـ \"${uiState.query}\"",
                                         style = LiquidTypography.TitleMedium,
-                                        color = LiquidColors.TextPrimary,
+                                        color = colors.text,
                                     )
                                     Text(
                                         "تأكد من كتابة الكلمة بشكل صحيح أو جرب كلمة بحث أعم",
                                         style = LiquidTypography.BodySmall,
-                                        color = LiquidColors.TextTertiary,
+                                        color = colors.muted,
                                     )
                                 }
                             }
@@ -248,7 +252,7 @@ fun SearchScreen(
                         Text(
                             text = "تم العثور على $total نتيجة",
                             style = LiquidTypography.LabelMedium,
-                            color = LiquidColors.TextSecondary,
+                            color = colors.textSecondary,
                             modifier = Modifier.padding(bottom = 12.dp),
                         )
                         LazyVerticalGrid(
@@ -283,6 +287,7 @@ private fun SearchResultGridCard(
     channel: Channel,
     onClick: () -> Unit,
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     val scale by animateFloatAsState(
@@ -299,9 +304,9 @@ private fun SearchResultGridCard(
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
         cornerRadius = 16.dp,
-        glassAlpha = if (isFocused) 0.25f else 0.12f,
-        borderAlpha = if (isFocused) 0.7f else 0.18f,
-        borderColor = if (isFocused) LiquidColors.AccentBlue else Color.White,
+        glassAlpha = if (isFocused) 0.90f else 0.78f,
+        borderAlpha = if (isFocused) 0.92f else 0.45f,
+        borderColor = if (isFocused) colors.focus else colors.border,
         isFocused = isFocused,
     ) {
         Column(
@@ -314,7 +319,7 @@ private fun SearchResultGridCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(90.dp)
-                    .background(LiquidColors.GlassTertiary, RoundedCornerShape(10.dp))
+                    .background(colors.surface.copy(alpha = if (colors.isLight) 0.90f else 0.72f), RoundedCornerShape(10.dp))
                     .padding(6.dp),
                 contentAlignment = Alignment.Center,
             ) {
@@ -326,13 +331,17 @@ private fun SearchResultGridCard(
                         contentScale = ContentScale.Fit,
                     )
                 } else {
-                    Icon(Icons.Filled.Tv, null, tint = LiquidColors.TextTertiary, modifier = Modifier.size(32.dp))
+                    Icon(Icons.Filled.Tv, null, tint = colors.muted, modifier = Modifier.size(32.dp))
                 }
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopEnd) {
                     if (channel.mediaType == MediaType.LIVE) {
                         LiveBadge()
                     } else {
-                        MediaKindBadge("فيلم", LiquidColors.AccentViolet)
+                        MediaKindBadge(
+                            label = "فيلم",
+                            backgroundColor = colors.accent,
+                            contentColor = colors.onAccent,
+                        )
                     }
                 }
             }
@@ -341,14 +350,14 @@ private fun SearchResultGridCard(
                 Text(
                     text = channel.name,
                     style = LiquidTypography.TitleSmall,
-                    color = LiquidColors.TextPrimary,
+                    color = colors.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = channel.groupTitle ?: channel.country ?: "عام",
                     style = LiquidTypography.LabelSmall,
-                    color = LiquidColors.TextTertiary,
+                    color = colors.muted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -362,6 +371,7 @@ private fun SeriesSearchGridCard(
     series: SeriesItem,
     onClick: () -> Unit,
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     val scale by animateFloatAsState(
@@ -378,9 +388,9 @@ private fun SeriesSearchGridCard(
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
         cornerRadius = 16.dp,
-        glassAlpha = if (isFocused) 0.25f else 0.12f,
-        borderAlpha = if (isFocused) 0.7f else 0.18f,
-        borderColor = if (isFocused) LiquidColors.AccentViolet else Color.White,
+        glassAlpha = if (isFocused) 0.90f else 0.78f,
+        borderAlpha = if (isFocused) 0.92f else 0.45f,
+        borderColor = if (isFocused) colors.focus else colors.border,
         isFocused = isFocused,
     ) {
         Column(
@@ -393,7 +403,7 @@ private fun SeriesSearchGridCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(90.dp)
-                    .background(LiquidColors.GlassTertiary, RoundedCornerShape(10.dp)),
+                    .background(colors.surface.copy(alpha = if (colors.isLight) 0.90f else 0.72f), RoundedCornerShape(10.dp)),
                 contentAlignment = Alignment.Center,
             ) {
                 if (!series.coverUrl.isNullOrBlank()) {
@@ -404,10 +414,14 @@ private fun SeriesSearchGridCard(
                         contentScale = ContentScale.Crop,
                     )
                 } else {
-                    Icon(Icons.Filled.VideoLibrary, null, tint = LiquidColors.AccentVioletLight, modifier = Modifier.size(32.dp))
+                    Icon(Icons.Filled.VideoLibrary, null, tint = colors.accentText, modifier = Modifier.size(32.dp))
                 }
                 Box(Modifier.fillMaxSize().padding(6.dp), contentAlignment = Alignment.TopEnd) {
-                    MediaKindBadge("مسلسل", LiquidColors.AccentCyan)
+                    MediaKindBadge(
+                        label = "مسلسل",
+                        backgroundColor = colors.selected,
+                        contentColor = colors.text,
+                    )
                 }
             }
 
@@ -415,14 +429,14 @@ private fun SeriesSearchGridCard(
                 Text(
                     text = series.name,
                     style = LiquidTypography.TitleSmall,
-                    color = LiquidColors.TextPrimary,
+                    color = colors.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = series.categoryName ?: series.genre ?: "مسلسل",
                     style = LiquidTypography.LabelSmall,
-                    color = LiquidColors.TextTertiary,
+                    color = colors.muted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -432,12 +446,16 @@ private fun SeriesSearchGridCard(
 }
 
 @Composable
-private fun MediaKindBadge(label: String, color: Color) {
+private fun MediaKindBadge(
+    label: String,
+    backgroundColor: Color,
+    contentColor: Color,
+) {
     Box(
         modifier = Modifier
-            .background(color.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
+            .background(backgroundColor.copy(alpha = 0.92f), RoundedCornerShape(6.dp))
             .padding(horizontal = 6.dp, vertical = 2.dp),
     ) {
-        Text(label, style = LiquidTypography.LabelSmall, color = Color.White)
+        Text(label, style = LiquidTypography.LabelSmall, color = contentColor)
     }
 }

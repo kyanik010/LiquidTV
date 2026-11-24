@@ -20,7 +20,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -28,7 +27,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.liquidtv.app.ui.theme.LiquidColors
+import com.liquidtv.app.ui.theme.AppTheme
 import com.liquidtv.app.ui.theme.LiquidTypography
 
 @Composable
@@ -43,6 +42,7 @@ fun ParentalPinDialog(
 ) {
     if (!visible) return
 
+    val colors = AppTheme.colors
     var pin by remember(visible) { mutableStateOf("") }
     var localError by remember(visible, errorMessage) { mutableStateOf(errorMessage) }
     val focusRequester = remember { FocusRequester() }
@@ -64,7 +64,7 @@ fun ParentalPinDialog(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.65f)),
+                .background(colors.dialogScrim),
             contentAlignment = Alignment.Center,
         ) {
             LiquidGlassSurface(
@@ -72,9 +72,10 @@ fun ParentalPinDialog(
                     .padding(24.dp)
                     .widthIn(min = 320.dp, max = 440.dp),
                 cornerRadius = 24.dp,
-                glassAlpha = 0.28f,
-                borderAlpha = 0.5f,
-                borderColor = LiquidColors.AccentBlueLight,
+                glassColor = colors.panel,
+                glassAlpha = 0.95f,
+                borderAlpha = 0.8f,
+                borderColor = colors.border,
             ) {
                 Column(
                     modifier = Modifier
@@ -86,18 +87,18 @@ fun ParentalPinDialog(
                     Icon(
                         imageVector = Icons.Filled.Lock,
                         contentDescription = "رمز الرقابة الأبوية",
-                        tint = LiquidColors.AccentBlueLight,
+                        tint = colors.accent,
                         modifier = Modifier.size(40.dp),
                     )
                     Text(
                         text = title,
                         style = LiquidTypography.TitleMedium,
-                        color = LiquidColors.TextPrimary,
+                        color = colors.text,
                     )
                     Text(
                         text = subtitle,
                         style = LiquidTypography.BodySmall,
-                        color = LiquidColors.TextSecondary,
+                        color = colors.textSecondary,
                     )
 
                     OutlinedTextField(
@@ -125,12 +126,15 @@ fun ParentalPinDialog(
                         ),
                         shape = RoundedCornerShape(14.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = LiquidColors.AccentBlueLight,
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.25f),
-                            focusedLabelColor = LiquidColors.AccentBlueLight,
-                            unfocusedLabelColor = LiquidColors.TextSecondary,
+                            focusedTextColor = colors.text,
+                            unfocusedTextColor = colors.text,
+                            focusedContainerColor = colors.surface,
+                            unfocusedContainerColor = colors.surface,
+                            focusedBorderColor = colors.accent,
+                            unfocusedBorderColor = colors.border,
+                            focusedLabelColor = colors.accentText,
+                            unfocusedLabelColor = colors.textSecondary,
+                            cursorColor = colors.accent,
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -142,7 +146,7 @@ fun ParentalPinDialog(
                         Text(
                             text = err,
                             style = LiquidTypography.BodySmall,
-                            color = LiquidColors.ErrorRed,
+                            color = colors.danger,
                             modifier = Modifier.testTag("pin_error_text"),
                         )
                     }
@@ -187,6 +191,7 @@ private fun PinDialogButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     Box(
@@ -195,19 +200,15 @@ private fun PinDialogButton(
             .clip(RoundedCornerShape(14.dp))
             .background(
                 if (isPrimary) {
-                    Brush.horizontalGradient(listOf(LiquidColors.AccentBlue, LiquidColors.AccentViolet))
+                    Brush.horizontalGradient(listOf(colors.accent, colors.waveTwo))
                 } else {
-                    Brush.horizontalGradient(
-                        listOf(
-                            Color.White.copy(alpha = if (isFocused) 0.22f else 0.10f),
-                            Color.White.copy(alpha = if (isFocused) 0.22f else 0.10f),
-                        ),
-                    )
+                    val bg = if (isFocused) colors.selected else colors.surface
+                    Brush.horizontalGradient(listOf(bg, bg))
                 },
             )
             .border(
                 width = if (isFocused) 2.dp else 1.dp,
-                color = if (isFocused) Color.White else Color.White.copy(alpha = 0.25f),
+                color = if (isFocused) colors.focus else colors.border,
                 shape = RoundedCornerShape(14.dp),
             )
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
@@ -217,7 +218,7 @@ private fun PinDialogButton(
         Text(
             text = label,
             style = LiquidTypography.LabelLarge,
-            color = Color.White,
+            color = if (isPrimary) colors.onAccent else colors.text,
         )
     }
 }

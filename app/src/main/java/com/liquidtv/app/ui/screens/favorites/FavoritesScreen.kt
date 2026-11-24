@@ -36,7 +36,7 @@ import com.liquidtv.app.domain.model.MediaType
 import com.liquidtv.app.ui.components.AppBackground
 import com.liquidtv.app.ui.components.LiquidGlassSurface
 import com.liquidtv.app.ui.components.LiveBadge
-import com.liquidtv.app.ui.theme.LiquidColors
+import com.liquidtv.app.ui.theme.AppTheme
 import com.liquidtv.app.ui.theme.LiquidTypography
 
 @Composable
@@ -45,6 +45,7 @@ fun FavoritesScreen(
     viewModel: FavoritesViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val colors = AppTheme.colors
 
     AppBackground(modifier = Modifier.fillMaxSize()) {
         BoxWithConstraints(
@@ -64,35 +65,36 @@ fun FavoritesScreen(
                     text = "المفضلة وسجل المشاهدة",
                     style = LiquidTypography.HeadlineMedium.copy(
                         brush = Brush.linearGradient(
-                            listOf(LiquidColors.TextPrimary, LiquidColors.AccentRose)
+                            listOf(colors.text, colors.accentText)
                         )
                     ),
-                    color = LiquidColors.TextPrimary,
+                    color = colors.text,
                     modifier = Modifier.padding(horizontal = hPad, vertical = 12.dp),
                 )
 
                 if (uiState.isLoading && uiState.favorites.isEmpty() && uiState.recentlyWatched.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = LiquidColors.AccentBlue)
+                        CircularProgressIndicator(color = colors.accent)
                     }
                 } else if (uiState.favorites.isEmpty() && uiState.recentlyWatched.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         LiquidGlassSurface(
                             modifier = Modifier.padding(24.dp),
                             cornerRadius = 20.dp,
-                            glassAlpha = 0.15f,
+                            glassAlpha = 0.80f,
+                            borderColor = colors.border,
                         ) {
                             Column(
                                 modifier = Modifier.padding(32.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
-                                Icon(Icons.Filled.Favorite, null, tint = LiquidColors.LiveRed, modifier = Modifier.size(52.dp))
-                                Text("لا توجد عناصر في المفضلة بعد", style = LiquidTypography.TitleLarge, color = LiquidColors.TextPrimary)
+                                Icon(Icons.Filled.Favorite, null, tint = colors.danger, modifier = Modifier.size(52.dp))
+                                Text("لا توجد عناصر في المفضلة بعد", style = LiquidTypography.TitleLarge, color = colors.text)
                                 Text(
                                     "أضف أي قناة أو فيلم إلى المفضلة أثناء التصفح أو من داخل المشغل.",
                                     style = LiquidTypography.BodyMedium,
-                                    color = LiquidColors.TextSecondary,
+                                    color = colors.textSecondary,
                                 )
                             }
                         }
@@ -117,13 +119,13 @@ fun FavoritesScreen(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                                         ) {
-                                            Icon(Icons.Filled.Favorite, null, tint = LiquidColors.LiveRed, modifier = Modifier.size(20.dp))
-                                            Text("العناصر المحفوظة", style = LiquidTypography.HeadlineSmall, color = LiquidColors.TextPrimary)
+                                            Icon(Icons.Filled.Favorite, null, tint = colors.danger, modifier = Modifier.size(20.dp))
+                                            Text("العناصر المحفوظة", style = LiquidTypography.HeadlineSmall, color = colors.text)
                                         }
                                         Text(
                                             "${uiState.favorites.size} عنصر",
                                             style = LiquidTypography.LabelSmall,
-                                            color = LiquidColors.TextTertiary,
+                                            color = colors.muted,
                                         )
                                     }
 
@@ -156,8 +158,8 @@ fun FavoritesScreen(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                                         ) {
-                                            Icon(Icons.Filled.History, null, tint = LiquidColors.AccentBlue, modifier = Modifier.size(20.dp))
-                                            Text("شوهد مؤخراً", style = LiquidTypography.HeadlineSmall, color = LiquidColors.TextPrimary)
+                                            Icon(Icons.Filled.History, null, tint = colors.accentText, modifier = Modifier.size(20.dp))
+                                            Text("شوهد مؤخراً", style = LiquidTypography.HeadlineSmall, color = colors.text)
                                         }
                                         Row(
                                             modifier = Modifier
@@ -166,8 +168,8 @@ fun FavoritesScreen(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                                         ) {
-                                            Icon(Icons.Filled.DeleteSweep, null, tint = LiquidColors.TextTertiary, modifier = Modifier.size(16.dp))
-                                            Text("مسح السجل", style = LiquidTypography.LabelSmall, color = LiquidColors.TextTertiary)
+                                            Icon(Icons.Filled.DeleteSweep, null, tint = colors.muted, modifier = Modifier.size(16.dp))
+                                            Text("مسح السجل", style = LiquidTypography.LabelSmall, color = colors.muted)
                                         }
                                     }
 
@@ -197,6 +199,7 @@ private fun FavoriteChannelCard(
     channel: Channel,
     onClick: () -> Unit,
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     val scale by animateFloatAsState(
@@ -213,9 +216,9 @@ private fun FavoriteChannelCard(
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
         cornerRadius = 16.dp,
-        glassAlpha = if (isFocused) 0.25f else 0.12f,
-        borderAlpha = if (isFocused) 0.7f else 0.18f,
-        borderColor = if (isFocused) LiquidColors.AccentBlue else Color.White,
+        glassAlpha = if (isFocused) 0.90f else 0.78f,
+        borderAlpha = if (isFocused) 0.92f else 0.45f,
+        borderColor = if (isFocused) colors.focus else colors.border,
         isFocused = isFocused,
     ) {
         Column(
@@ -228,7 +231,7 @@ private fun FavoriteChannelCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(95.dp)
-                    .background(LiquidColors.GlassTertiary, RoundedCornerShape(10.dp))
+                    .background(colors.surface.copy(alpha = if (colors.isLight) 0.90f else 0.72f), RoundedCornerShape(10.dp))
                     .padding(6.dp),
                 contentAlignment = Alignment.Center,
             ) {
@@ -240,7 +243,7 @@ private fun FavoriteChannelCard(
                         contentScale = ContentScale.Fit,
                     )
                 } else {
-                    Icon(Icons.Filled.Tv, null, tint = LiquidColors.TextTertiary, modifier = Modifier.size(34.dp))
+                    Icon(Icons.Filled.Tv, null, tint = colors.muted, modifier = Modifier.size(34.dp))
                 }
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopEnd) {
                     if (channel.mediaType == MediaType.LIVE) {
@@ -248,13 +251,13 @@ private fun FavoriteChannelCard(
                     } else {
                         Box(
                             modifier = Modifier
-                                .background(LiquidColors.AccentViolet.copy(alpha = 0.8f), RoundedCornerShape(6.dp))
+                                .background(colors.accent.copy(alpha = 0.92f), RoundedCornerShape(6.dp))
                                 .padding(horizontal = 6.dp, vertical = 2.dp),
                         ) {
                             Text(
                                 text = if (channel.mediaType == MediaType.MOVIE) "فيلم" else "حلقة",
                                 style = LiquidTypography.LabelSmall,
-                                color = Color.White,
+                                color = colors.onAccent,
                             )
                         }
                     }
@@ -265,14 +268,14 @@ private fun FavoriteChannelCard(
                 Text(
                     text = channel.name,
                     style = LiquidTypography.TitleSmall,
-                    color = LiquidColors.TextPrimary,
+                    color = colors.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = channel.groupTitle ?: channel.country ?: "عام",
                     style = LiquidTypography.LabelSmall,
-                    color = LiquidColors.TextTertiary,
+                    color = colors.muted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

@@ -43,7 +43,7 @@ import com.liquidtv.app.domain.model.SortOrder
 import com.liquidtv.app.ui.components.AppBackground
 import com.liquidtv.app.ui.components.LiquidGlassSurface
 import com.liquidtv.app.ui.components.LiveBadge
-import com.liquidtv.app.ui.theme.LiquidColors
+import com.liquidtv.app.ui.theme.AppTheme
 import com.liquidtv.app.ui.theme.LiquidTypography
 import com.liquidtv.app.ui.utils.calculateEpgProgress
 import com.liquidtv.app.ui.utils.formatEpgTimeRange
@@ -110,19 +110,23 @@ fun LiveTVScreen(
 
                 if (uiState.isLoading && uiState.channels.isEmpty()) {
                     Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = LiquidColors.AccentBlue)
+                        CircularProgressIndicator(color = AppTheme.colors.accent)
                     }
                 } else if (uiState.error != null && uiState.channels.isEmpty()) {
+                    val colors = AppTheme.colors
                     Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        LiquidGlassSurface(cornerRadius = 20.dp, glassAlpha = 0.16f) {
+                        LiquidGlassSurface(cornerRadius = 20.dp, glassAlpha = 0.18f) {
                             Column(
                                 modifier = Modifier.padding(28.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
-                                Icon(Icons.Filled.ErrorOutline, null, tint = LiquidColors.ErrorRed, modifier = Modifier.size(44.dp))
-                                Text(uiState.error.orEmpty(), style = LiquidTypography.TitleMedium, color = LiquidColors.TextPrimary)
-                                Button(onClick = viewModel::refresh) {
+                                Icon(Icons.Filled.ErrorOutline, null, tint = colors.danger, modifier = Modifier.size(44.dp))
+                                Text(uiState.error.orEmpty(), style = LiquidTypography.TitleMedium, color = colors.text)
+                                Button(
+                                    onClick = viewModel::refresh,
+                                    colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = colors.onAccent),
+                                ) {
                                     Text("إعادة المحاولة")
                                 }
                             }
@@ -253,9 +257,11 @@ fun LiveTVScreen(
         }
 
         if (showCategoriesSheet) {
+            val colors = AppTheme.colors
             ModalBottomSheet(
                 onDismissRequest = { showCategoriesSheet = false },
-                containerColor = LiquidColors.DeepSurface,
+                containerColor = colors.panel,
+                contentColor = colors.text,
             ) {
                 Column(
                     modifier = Modifier
@@ -266,7 +272,7 @@ fun LiveTVScreen(
                     Text(
                         text = "تصنيفات القنوات",
                         style = LiquidTypography.TitleLarge,
-                        color = LiquidColors.TextPrimary,
+                        color = colors.text,
                         modifier = Modifier.padding(horizontal = 4.dp),
                     )
                     LazyColumn(
@@ -331,6 +337,7 @@ private fun LiveTVHeader(
     onSortSelected: (SortOrder) -> Unit,
     onViewModeSelected: (ViewMode) -> Unit,
 ) {
+    val colors = AppTheme.colors
     val sortOrders = remember {
         listOf(
             "أ - ي" to SortOrder.NAME_ASC,
@@ -359,7 +366,7 @@ private fun LiveTVHeader(
                     text = filterTitle,
                     style = (if (compactHeight) LiquidTypography.TitleMedium else LiquidTypography.TitleLarge).copy(
                         brush = Brush.linearGradient(
-                            listOf(LiquidColors.TextPrimary, LiquidColors.AccentBlueLight),
+                            listOf(colors.text, colors.accentText),
                         ),
                     ),
                     maxLines = 1,
@@ -368,13 +375,13 @@ private fun LiveTVHeader(
                 )
                 LiquidGlassSurface(
                     cornerRadius = 10.dp,
-                    glassAlpha = 0.14f,
-                    borderAlpha = 0.22f,
+                    glassAlpha = 0.22f,
+                    borderAlpha = 0.28f,
                 ) {
                     Text(
                         text = "$channelsCount قناة متاحة",
                         style = LiquidTypography.LabelSmall,
-                        color = LiquidColors.TextSecondary,
+                        color = colors.textSecondary,
                         maxLines = 1,
                         modifier = Modifier
                             .padding(horizontal = 8.dp, vertical = 3.dp)
@@ -441,7 +448,7 @@ private fun LiveTVHeader(
                         text = filterTitle,
                         style = LiquidTypography.TitleLarge.copy(
                             brush = Brush.linearGradient(
-                                listOf(LiquidColors.TextPrimary, LiquidColors.AccentBlueLight),
+                                listOf(colors.text, colors.accentText),
                             ),
                         ),
                         maxLines = 1,
@@ -450,13 +457,13 @@ private fun LiveTVHeader(
                     )
                     LiquidGlassSurface(
                         cornerRadius = 10.dp,
-                        glassAlpha = 0.14f,
-                        borderAlpha = 0.22f,
+                        glassAlpha = 0.22f,
+                        borderAlpha = 0.28f,
                     ) {
                         Text(
                             text = "$channelsCount قناة متاحة",
                             style = LiquidTypography.LabelSmall,
-                            color = LiquidColors.TextSecondary,
+                            color = colors.textSecondary,
                             maxLines = 1,
                             modifier = Modifier
                                 .padding(horizontal = 7.dp, vertical = 3.dp)
@@ -476,16 +483,16 @@ private fun LiveTVHeader(
                             .height(38.dp)
                             .clickable(onClick = onOpenCategoriesSheet),
                         cornerRadius = 19.dp,
-                        glassAlpha = 0.20f,
-                        borderColor = LiquidColors.AccentBlueLight,
+                        glassAlpha = 0.28f,
+                        borderColor = colors.accent,
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
-                            Icon(Icons.Filled.FilterList, contentDescription = "التصنيفات", tint = LiquidColors.AccentBlueLight, modifier = Modifier.size(16.dp))
-                            Text("التصنيفات", style = LiquidTypography.LabelMedium, color = Color.White)
+                            Icon(Icons.Filled.FilterList, contentDescription = "التصنيفات", tint = colors.accentText, modifier = Modifier.size(16.dp))
+                            Text("التصنيفات", style = LiquidTypography.LabelMedium, color = colors.text)
                         }
                     }
 
@@ -529,6 +536,7 @@ private fun ViewModeIconButton(
     compact: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     val btnSize = if (compact) 36.dp else 40.dp
@@ -538,16 +546,17 @@ private fun ViewModeIconButton(
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
         cornerRadius = btnSize / 2,
-        glassAlpha = if (selected) 0.34f else 0.14f,
-        borderAlpha = if (isFocused) 0.85f else if (selected) 0.55f else 0.20f,
-        borderColor = if (selected || isFocused) LiquidColors.AccentBlueLight else Color.White,
+        glassColor = if (selected) colors.selected else colors.surface,
+        glassAlpha = if (selected) 0.92f else 0.72f,
+        borderAlpha = if (isFocused) 0.95f else if (selected) 0.75f else 0.45f,
+        borderColor = if (isFocused) colors.focus else if (selected) colors.accent else colors.border,
         isFocused = isFocused,
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
-                tint = if (selected) LiquidColors.AccentBlueLight else LiquidColors.TextSecondary,
+                tint = if (selected) colors.accentText else colors.textSecondary,
                 modifier = Modifier.size(18.dp),
             )
         }
@@ -567,11 +576,12 @@ private fun LiveCategoriesSidebar(
     onSelectCategory: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val colors = AppTheme.colors
     LiquidGlassSurface(
         modifier = modifier.testTag("live_categories_pane"),
         cornerRadius = 20.dp,
-        glassAlpha = 0.14f,
-        borderAlpha = 0.22f,
+        glassAlpha = 0.18f,
+        borderAlpha = 0.28f,
     ) {
         Column(
             modifier = Modifier
@@ -582,7 +592,7 @@ private fun LiveCategoriesSidebar(
             Text(
                 text = "التصنيفات",
                 style = if (compactHeight) LiquidTypography.TitleSmall else LiquidTypography.TitleMedium,
-                color = LiquidColors.TextPrimary,
+                color = colors.text,
                 modifier = Modifier.padding(horizontal = 6.dp),
             )
 
@@ -633,6 +643,7 @@ private fun CategorySidebarRow(
     compact: Boolean,
     onClick: () -> Unit,
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
@@ -643,9 +654,10 @@ private fun CategorySidebarRow(
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
         cornerRadius = 11.dp,
-        glassAlpha = if (isSelected) 0.34f else if (isFocused) 0.22f else 0.08f,
-        borderAlpha = if (isFocused) 0.85f else if (isSelected) 0.55f else 0.14f,
-        borderColor = if (isSelected || isFocused) LiquidColors.AccentBlueLight else Color.White,
+        glassColor = if (isSelected) colors.selected else colors.surface,
+        glassAlpha = if (isSelected) 0.92f else if (isFocused) 0.80f else 0.55f,
+        borderAlpha = if (isFocused) 0.95f else if (isSelected) 0.75f else 0.28f,
+        borderColor = if (isFocused) colors.focus else if (isSelected) colors.accent else colors.border,
         isFocused = isFocused,
     ) {
         Row(
@@ -658,7 +670,7 @@ private fun CategorySidebarRow(
             Text(
                 text = label,
                 style = LiquidTypography.LabelLarge,
-                color = if (isSelected) Color.White else LiquidColors.TextSecondary,
+                color = if (isSelected) colors.text else colors.textSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -667,7 +679,7 @@ private fun CategorySidebarRow(
             Text(
                 text = count.toString(),
                 style = LiquidTypography.LabelSmall,
-                color = if (isSelected) LiquidColors.AccentBlueLight else LiquidColors.TextTertiary,
+                color = if (isSelected) colors.accentText else colors.muted,
             )
         }
     }
@@ -687,15 +699,16 @@ private fun LiveChannelsPane(
     modifier: Modifier = Modifier,
 ) {
     if (channels.isEmpty()) {
+        val colors = AppTheme.colors
         Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(
                 modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Icon(Icons.Filled.Tv, null, tint = LiquidColors.TextTertiary, modifier = Modifier.size(46.dp))
-                Text("لا توجد قنوات مطابقة", style = LiquidTypography.TitleLarge, color = LiquidColors.TextPrimary)
-                Text("جرّب اختيار تصنيف آخر أو تحديث القائمة من الإعدادات.", style = LiquidTypography.BodySmall, color = LiquidColors.TextSecondary)
+                Icon(Icons.Filled.Tv, null, tint = colors.muted, modifier = Modifier.size(46.dp))
+                Text("لا توجد قنوات مطابقة", style = LiquidTypography.TitleLarge, color = colors.text)
+                Text("جرّب اختيار تصنيف آخر أو تحديث القائمة من الإعدادات.", style = LiquidTypography.BodySmall, color = colors.textSecondary)
             }
         }
         return
@@ -761,18 +774,19 @@ private fun LiveChannelInfoEpgPane(
     onFavoriteToggle: (Channel) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val colors = AppTheme.colors
     LiquidGlassSurface(
         modifier = modifier,
         cornerRadius = 20.dp,
-        glassAlpha = 0.16f,
-        borderAlpha = 0.24f,
+        glassAlpha = 0.20f,
+        borderAlpha = 0.28f,
     ) {
         if (channel == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
                     text = "اختر قناة لعرض معلوماتها ودليل البرامج",
                     style = LiquidTypography.BodySmall,
-                    color = LiquidColors.TextSecondary,
+                    color = colors.textSecondary,
                     modifier = Modifier.padding(16.dp),
                 )
             }
@@ -795,8 +809,8 @@ private fun LiveChannelInfoEpgPane(
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                LiquidColors.AccentBlue.copy(alpha = 0.22f),
-                                LiquidColors.GlassTertiary,
+                                colors.accent.copy(alpha = 0.16f),
+                                colors.surface.copy(alpha = 0.85f),
                             ),
                         ),
                     ),
@@ -812,7 +826,7 @@ private fun LiveChannelInfoEpgPane(
                         contentScale = ContentScale.Fit,
                     )
                 } else {
-                    Icon(Icons.Filled.Tv, null, tint = LiquidColors.AccentBlueLight, modifier = Modifier.size(if (compactHeight) 34.dp else 44.dp))
+                    Icon(Icons.Filled.Tv, null, tint = colors.accentText, modifier = Modifier.size(if (compactHeight) 34.dp else 44.dp))
                 }
                 Box(
                     modifier = Modifier
@@ -830,7 +844,7 @@ private fun LiveChannelInfoEpgPane(
                     Icon(
                         imageVector = if (channel.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                         contentDescription = if (channel.isFavorite) "إزالة من المفضلة" else "إضافة إلى المفضلة",
-                        tint = if (channel.isFavorite) LiquidColors.LiveRed else Color.White,
+                        tint = if (channel.isFavorite) colors.danger else colors.textSecondary,
                     )
                 }
             }
@@ -840,7 +854,7 @@ private fun LiveChannelInfoEpgPane(
                 Text(
                     text = channel.name,
                     style = if (compactHeight) LiquidTypography.TitleMedium else LiquidTypography.TitleLarge,
-                    color = LiquidColors.TextPrimary,
+                    color = colors.text,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -849,13 +863,13 @@ private fun LiveChannelInfoEpgPane(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     channel.groupTitle?.takeIf { it.isNotBlank() }?.let { group ->
-                        Text(group, style = LiquidTypography.LabelSmall, color = LiquidColors.AccentBlueLight, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(group, style = LiquidTypography.LabelSmall, color = colors.accentText, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     channel.country?.takeIf { it.isNotBlank() }?.let { country ->
-                        Text("• $country", style = LiquidTypography.LabelSmall, color = LiquidColors.TextTertiary, maxLines = 1)
+                        Text("• $country", style = LiquidTypography.LabelSmall, color = colors.muted, maxLines = 1)
                     }
                     channel.language?.takeIf { it.isNotBlank() }?.let { lang ->
-                        Text("• $lang", style = LiquidTypography.LabelSmall, color = LiquidColors.TextTertiary, maxLines = 1)
+                        Text("• $lang", style = LiquidTypography.LabelSmall, color = colors.muted, maxLines = 1)
                     }
                 }
             }
@@ -865,8 +879,8 @@ private fun LiveChannelInfoEpgPane(
                 onClick = { onPlayClick(channel) },
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = LiquidColors.AccentBlue,
-                    contentColor = Color.White,
+                    containerColor = colors.accent,
+                    contentColor = colors.onAccent,
                 ),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 modifier = Modifier
@@ -882,8 +896,8 @@ private fun LiveChannelInfoEpgPane(
             // EPG Current & Next
             LiquidGlassSurface(
                 cornerRadius = 14.dp,
-                glassAlpha = 0.12f,
-                borderAlpha = 0.20f,
+                glassAlpha = 0.16f,
+                borderAlpha = 0.25f,
             ) {
                 Column(
                     modifier = Modifier
@@ -894,7 +908,7 @@ private fun LiveChannelInfoEpgPane(
                     Text(
                         text = "دليل البرامج المباشر",
                         style = LiquidTypography.TitleSmall,
-                        color = LiquidColors.AccentBlueLight,
+                        color = colors.accentText,
                     )
 
                     val current = epg.current
@@ -904,7 +918,7 @@ private fun LiveChannelInfoEpgPane(
                         Text(
                             text = "لا تتوفر بيانات دليل البرامج لهذه القناة حالياً",
                             style = LiquidTypography.BodySmall,
-                            color = LiquidColors.TextTertiary,
+                            color = colors.muted,
                         )
                     } else {
                         current?.let { prog ->
@@ -913,17 +927,17 @@ private fun LiveChannelInfoEpgPane(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                 ) {
-                                    Text("يُعرض الآن", style = LiquidTypography.LabelSmall, color = LiquidColors.AccentCyan)
+                                    Text("يُعرض الآن", style = LiquidTypography.LabelSmall, color = colors.accentText)
                                     Text(
                                         text = formatEpgTimeRange(prog.startTimeMs, prog.endTimeMs),
                                         style = LiquidTypography.LabelSmall,
-                                        color = LiquidColors.TextTertiary,
+                                        color = colors.muted,
                                     )
                                 }
                                 Text(
                                     text = prog.title,
                                     style = LiquidTypography.TitleSmall,
-                                    color = LiquidColors.TextPrimary,
+                                    color = colors.text,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
                                 )
@@ -931,15 +945,15 @@ private fun LiveChannelInfoEpgPane(
                                     Text(
                                         text = desc,
                                         style = LiquidTypography.BodySmall,
-                                        color = LiquidColors.TextSecondary,
+                                        color = colors.textSecondary,
                                         maxLines = if (compactHeight) 2 else 3,
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                 }
                                 LinearProgressIndicator(
                                     progress = { calculateEpgProgress(prog.startTimeMs, prog.endTimeMs) },
-                                    color = LiquidColors.AccentBlueLight,
-                                    trackColor = Color.White.copy(alpha = 0.15f),
+                                    color = colors.accent,
+                                    trackColor = colors.border.copy(alpha = 0.30f),
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(4.dp)
@@ -949,23 +963,23 @@ private fun LiveChannelInfoEpgPane(
                         }
 
                         next?.let { prog ->
-                            HorizontalDivider(color = Color.White.copy(alpha = 0.10f))
+                            HorizontalDivider(color = colors.border.copy(alpha = 0.28f))
                             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                 ) {
-                                    Text("التالي", style = LiquidTypography.LabelSmall, color = LiquidColors.AccentVioletLight)
+                                    Text("التالي", style = LiquidTypography.LabelSmall, color = colors.accentText)
                                     Text(
                                         text = formatEpgTimeRange(prog.startTimeMs, prog.endTimeMs),
                                         style = LiquidTypography.LabelSmall,
-                                        color = LiquidColors.TextTertiary,
+                                        color = colors.muted,
                                     )
                                 }
                                 Text(
                                     text = prog.title,
                                     style = LiquidTypography.BodySmall,
-                                    color = LiquidColors.TextPrimary,
+                                    color = colors.text,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
@@ -985,10 +999,11 @@ private fun CompactSelectedEpgStrip(
     onPlayClick: () -> Unit,
 ) {
     val current = epg.current ?: return
+    val colors = AppTheme.colors
     LiquidGlassSurface(
         cornerRadius = 14.dp,
-        glassAlpha = 0.16f,
-        borderColor = LiquidColors.AccentBlue.copy(alpha = 0.5f),
+        glassAlpha = 0.22f,
+        borderColor = colors.accent.copy(alpha = 0.65f),
         onClick = onPlayClick,
     ) {
         Row(
@@ -1003,17 +1018,17 @@ private fun CompactSelectedEpgStrip(
                 Text(
                     text = "${channel.name} • ${current.title}",
                     style = LiquidTypography.LabelMedium,
-                    color = Color.White,
+                    color = colors.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = formatEpgTimeRange(current.startTimeMs, current.endTimeMs),
                     style = LiquidTypography.LabelSmall,
-                    color = LiquidColors.TextTertiary,
+                    color = colors.muted,
                 )
             }
-            Icon(Icons.Filled.PlayArrow, contentDescription = "تشغيل", tint = LiquidColors.AccentBlueLight)
+            Icon(Icons.Filled.PlayArrow, contentDescription = "تشغيل", tint = colors.accentText)
         }
     }
 }
@@ -1026,6 +1041,7 @@ private fun CompactFilterChip(
     compact: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     val chipHeight = if (compact) 32.dp else 34.dp
@@ -1035,9 +1051,10 @@ private fun CompactFilterChip(
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
         cornerRadius = chipHeight / 2,
-        glassAlpha = if (selected) 0.35f else if (isFocused) 0.22f else 0.12f,
-        borderAlpha = if (isFocused) 0.80f else if (selected) 0.55f else 0.18f,
-        borderColor = if (selected || isFocused) LiquidColors.AccentBlueLight else Color.White,
+        glassColor = if (selected) colors.selected else colors.surface,
+        glassAlpha = if (selected) 0.92f else if (isFocused) 0.80f else 0.65f,
+        borderAlpha = if (isFocused) 0.95f else if (selected) 0.75f else 0.35f,
+        borderColor = if (isFocused) colors.focus else if (selected) colors.accent else colors.border,
         isFocused = isFocused,
     ) {
         Box(
@@ -1047,7 +1064,7 @@ private fun CompactFilterChip(
             Text(
                 text = label,
                 style = LiquidTypography.LabelMedium,
-                color = if (selected) Color.White else LiquidColors.TextSecondary,
+                color = if (selected) colors.text else colors.textSecondary,
                 maxLines = 1,
             )
         }
@@ -1063,6 +1080,7 @@ private fun LiveTVGridCard(
     onClick: () -> Unit,
     onFavoriteToggle: () -> Unit,
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
@@ -1074,9 +1092,10 @@ private fun LiveTVGridCard(
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
         cornerRadius = 16.dp,
-        glassAlpha = if (isFocused || isSelected) 0.30f else 0.15f,
-        borderAlpha = if (isFocused || isSelected) 0.85f else 0.22f,
-        borderColor = if (isFocused || isSelected) LiquidColors.AccentBlueLight else Color.White,
+        glassColor = if (isSelected) colors.selected else colors.card,
+        glassAlpha = if (isFocused || isSelected) 0.88f else 0.72f,
+        borderAlpha = if (isFocused || isSelected) 0.92f else 0.38f,
+        borderColor = if (isFocused) colors.focus else if (isSelected) colors.accent else colors.border,
         isFocused = isFocused,
     ) {
         Column(
@@ -1090,8 +1109,8 @@ private fun LiveTVGridCard(
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                LiquidColors.AccentBlue.copy(alpha = if (isFocused) 0.22f else 0.08f),
-                                LiquidColors.GlassTertiary,
+                                colors.accent.copy(alpha = if (isFocused) 0.18f else 0.08f),
+                                colors.surface.copy(alpha = 0.85f),
                             ),
                         ),
                         RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
@@ -1108,7 +1127,7 @@ private fun LiveTVGridCard(
                         contentScale = ContentScale.Fit,
                     )
                 } else {
-                    Icon(Icons.Filled.Tv, null, tint = LiquidColors.AccentBlue.copy(alpha = 0.45f), modifier = Modifier.size(34.dp))
+                    Icon(Icons.Filled.Tv, null, tint = colors.accentText.copy(alpha = 0.55f), modifier = Modifier.size(34.dp))
                 }
                 Box(
                     Modifier
@@ -1127,7 +1146,7 @@ private fun LiveTVGridCard(
                     Icon(
                         imageVector = if (channel.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                         contentDescription = "المفضلة",
-                        tint = if (channel.isFavorite) LiquidColors.LiveRed else Color.White,
+                        tint = if (channel.isFavorite) colors.danger else colors.textSecondary,
                         modifier = Modifier.size(18.dp),
                     )
                 }
@@ -1142,14 +1161,14 @@ private fun LiveTVGridCard(
                 Text(
                     text = channel.name,
                     style = LiquidTypography.TitleSmall,
-                    color = LiquidColors.TextPrimary,
+                    color = colors.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = channel.groupTitle ?: channel.country ?: "عام",
                     style = LiquidTypography.LabelSmall,
-                    color = if (isFocused || isSelected) LiquidColors.AccentBlueLight else LiquidColors.TextTertiary,
+                    color = if (isFocused || isSelected) colors.accentText else colors.muted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -1169,6 +1188,7 @@ private fun LiveTVListRow(
     onPlayClick: () -> Unit,
     onFavoriteToggle: () -> Unit,
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     val displayNumber = String.format(Locale.US, "%03d", channel.channelNumber ?: index)
@@ -1181,9 +1201,10 @@ private fun LiveTVListRow(
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
         cornerRadius = 12.dp,
-        glassAlpha = if (isFocused) 0.30f else if (isSelected) 0.22f else 0.12f,
-        borderAlpha = if (isFocused) 0.85f else if (isSelected) 0.55f else 0.18f,
-        borderColor = if (isFocused || isSelected) LiquidColors.AccentBlueLight else Color.White,
+        glassColor = if (isSelected) colors.selected else colors.surface,
+        glassAlpha = if (isFocused || isSelected) 0.90f else 0.65f,
+        borderAlpha = if (isFocused) 0.95f else if (isSelected) 0.72f else 0.30f,
+        borderColor = if (isFocused) colors.focus else if (isSelected) colors.accent else colors.border,
         isFocused = isFocused,
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -1202,14 +1223,14 @@ private fun LiveTVListRow(
                     modifier = Modifier
                         .widthIn(min = 32.dp)
                         .clip(RoundedCornerShape(6.dp))
-                        .background(Color.White.copy(alpha = 0.08f))
+                        .background(colors.panel.copy(alpha = 0.75f))
                         .padding(horizontal = 4.dp, vertical = 2.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = displayNumber,
                         style = LiquidTypography.LabelSmall,
-                        color = if (isFocused || isSelected) LiquidColors.AccentBlueLight else LiquidColors.TextTertiary,
+                        color = if (isFocused || isSelected) colors.accentText else colors.muted,
                     )
                 }
 
@@ -1220,8 +1241,8 @@ private fun LiveTVListRow(
                         .background(
                             Brush.linearGradient(
                                 listOf(
-                                    LiquidColors.AccentBlue.copy(alpha = if (isFocused) 0.25f else 0.12f),
-                                    LiquidColors.GlassTertiary,
+                                    colors.accent.copy(alpha = if (isFocused) 0.22f else 0.12f),
+                                    colors.panel.copy(alpha = 0.85f),
                                 ),
                             ),
                             RoundedCornerShape(8.dp),
@@ -1238,7 +1259,7 @@ private fun LiveTVListRow(
                             contentScale = ContentScale.Fit,
                         )
                     } else {
-                        Icon(Icons.Filled.Tv, null, tint = LiquidColors.AccentBlue.copy(alpha = 0.45f), modifier = Modifier.size(18.dp))
+                        Icon(Icons.Filled.Tv, null, tint = colors.accentText.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
                     }
                 }
 
@@ -1250,7 +1271,7 @@ private fun LiveTVListRow(
                     Text(
                         text = channel.name,
                         style = LiquidTypography.TitleSmall,
-                        color = LiquidColors.TextPrimary,
+                        color = colors.text,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -1262,16 +1283,16 @@ private fun LiveTVListRow(
                             Text(
                                 text = it,
                                 style = LiquidTypography.LabelSmall,
-                                color = LiquidColors.AccentBlueLight,
+                                color = colors.accentText,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
                         channel.language?.takeIf { it.isNotBlank() }?.let {
-                            Text(it, style = LiquidTypography.LabelSmall, color = LiquidColors.TextTertiary, maxLines = 1)
+                            Text(it, style = LiquidTypography.LabelSmall, color = colors.muted, maxLines = 1)
                         }
                         channel.country?.takeIf { it.isNotBlank() }?.let {
-                            Text(it, style = LiquidTypography.LabelSmall, color = LiquidColors.TextTertiary, maxLines = 1)
+                            Text(it, style = LiquidTypography.LabelSmall, color = colors.muted, maxLines = 1)
                         }
                     }
                 }
@@ -1287,7 +1308,7 @@ private fun LiveTVListRow(
                     Icon(
                         imageVector = if (channel.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                         contentDescription = if (channel.isFavorite) "إزالة من المفضلة" else "إضافة إلى المفضلة",
-                        tint = if (channel.isFavorite) LiquidColors.LiveRed else LiquidColors.TextTertiary,
+                        tint = if (channel.isFavorite) colors.danger else colors.muted,
                         modifier = Modifier.size(16.dp),
                     )
                 }
@@ -1298,12 +1319,12 @@ private fun LiveTVListRow(
                         modifier = Modifier
                             .size(32.dp)
                             .clip(CircleShape)
-                            .background(LiquidColors.AccentBlue.copy(alpha = 0.20f)),
+                            .background(colors.accent.copy(alpha = 0.22f)),
                     ) {
                         Icon(
                             imageVector = Icons.Filled.PlayArrow,
                             contentDescription = "تشغيل القناة",
-                            tint = LiquidColors.AccentBlueLight,
+                            tint = colors.accentText,
                             modifier = Modifier.size(16.dp),
                         )
                     }

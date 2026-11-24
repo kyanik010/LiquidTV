@@ -10,6 +10,7 @@ import com.liquidtv.app.domain.model.Subscription
 import com.liquidtv.app.domain.repository.ChannelRepository
 import com.liquidtv.app.domain.repository.SubscriptionRepository
 import com.liquidtv.app.domain.repository.UserPreferencesRepository
+import com.liquidtv.app.ui.theme.AppThemeCatalog
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.*
@@ -25,6 +26,7 @@ data class SettingsUiState(
     val subtitlesEnabled: Boolean = false,
     val preferredSubtitleLanguage: String = "en",
     // UI preferences
+    val appTheme: String = AppThemeCatalog.DEFAULT_THEME_ID,
     val theme: String = "midnight_glass",
     val clockVisible: Boolean = true,
     val ambientEnabled: Boolean = true,
@@ -76,6 +78,7 @@ class SettingsViewModel @Inject constructor(
                     autoPlay = prefs.autoPlay,
                     subtitlesEnabled = prefs.subtitlesEnabled,
                     preferredSubtitleLanguage = prefs.preferredSubtitleLanguage,
+                    appTheme = AppThemeCatalog.resolve(prefs.appTheme).id,
                     theme = prefs.theme,
                     clockVisible = prefs.clockVisible,
                     ambientEnabled = prefs.ambientEnabled,
@@ -137,6 +140,12 @@ class SettingsViewModel @Inject constructor(
     }
 
     // --- Appearance & Ambient ---
+
+    fun selectAppTheme(themeId: String) {
+        viewModelScope.launch {
+            userPreferencesRepository.setAppTheme(themeId)
+        }
+    }
 
     fun setTheme(theme: String) {
         viewModelScope.launch {

@@ -31,6 +31,7 @@ import com.liquidtv.app.domain.model.Category
 import com.liquidtv.app.ui.components.AppBackground
 import com.liquidtv.app.ui.components.LiquidGlassSurface
 import com.liquidtv.app.ui.components.ParentalPinDialog
+import com.liquidtv.app.ui.theme.AppTheme
 import com.liquidtv.app.ui.theme.LiquidColors
 import com.liquidtv.app.ui.theme.LiquidTypography
 import kotlinx.coroutines.launch
@@ -55,6 +56,7 @@ fun CategoriesScreen(
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.statusBars),
         ) {
+            val colors = AppTheme.colors
             val isCompact = maxWidth < 600.dp
             val hPad = if (isCompact) 16.dp else 36.dp
 
@@ -75,7 +77,7 @@ fun CategoriesScreen(
                             text = "تصفح التصنيفات",
                             style = LiquidTypography.HeadlineMedium.copy(
                                 brush = Brush.linearGradient(
-                                    listOf(LiquidColors.TextPrimary, LiquidColors.AccentVioletLight)
+                                    listOf(colors.text, colors.accentText)
                                 )
                             ),
                         )
@@ -86,7 +88,7 @@ fun CategoriesScreen(
                                 "${uiState.categories.size} تصنيف متاح"
                             },
                             style = LiquidTypography.BodySmall,
-                            color = LiquidColors.TextTertiary,
+                            color = colors.muted,
                         )
                     }
 
@@ -107,11 +109,11 @@ fun CategoriesScreen(
                 if (uiState.isLoading && uiState.categories.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                            CircularProgressIndicator(color = LiquidColors.AccentBlue)
+                            CircularProgressIndicator(color = colors.accent)
                             Text(
                                 text = uiState.loadingMessage ?: "جارٍ فهرسة التصنيفات…",
                                 style = LiquidTypography.BodyMedium,
-                                color = LiquidColors.TextSecondary,
+                                color = colors.textSecondary,
                             )
                         }
                     }
@@ -121,17 +123,21 @@ fun CategoriesScreen(
                             Text(
                                 text = "لا توجد تصنيفات متاحة في القائمة النشطة",
                                 style = LiquidTypography.HeadlineSmall,
-                                color = LiquidColors.TextSecondary,
+                                color = colors.textSecondary,
                             )
                             LiquidGlassSurface(
                                 modifier = Modifier
-                                    .clickable { viewModel.refresh() }
-                                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                                    .clickable { viewModel.refresh() },
                                 cornerRadius = 14.dp,
-                                glassAlpha = 0.25f,
-                                borderColor = LiquidColors.AccentBlue,
+                                glassAlpha = 0.28f,
+                                borderColor = colors.accent,
                             ) {
-                                Text("تحديث القائمة", style = LiquidTypography.LabelLarge, color = LiquidColors.AccentBlue)
+                                Text(
+                                    "تحديث القائمة",
+                                    style = LiquidTypography.LabelLarge,
+                                    color = colors.accentText,
+                                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                                )
                             }
                         }
                     }
@@ -195,6 +201,7 @@ private fun HeaderQuickPill(
     icon: ImageVector,
     onClick: () -> Unit,
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     LiquidGlassSurface(
@@ -203,8 +210,8 @@ private fun HeaderQuickPill(
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
         cornerRadius = 24.dp,
-        glassAlpha = if (isFocused) 0.28f else 0.14f,
-        borderAlpha = if (isFocused) 0.8f else 0.25f,
+        glassAlpha = if (isFocused) 0.34f else 0.18f,
+        borderAlpha = if (isFocused) 0.90f else 0.30f,
         isFocused = isFocused,
     ) {
         Row(
@@ -212,8 +219,8 @@ private fun HeaderQuickPill(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Icon(icon, contentDescription = label, tint = LiquidColors.AccentBlueLight, modifier = Modifier.size(18.dp))
-            Text(label, style = LiquidTypography.LabelMedium, color = LiquidColors.TextPrimary)
+            Icon(icon, contentDescription = label, tint = colors.accentText, modifier = Modifier.size(18.dp))
+            Text(label, style = LiquidTypography.LabelMedium, color = colors.text)
         }
     }
 }
@@ -224,44 +231,35 @@ private fun CategoryGridTile(
     isLocked: Boolean,
     onClick: () -> Unit,
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
     val icon = getCategoryIcon(category.name)
-    val colors = getCategoryColors(category.name)
+    val catColors = getCategoryColors(category.name)
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(132.dp)
             .clip(RoundedCornerShape(18.dp))
+            .background(colors.card.copy(alpha = if (colors.isLight) 0.94f else 0.78f))
             .background(
                 Brush.linearGradient(
                     listOf(
-                        colors.first.copy(alpha = if (isFocused) 0.60f else 0.28f),
-                        colors.second.copy(alpha = if (isFocused) 0.50f else 0.18f),
+                        catColors.first.copy(alpha = if (isFocused) 0.32f else 0.16f),
+                        catColors.second.copy(alpha = if (isFocused) 0.26f else 0.10f),
                     )
                 )
             )
             .border(
                 width = if (isFocused) 2.dp else 1.dp,
-                color = if (isFocused) colors.first.copy(alpha = 0.95f) else colors.first.copy(alpha = 0.35f),
+                color = if (isFocused) colors.focus else colors.border.copy(alpha = 0.65f),
                 shape = RoundedCornerShape(18.dp),
             )
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(60.dp)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color.White.copy(alpha = if (isFocused) 0.20f else 0.08f), Color.Transparent)
-                    )
-                ),
-        )
-
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.BottomEnd,
@@ -269,7 +267,7 @@ private fun CategoryGridTile(
             Icon(
                 imageVector = if (isLocked) Icons.Filled.Lock else icon,
                 contentDescription = null,
-                tint = Color.White.copy(alpha = 0.06f),
+                tint = colors.text.copy(alpha = 0.06f),
                 modifier = Modifier.size(68.dp).padding(end = 8.dp, bottom = 8.dp),
             )
         }
@@ -279,13 +277,13 @@ private fun CategoryGridTile(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(10.dp)
-                    .background(LiquidColors.ErrorRed.copy(alpha = 0.85f), CircleShape)
+                    .background(colors.danger.copy(alpha = 0.92f), CircleShape)
                     .padding(6.dp),
             ) {
                 Icon(
                     imageVector = Icons.Filled.Lock,
                     contentDescription = "تصنيف مقفل",
-                    tint = Color.White,
+                    tint = colors.onDanger,
                     modifier = Modifier.size(14.dp),
                 )
             }
@@ -304,13 +302,13 @@ private fun CategoryGridTile(
                     .background(
                         Brush.radialGradient(
                             listOf(
-                                colors.first.copy(alpha = if (isFocused) 0.80f else 0.45f),
-                                colors.second.copy(alpha = if (isFocused) 0.60f else 0.30f),
+                                catColors.first.copy(alpha = if (isFocused) 0.90f else 0.72f),
+                                catColors.second.copy(alpha = if (isFocused) 0.78f else 0.56f),
                             )
                         ),
                         CircleShape,
                     )
-                    .border(1.dp, Color.White.copy(alpha = if (isFocused) 0.5f else 0.2f), CircleShape),
+                    .border(1.dp, colors.border.copy(alpha = 0.55f), CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -328,7 +326,7 @@ private fun CategoryGridTile(
                 Text(
                     text = category.name,
                     style = LiquidTypography.TitleMedium,
-                    color = LiquidColors.TextPrimary,
+                    color = colors.text,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -336,7 +334,7 @@ private fun CategoryGridTile(
                 Text(
                     text = if (isLocked) "محمي برمز • ${category.channelCount} قناة" else "${category.channelCount} قناة",
                     style = LiquidTypography.LabelSmall,
-                    color = if (isFocused) Color.White.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.6f),
+                    color = if (isFocused) colors.accentText else colors.textSecondary,
                 )
             }
         }

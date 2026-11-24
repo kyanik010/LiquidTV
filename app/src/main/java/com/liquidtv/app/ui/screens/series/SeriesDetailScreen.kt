@@ -36,6 +36,7 @@ import com.liquidtv.app.domain.model.SeasonGroup
 import com.liquidtv.app.domain.model.SeriesItem
 import com.liquidtv.app.ui.components.AppBackground
 import com.liquidtv.app.ui.components.LiquidGlassSurface
+import com.liquidtv.app.ui.theme.AppTheme
 import com.liquidtv.app.ui.theme.LiquidColors
 import com.liquidtv.app.ui.theme.LiquidTypography
 import com.liquidtv.app.ui.utils.calculateEpisodeProgress
@@ -72,6 +73,7 @@ fun SeriesDetailScreen(
             ) {
                 // Top Bar
                 item {
+                    val colors = AppTheme.colors
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -87,14 +89,15 @@ fun SeriesDetailScreen(
                                 modifier = Modifier
                                     .size(48.dp)
                                     .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.12f)),
+                                    .background(colors.surface.copy(alpha = 0.82f))
+                                    .border(1.dp, colors.border.copy(alpha = 0.55f), CircleShape),
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color.White)
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = colors.text)
                             }
                             Text(
                                 text = state.series?.name ?: "تفاصيل المسلسل",
                                 style = LiquidTypography.HeadlineSmall,
-                                color = LiquidColors.TextPrimary,
+                                color = colors.text,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -105,7 +108,7 @@ fun SeriesDetailScreen(
                                 onClick = viewModel::refreshDetails,
                                 modifier = Modifier.size(48.dp),
                             ) {
-                                Icon(Icons.Filled.Refresh, contentDescription = "تحديث الحلقات", tint = LiquidColors.TextSecondary)
+                                Icon(Icons.Filled.Refresh, contentDescription = "تحديث الحلقات", tint = colors.textSecondary)
                             }
                             state.series?.let { series ->
                                 IconButton(
@@ -115,7 +118,7 @@ fun SeriesDetailScreen(
                                     Icon(
                                         imageVector = if (series.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                                         contentDescription = if (series.isFavorite) "إزالة من المفضلة" else "إضافة إلى المفضلة",
-                                        tint = if (series.isFavorite) LiquidColors.LiveRed else Color.White,
+                                        tint = if (series.isFavorite) colors.danger else colors.textSecondary,
                                     )
                                 }
                             }
@@ -141,11 +144,12 @@ fun SeriesDetailScreen(
                 // Visual Selectable Season Cards
                 if (state.seasons.isNotEmpty()) {
                     item {
+                        val colors = AppTheme.colors
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text(
                                 text = "المواسم (${state.seasons.size})",
                                 style = LiquidTypography.TitleMedium,
-                                color = LiquidColors.TextPrimary,
+                                color = colors.text,
                             )
                             LazyRow(
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -166,6 +170,7 @@ fun SeriesDetailScreen(
                 // Episodes Section Header
                 if (!state.isLoading && state.seasons.isNotEmpty()) {
                     item {
+                        val colors = AppTheme.colors
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -174,12 +179,12 @@ fun SeriesDetailScreen(
                             Text(
                                 text = "حلقات ${formatSeasonTitleAr(state.selectedSeason)}",
                                 style = LiquidTypography.TitleMedium,
-                                color = LiquidColors.AccentVioletLight,
+                                color = colors.accentText,
                             )
                             Text(
                                 text = "${state.currentSeasonEpisodes.size} حلقة",
                                 style = LiquidTypography.LabelMedium,
-                                color = LiquidColors.TextTertiary,
+                                color = colors.muted,
                             )
                         }
                     }
@@ -194,15 +199,16 @@ fun SeriesDetailScreen(
                                 .height(200.dp),
                             contentAlignment = Alignment.Center,
                         ) {
-                            CircularProgressIndicator(color = LiquidColors.AccentVioletLight)
+                            CircularProgressIndicator(color = AppTheme.colors.accent)
                         }
                     }
                 } else if (state.currentSeasonEpisodes.isEmpty()) {
                     item {
+                        val colors = AppTheme.colors
                         LiquidGlassSurface(
                             modifier = Modifier.fillMaxWidth(),
                             cornerRadius = 18.dp,
-                            glassAlpha = 0.14f,
+                            glassAlpha = 0.18f,
                         ) {
                             Column(
                                 modifier = Modifier
@@ -211,13 +217,16 @@ fun SeriesDetailScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
-                                Icon(Icons.Filled.VideoLibrary, null, tint = LiquidColors.AccentVioletLight, modifier = Modifier.size(40.dp))
+                                Icon(Icons.Filled.VideoLibrary, null, tint = colors.accentText, modifier = Modifier.size(40.dp))
                                 Text(
                                     text = state.error ?: "لا توجد حلقات متاحة لهذا المسلسل حالياً.",
                                     style = LiquidTypography.BodyMedium,
-                                    color = LiquidColors.TextSecondary,
+                                    color = colors.textSecondary,
                                 )
-                                Button(onClick = viewModel::refreshDetails) {
+                                Button(
+                                    onClick = viewModel::refreshDetails,
+                                    colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = colors.onAccent),
+                                ) {
                                     Text("إعادة المحاولة")
                                 }
                             }
@@ -247,11 +256,12 @@ private fun SeriesHeroBanner(
     isWide: Boolean,
     onPlayEpisode: (String) -> Unit,
 ) {
+    val colors = AppTheme.colors
     LiquidGlassSurface(
         modifier = Modifier.fillMaxWidth(),
         cornerRadius = 24.dp,
-        glassAlpha = 0.18f,
-        borderAlpha = 0.28f,
+        glassAlpha = 0.20f,
+        borderAlpha = 0.34f,
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
             // Atmospheric backdrop
@@ -261,7 +271,7 @@ private fun SeriesHeroBanner(
                     contentDescription = null,
                     modifier = Modifier
                         .matchParentSize()
-                        .alpha(0.22f),
+                        .alpha(if (colors.isLight) 0.14f else 0.22f),
                     contentScale = ContentScale.Crop,
                 )
             }
@@ -271,8 +281,8 @@ private fun SeriesHeroBanner(
                     .background(
                         Brush.verticalGradient(
                             listOf(
-                                LiquidColors.MidnightNavy.copy(alpha = 0.45f),
-                                LiquidColors.MidnightNavy.copy(alpha = 0.88f),
+                                colors.card.copy(alpha = if (colors.isLight) 0.82f else 0.62f),
+                                colors.card.copy(alpha = if (colors.isLight) 0.96f else 0.92f),
                             ),
                         ),
                     ),
@@ -295,8 +305,8 @@ private fun SeriesHeroBanner(
                             .width(if (isWide) 130.dp else 102.dp)
                             .aspectRatio(2f / 3f)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(LiquidColors.GlassTertiary)
-                            .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(14.dp)),
+                            .background(colors.surface.copy(alpha = 0.85f))
+                            .border(1.dp, colors.border.copy(alpha = 0.55f), RoundedCornerShape(14.dp)),
                         contentAlignment = Alignment.Center,
                     ) {
                         if (!series.coverUrl.isNullOrBlank()) {
@@ -307,7 +317,7 @@ private fun SeriesHeroBanner(
                                 contentScale = ContentScale.Crop,
                             )
                         } else {
-                            Icon(Icons.Filled.VideoLibrary, null, tint = LiquidColors.AccentVioletLight, modifier = Modifier.size(38.dp))
+                            Icon(Icons.Filled.VideoLibrary, null, tint = colors.accentText, modifier = Modifier.size(38.dp))
                         }
                     }
 
@@ -318,7 +328,7 @@ private fun SeriesHeroBanner(
                         Text(
                             text = series.name,
                             style = LiquidTypography.HeadlineSmall,
-                            color = Color.White,
+                            color = colors.text,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -329,13 +339,13 @@ private fun SeriesHeroBanner(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             series.categoryName?.takeIf { it.isNotBlank() }?.let { cat ->
-                                MetaPill(text = cat, tint = LiquidColors.AccentVioletLight)
+                                MetaPill(text = cat, tint = colors.accentText)
                             }
                             series.releaseDate?.takeIf { it.isNotBlank() }?.let { date ->
-                                MetaPill(text = date.take(4), tint = LiquidColors.TextSecondary)
+                                MetaPill(text = date.take(4), tint = colors.textSecondary)
                             }
                             series.rating?.takeIf { it.isNotBlank() && it != "0" }?.let { rating ->
-                                MetaPill(text = "★ $rating", tint = LiquidColors.AccentGold)
+                                MetaPill(text = "★ $rating", tint = if (colors.isLight) colors.warning else LiquidColors.AccentGold)
                             }
                         }
 
@@ -343,7 +353,7 @@ private fun SeriesHeroBanner(
                             Text(
                                 text = "$seasonsCount مواسم • $totalEpisodesCount حلقة",
                                 style = LiquidTypography.LabelMedium,
-                                color = LiquidColors.AccentBlueLight,
+                                color = colors.accentText,
                             )
                         }
 
@@ -351,7 +361,7 @@ private fun SeriesHeroBanner(
                             Text(
                                 text = plot,
                                 style = LiquidTypography.BodySmall,
-                                color = LiquidColors.TextSecondary,
+                                color = colors.textSecondary,
                                 maxLines = 4,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -361,7 +371,7 @@ private fun SeriesHeroBanner(
                             Text(
                                 text = "التصنيف الفني: $genre",
                                 style = LiquidTypography.LabelSmall,
-                                color = LiquidColors.TextTertiary,
+                                color = colors.muted,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -370,7 +380,7 @@ private fun SeriesHeroBanner(
                             Text(
                                 text = "الإخراج: $director",
                                 style = LiquidTypography.LabelSmall,
-                                color = LiquidColors.TextTertiary,
+                                color = colors.muted,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -379,7 +389,7 @@ private fun SeriesHeroBanner(
                             Text(
                                 text = "طاقم العمل: $cast",
                                 style = LiquidTypography.LabelSmall,
-                                color = LiquidColors.TextTertiary,
+                                color = colors.muted,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -399,8 +409,8 @@ private fun SeriesHeroBanner(
                                 onClick = { onPlayEpisode(continueWatchingEpisode.id) },
                                 shape = RoundedCornerShape(14.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = LiquidColors.AccentViolet,
-                                    contentColor = Color.White,
+                                    containerColor = colors.accent,
+                                    contentColor = colors.onAccent,
                                 ),
                                 modifier = Modifier
                                     .weight(1f)
@@ -421,8 +431,8 @@ private fun SeriesHeroBanner(
                                 onClick = { onPlayEpisode(firstEpisode.id) },
                                 shape = RoundedCornerShape(14.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = LiquidColors.AccentViolet,
-                                    contentColor = Color.White,
+                                    containerColor = colors.accent,
+                                    contentColor = colors.onAccent,
                                 ),
                                 modifier = Modifier
                                     .weight(1f)
@@ -461,6 +471,7 @@ private fun SeasonGlassCard(
     isSelected: Boolean,
     onClick: () -> Unit,
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
@@ -472,9 +483,10 @@ private fun SeasonGlassCard(
             .focusable(interactionSource = interactionSource)
             .testTag("season_card_${season.seasonNumber}"),
         cornerRadius = 16.dp,
-        glassAlpha = if (isSelected) 0.36f else if (isFocused) 0.24f else 0.12f,
-        borderAlpha = if (isFocused) 0.88f else if (isSelected) 0.65f else 0.18f,
-        borderColor = if (isSelected || isFocused) LiquidColors.AccentVioletLight else Color.White,
+        glassColor = if (isSelected) colors.selected else colors.surface,
+        glassAlpha = if (isSelected) 0.92f else if (isFocused) 0.80f else 0.65f,
+        borderAlpha = if (isFocused) 0.95f else if (isSelected) 0.78f else 0.35f,
+        borderColor = if (isFocused) colors.focus else if (isSelected) colors.accent else colors.border,
         isFocused = isFocused,
     ) {
         Column(
@@ -485,13 +497,13 @@ private fun SeasonGlassCard(
             Text(
                 text = formatSeasonTitleAr(season.seasonNumber),
                 style = LiquidTypography.TitleSmall.copy(fontWeight = FontWeight.Bold),
-                color = if (isSelected) Color.White else LiquidColors.TextPrimary,
+                color = if (isSelected) colors.text else colors.textSecondary,
                 maxLines = 1,
             )
             Text(
                 text = "${season.episodes.size} حلقة",
                 style = LiquidTypography.LabelSmall,
-                color = if (isSelected) LiquidColors.AccentVioletLight else LiquidColors.TextTertiary,
+                color = if (isSelected) colors.accentText else colors.muted,
                 maxLines = 1,
             )
         }
@@ -504,6 +516,7 @@ private fun EpisodeCinemaRowCard(
     seriesCoverUrl: String?,
     onClick: () -> Unit,
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     val thumbUrl = episode.coverUrl?.takeIf { it.isNotBlank() } ?: seriesCoverUrl?.takeIf { it.isNotBlank() }
@@ -519,9 +532,10 @@ private fun EpisodeCinemaRowCard(
             .focusable(interactionSource = interactionSource)
             .testTag("episode_card_${episode.id}"),
         cornerRadius = 18.dp,
-        glassAlpha = if (isFocused) 0.28f else 0.14f,
-        borderAlpha = if (isFocused) 0.88f else 0.20f,
-        borderColor = if (isFocused) LiquidColors.AccentVioletLight else Color.White,
+        glassColor = colors.card,
+        glassAlpha = if (isFocused) 0.92f else 0.76f,
+        borderAlpha = if (isFocused) 0.95f else 0.35f,
+        borderColor = if (isFocused) colors.focus else colors.border,
         isFocused = isFocused,
     ) {
         Column(
@@ -540,7 +554,7 @@ private fun EpisodeCinemaRowCard(
                     modifier = Modifier
                         .size(width = 112.dp, height = 68.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(LiquidColors.GlassTertiary),
+                        .background(colors.surface.copy(alpha = 0.85f)),
                     contentAlignment = Alignment.Center,
                 ) {
                     if (thumbUrl != null) {
@@ -554,7 +568,7 @@ private fun EpisodeCinemaRowCard(
                         Icon(
                             imageVector = Icons.Filled.VideoLibrary,
                             contentDescription = null,
-                            tint = LiquidColors.AccentVioletLight.copy(alpha = 0.45f),
+                            tint = colors.accentText.copy(alpha = 0.55f),
                             modifier = Modifier.size(28.dp),
                         )
                     }
@@ -562,7 +576,7 @@ private fun EpisodeCinemaRowCard(
                         modifier = Modifier
                             .size(34.dp)
                             .clip(CircleShape)
-                            .background(Color.Black.copy(alpha = 0.58f)),
+                            .background(Color.Black.copy(alpha = 0.62f)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(Icons.Filled.PlayArrow, contentDescription = "تشغيل الحلقة", tint = Color.White, modifier = Modifier.size(20.dp))
@@ -580,24 +594,24 @@ private fun EpisodeCinemaRowCard(
                         codeLabel?.let { code ->
                             Box(
                                 modifier = Modifier
-                                    .background(LiquidColors.AccentViolet.copy(alpha = 0.28f), RoundedCornerShape(6.dp))
+                                    .background(colors.accent.copy(alpha = 0.22f), RoundedCornerShape(6.dp))
                                     .padding(horizontal = 6.dp, vertical = 2.dp),
                             ) {
-                                Text(code, style = LiquidTypography.LabelSmall, color = LiquidColors.AccentVioletLight)
+                                Text(code, style = LiquidTypography.LabelSmall, color = colors.accentText)
                             }
                         }
                         durationLabel?.let { dur ->
-                            Text(dur, style = LiquidTypography.LabelSmall, color = LiquidColors.TextTertiary)
+                            Text(dur, style = LiquidTypography.LabelSmall, color = colors.muted)
                         }
                         if (episode.lastWatchedAt != null) {
-                            Text("تمت المشاهدة", style = LiquidTypography.LabelSmall, color = LiquidColors.SuccessGreen)
+                            Text("تمت المشاهدة", style = LiquidTypography.LabelSmall, color = colors.success)
                         }
                     }
 
                     Text(
                         text = episode.title,
                         style = LiquidTypography.TitleSmall,
-                        color = LiquidColors.TextPrimary,
+                        color = colors.text,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -606,7 +620,7 @@ private fun EpisodeCinemaRowCard(
                         Text(
                             text = plot,
                             style = LiquidTypography.BodySmall,
-                            color = LiquidColors.TextSecondary,
+                            color = colors.textSecondary,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -623,8 +637,8 @@ private fun EpisodeCinemaRowCard(
                 ) {
                     LinearProgressIndicator(
                         progress = { progress },
-                        color = LiquidColors.AccentVioletLight,
-                        trackColor = Color.White.copy(alpha = 0.14f),
+                        color = colors.accent,
+                        trackColor = colors.border.copy(alpha = 0.30f),
                         modifier = Modifier
                             .weight(1f)
                             .height(4.dp)
@@ -634,7 +648,7 @@ private fun EpisodeCinemaRowCard(
                         Text(
                             text = time,
                             style = LiquidTypography.LabelSmall,
-                            color = LiquidColors.AccentVioletLight,
+                            color = colors.accentText,
                         )
                     }
                 }

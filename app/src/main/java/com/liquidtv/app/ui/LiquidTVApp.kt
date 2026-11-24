@@ -19,7 +19,7 @@ import com.liquidtv.app.ui.navigation.MirrorBubbleNavigation
 import com.liquidtv.app.ui.navigation.NavDestination
 import com.liquidtv.app.ui.navigation.Screen
 import com.liquidtv.app.ui.navigation.toScreen
-import com.liquidtv.app.ui.theme.LiquidColors
+import com.liquidtv.app.ui.theme.AppTheme
 import com.liquidtv.app.ui.theme.LiquidTypography
 import com.liquidtv.app.updater.AppUpdateViewModel
 import com.liquidtv.app.updater.GlassUpdateDialog
@@ -46,11 +46,11 @@ fun LiquidTVApp(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                CircularProgressIndicator(color = LiquidColors.AccentBlueLight)
+                CircularProgressIndicator(color = AppTheme.colors.accent)
                 Text(
                     text = "LIQUID TV",
                     style = LiquidTypography.HeadlineMedium,
-                    color = LiquidColors.TextPrimary,
+                    color = AppTheme.colors.text,
                 )
             }
         }
@@ -135,7 +135,7 @@ fun LiquidTVApp(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(LiquidColors.MidnightNavy)
+            .background(AppTheme.colors.background)
             .onPreviewKeyEvent {
                 lastInteractionMs.longValue = System.currentTimeMillis()
                 false

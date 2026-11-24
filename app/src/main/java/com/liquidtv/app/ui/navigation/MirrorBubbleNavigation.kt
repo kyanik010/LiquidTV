@@ -34,7 +34,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.liquidtv.app.R
-import com.liquidtv.app.ui.theme.LiquidColors
+import com.liquidtv.app.ui.theme.AppTheme
 import com.liquidtv.app.ui.theme.LiquidTypography
 
 /**
@@ -66,6 +66,8 @@ fun MirrorBubbleNavigation(
     modifier: Modifier = Modifier,
 ) {
     val scrollState = rememberScrollState()
+    val colors = AppTheme.colors
+    val isLight = colors.isLight
 
     // Outer glass pill
     Box(
@@ -80,21 +82,21 @@ fun MirrorBubbleNavigation(
 
                 // Subtle ambient glow behind the nav pill
                 drawRoundRect(
-                    color = LiquidColors.AccentBlue.copy(alpha = 0.10f),
+                    color = colors.accent.copy(alpha = if (isLight) 0.14f else 0.12f),
                     topLeft = Offset(-4.dp.toPx(), -2.dp.toPx()),
                     size = Size(w + 8.dp.toPx(), h + 4.dp.toPx()),
                     cornerRadius = CornerRadius(cr + 4.dp.toPx()),
                 )
 
-                // Glass fill
+                // Theme-tinted glass pill fill
                 drawRoundRect(
-                    color = Color.White.copy(alpha = 0.12f),
+                    color = colors.panel.copy(alpha = if (isLight) 0.90f else 0.80f),
                     cornerRadius = CornerRadius(cr),
                 )
                 // Top specular highlight
                 drawRoundRect(
                     brush = Brush.verticalGradient(
-                        colors = listOf(Color.White.copy(alpha = 0.26f), Color.Transparent),
+                        colors = listOf(Color.White.copy(alpha = if (isLight) 0.55f else 0.18f), Color.Transparent),
                         startY = 0f,
                         endY = h * 0.45f,
                     ),
@@ -102,7 +104,7 @@ fun MirrorBubbleNavigation(
                 )
                 // Border
                 drawRoundRect(
-                    color = Color.White.copy(alpha = 0.25f),
+                    color = colors.border.copy(alpha = if (isLight) 0.72f else 0.55f),
                     cornerRadius = CornerRadius(cr),
                     style = Stroke(width = 1.2.dp.toPx()),
                 )
@@ -135,6 +137,8 @@ private fun NavTab(
     isSelected: Boolean,
     onSelected: () -> Unit,
 ) {
+    val colors = AppTheme.colors
+    val isLight = colors.isLight
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     val labelText = stringResource(destination.labelRes)
@@ -146,7 +150,7 @@ private fun NavTab(
     )
 
     val bubbleAlpha by animateFloatAsState(
-        targetValue = if (isSelected) 1f else if (isFocused) 0.5f else 0f,
+        targetValue = if (isSelected) 1f else if (isFocused) 0.55f else 0f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
         label = "bubbleAlpha_${destination.name}",
     )
@@ -156,6 +160,8 @@ private fun NavTab(
         animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow),
         label = "labelAlpha_${destination.name}",
     )
+
+    val activeTint = if (isSelected) colors.text else if (isFocused) colors.accentText else colors.textSecondary
 
     Box(
         modifier = Modifier
@@ -172,12 +178,12 @@ private fun NavTab(
                     val w = size.width
                     val h = size.height
                     val cr = h / 2f
-                    // Gradient fill for active bubble (blue into violet)
+                    // Gradient fill for active bubble tinted with theme selected + accent
                     drawRoundRect(
                         brush = Brush.horizontalGradient(
                             listOf(
-                                LiquidColors.AccentBlue.copy(alpha = 0.35f * bubbleAlpha),
-                                LiquidColors.AccentViolet.copy(alpha = 0.25f * bubbleAlpha),
+                                colors.selected.copy(alpha = (if (isLight) 0.92f else 0.85f) * bubbleAlpha),
+                                colors.accent.copy(alpha = (if (isLight) 0.28f else 0.24f) * bubbleAlpha),
                             )
                         ),
                         cornerRadius = CornerRadius(cr),
@@ -187,7 +193,7 @@ private fun NavTab(
                     drawRoundRect(
                         brush = Brush.verticalGradient(
                             colors = listOf(
-                                Color.White.copy(alpha = 0.45f * bubbleAlpha),
+                                Color.White.copy(alpha = (if (isLight) 0.50f else 0.26f) * bubbleAlpha),
                                 Color.Transparent,
                             ),
                             startY = 0f,
@@ -197,13 +203,13 @@ private fun NavTab(
                     )
                     // Border
                     drawRoundRect(
-                        color = LiquidColors.AccentBlue.copy(alpha = 0.85f * bubbleAlpha),
+                        color = (if (isFocused) colors.focus else colors.accent).copy(alpha = 0.88f * bubbleAlpha),
                         cornerRadius = CornerRadius(cr),
-                        style = Stroke(width = 1.2.dp.toPx()),
+                        style = Stroke(width = if (isFocused) 1.6.dp.toPx() else 1.2.dp.toPx()),
                     )
                     // Lens glint
                     drawCircle(
-                        color = Color.White.copy(alpha = 0.6f * bubbleAlpha),
+                        color = colors.accent.copy(alpha = 0.65f * bubbleAlpha),
                         radius = 3.dp.toPx(),
                         center = Offset(cr, cr * 0.5f),
                     )
@@ -227,7 +233,7 @@ private fun NavTab(
             Icon(
                 imageVector = destination.icon,
                 contentDescription = labelText,
-                tint = if (isSelected) Color.White else if (isFocused) LiquidColors.AccentBlueLight else LiquidColors.IconInactive,
+                tint = activeTint,
                 modifier = Modifier
                     .size(20.dp)
                     .scale(iconScale),
@@ -236,7 +242,7 @@ private fun NavTab(
                 Text(
                     text = labelText,
                     style = LiquidTypography.NavLabel,
-                    color = Color.White.copy(alpha = labelAlpha),
+                    color = colors.text.copy(alpha = labelAlpha),
                     maxLines = 1,
                 )
             }

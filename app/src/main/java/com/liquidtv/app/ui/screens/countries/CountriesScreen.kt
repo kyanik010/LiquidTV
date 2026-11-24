@@ -26,7 +26,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.liquidtv.app.domain.model.Country
 import com.liquidtv.app.ui.components.AppBackground
 import com.liquidtv.app.ui.components.LiquidGlassSurface
-import com.liquidtv.app.ui.theme.LiquidColors
+import com.liquidtv.app.ui.theme.AppTheme
 import com.liquidtv.app.ui.theme.LiquidTypography
 
 @Composable
@@ -35,6 +35,7 @@ fun CountriesScreen(
     viewModel: CountriesViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val colors = AppTheme.colors
 
     AppBackground(modifier = Modifier.fillMaxSize()) {
         BoxWithConstraints(
@@ -62,7 +63,7 @@ fun CountriesScreen(
                             text = "تصفح حسب الدولة",
                             style = LiquidTypography.HeadlineMedium.copy(
                                 brush = Brush.linearGradient(
-                                    listOf(LiquidColors.TextPrimary, LiquidColors.AccentBlueLight)
+                                    listOf(colors.text, colors.accentText)
                                 )
                             ),
                         )
@@ -73,7 +74,7 @@ fun CountriesScreen(
                                 "${uiState.countries.size} دولة وإقليم"
                             },
                             style = LiquidTypography.BodySmall,
-                            color = LiquidColors.TextTertiary,
+                            color = colors.muted,
                         )
                     }
                 }
@@ -81,11 +82,11 @@ fun CountriesScreen(
                 if (uiState.isLoading && uiState.countries.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                            CircularProgressIndicator(color = LiquidColors.AccentBlue)
+                            CircularProgressIndicator(color = colors.accent)
                             Text(
                                 text = uiState.loadingMessage ?: "جارٍ جلب وفهرسة الدول…",
                                 style = LiquidTypography.BodyMedium,
-                                color = LiquidColors.TextSecondary,
+                                color = colors.textSecondary,
                             )
                         }
                     }
@@ -95,17 +96,17 @@ fun CountriesScreen(
                             Text(
                                 text = "لا توجد وسوم دول في القائمة النشطة",
                                 style = LiquidTypography.HeadlineSmall,
-                                color = LiquidColors.TextSecondary,
+                                color = colors.textSecondary,
                             )
                             LiquidGlassSurface(
                                 modifier = Modifier
                                     .clickable { viewModel.refresh() }
                                     .padding(horizontal = 24.dp, vertical = 12.dp),
                                 cornerRadius = 14.dp,
-                                glassAlpha = 0.25f,
-                                borderColor = LiquidColors.AccentBlue,
+                                glassAlpha = 0.85f,
+                                borderColor = colors.accent,
                             ) {
-                                Text("تحديث القائمة", style = LiquidTypography.LabelLarge, color = LiquidColors.AccentBlue)
+                                Text("تحديث القائمة", style = LiquidTypography.LabelLarge, color = colors.accentText)
                             }
                         }
                     }
@@ -135,14 +136,15 @@ private fun CountryGridTile(
     country: Country,
     onClick: () -> Unit,
 ) {
+    val colors = AppTheme.colors
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
-    val accentSeed = remember(country.name) {
+    val accentSeed = remember(country.name, colors) {
         val h = country.name.hashCode()
         listOf(
-            LiquidColors.AccentBlue, LiquidColors.AccentViolet, LiquidColors.AccentCyan,
-            LiquidColors.AccentTeal, LiquidColors.AccentGold, LiquidColors.AccentGreen,
+            colors.accent, colors.waveOne, colors.waveTwo,
+            colors.success, colors.focus, colors.accentSecondary,
         )[(h and 0x7FFFFFFF) % 6]
     }
 
@@ -152,16 +154,19 @@ private fun CountryGridTile(
             .height(116.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(
+                if (isFocused) colors.selected else colors.card.copy(alpha = if (colors.isLight) 0.94f else 0.78f)
+            )
+            .background(
                 Brush.linearGradient(
                     listOf(
-                        accentSeed.copy(alpha = if (isFocused) 0.30f else 0.12f),
-                        Color.White.copy(alpha = if (isFocused) 0.08f else 0.03f),
+                        accentSeed.copy(alpha = if (isFocused) 0.24f else 0.12f),
+                        colors.surface.copy(alpha = if (colors.isLight) 0.45f else 0.30f),
                     )
                 )
             )
             .border(
                 width = if (isFocused) 2.dp else 1.dp,
-                color = if (isFocused) accentSeed.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.18f),
+                color = if (isFocused) colors.focus else colors.border.copy(alpha = if (colors.isLight) 0.72f else 0.48f),
                 shape = RoundedCornerShape(18.dp),
             )
             .clickable(interactionSource, null, onClick = onClick)
@@ -173,7 +178,10 @@ private fun CountryGridTile(
                 .height(50.dp)
                 .background(
                     Brush.verticalGradient(
-                        listOf(Color.White.copy(alpha = if (isFocused) 0.15f else 0.06f), Color.Transparent)
+                        listOf(
+                            (if (colors.isLight) Color.White else colors.text).copy(alpha = if (isFocused) 0.20f else 0.08f),
+                            Color.Transparent,
+                        )
                     )
                 ),
         )
@@ -185,7 +193,7 @@ private fun CountryGridTile(
             Text(
                 text = "🌐",
                 style = LiquidTypography.DisplayMedium,
-                color = Color.White.copy(alpha = 0.04f),
+                color = colors.muted.copy(alpha = 0.08f),
                 modifier = Modifier.padding(end = 10.dp),
             )
         }
@@ -202,11 +210,11 @@ private fun CountryGridTile(
                     .size(if (isFocused) 56.dp else 50.dp)
                     .background(
                         Brush.radialGradient(
-                            listOf(accentSeed.copy(alpha = 0.3f), Color.Black.copy(alpha = 0.2f))
+                            listOf(accentSeed.copy(alpha = 0.28f), colors.surface.copy(alpha = 0.90f))
                         ),
                         CircleShape,
                     )
-                    .border(1.dp, accentSeed.copy(alpha = 0.4f), CircleShape),
+                    .border(1.dp, accentSeed.copy(alpha = 0.55f), CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -222,7 +230,7 @@ private fun CountryGridTile(
                 Text(
                     text = country.name,
                     style = LiquidTypography.TitleMedium,
-                    color = LiquidColors.TextPrimary,
+                    color = colors.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -230,7 +238,7 @@ private fun CountryGridTile(
                 Text(
                     text = "${country.channelCount} قناة",
                     style = LiquidTypography.LabelSmall,
-                    color = if (isFocused) accentSeed.copy(alpha = 0.85f) else LiquidColors.TextTertiary,
+                    color = if (isFocused) colors.accentText else colors.muted,
                 )
             }
         }

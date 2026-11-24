@@ -233,6 +233,7 @@ data class UserPreferences(
     val glassIntensity: Float = 0.8f,
     val blurIntensity: Float = 0.6f,
     val animationIntensity: Float = 1.0f,
+    val appTheme: String = "royal-navy",
     val theme: String = "midnight_glass",
     val ambientEnabled: Boolean = true,
     val ambientIdleDuration: Long = 180_000L,
