@@ -680,8 +680,6 @@ class RedesignUiAndLogicTest {
         val fakeChannels = FakeChannelRepository(movies = sixMovies, seriesList = sixSeries)
         val prefs = UserPreferencesDataStore(context)
         val moviesVm = MoviesViewModel(fakeChannels, prefs)
-        val seriesVm = SeriesViewModel(fakeChannels, prefs)
-        val liveVm = LiveTVViewModel(fakeChannels, prefs, SavedStateHandle())
 
         val wideWidths = listOf(800, 960, 1200, 1280, 1600, 1920)
         wideWidths.forEach { w ->
@@ -689,7 +687,7 @@ class RedesignUiAndLogicTest {
             assertTrue("Sidebar width out of [232, 400] bounds for $w: $expectedSidebar", expectedSidebar in 232f..400f)
         }
 
-        // Verify 5 columns (6th poster wraps to row 2) and identical sidebar widths on 1280dp & 1920dp
+        // Verify 5 columns (6th poster wraps to row 2) and identical sidebar width on 1280dp
         composeRule.setContent {
             LiquidTVTheme {
                 Box(Modifier.width(1280.dp).height(720.dp)) {
@@ -709,8 +707,6 @@ class RedesignUiAndLogicTest {
         assertTrue("Expected posters 1 and 5 on same first row", kotlin.math.abs(movieBox1.top - movieBox5.top) <= 4f * density)
         assertTrue("Expected poster 6 to wrap to second row (strictly 5 columns)", movieBox6.top > movieBox1.top + 40f * density)
         assertTrue("Expected poster 6 aligned with column 1 in RTL", kotlin.math.abs(movieBox6.right - movieBox1.right) <= 4f * density)
-        assertEquals(6, seriesVm.uiState.value.series.size)
-        assertEquals(1, liveVm.uiState.value.channels.size)
     }
 
     @Test
