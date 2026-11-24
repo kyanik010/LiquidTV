@@ -2,6 +2,7 @@ package com.liquidtv.app.di
 
 import android.content.Context
 import androidx.room.Room
+import com.liquidtv.app.data.datastore.AddonPreferencesDataStore
 import com.liquidtv.app.data.datastore.UserPreferencesDataStore
 import com.liquidtv.app.data.local.LiquidTVDatabase
 import com.liquidtv.app.data.local.dao.*
@@ -11,6 +12,7 @@ import com.liquidtv.app.data.repository.SubscriptionRepositoryImpl
 import com.liquidtv.app.data.security.AndroidKeystoreCredentialCrypto
 import com.liquidtv.app.data.security.CredentialCrypto
 import com.liquidtv.app.data.security.LogSanitizer
+import com.liquidtv.app.domain.repository.AddonPreferencesRepository
 import com.liquidtv.app.domain.repository.ChannelRepository
 import com.liquidtv.app.domain.repository.SubscriptionRepository
 import com.liquidtv.app.domain.repository.UserPreferencesRepository
@@ -120,4 +122,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindUserPreferencesRepository(impl: UserPreferencesDataStore): UserPreferencesRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAddonPreferencesRepository(impl: AddonPreferencesDataStore): AddonPreferencesRepository
 }

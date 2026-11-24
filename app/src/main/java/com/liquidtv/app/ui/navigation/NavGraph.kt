@@ -8,6 +8,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.liquidtv.app.domain.model.MediaType
+import com.liquidtv.app.ui.screens.addons.AddonsScreen
 import com.liquidtv.app.ui.screens.ambient.AmbientScreen
 import com.liquidtv.app.ui.screens.categories.CategoriesScreen
 import com.liquidtv.app.ui.screens.countries.CountriesScreen
@@ -47,6 +48,7 @@ sealed class Screen(val route: String) {
     object Search : Screen("search")
     object Favorites : Screen("favorites")
     object Settings : Screen("settings")
+    object Addons : Screen("addons")
     object Player : Screen("player/{channelId}?mediaType={mediaType}") {
         fun createRoute(channelId: String, mediaType: MediaType = MediaType.LIVE): String {
             val encodedId = URLEncoder.encode(channelId, "UTF-8")
@@ -232,6 +234,15 @@ fun LiquidTVNavGraph(
                 onManageSubscriptions = {
                     navController.navigate(Screen.Subscriptions.route)
                 },
+                onOpenAddons = {
+                    navController.navigate(Screen.Addons.route)
+                },
+            )
+        }
+
+        composable(Screen.Addons.route) {
+            AddonsScreen(
+                onBack = { navController.popBackStack() },
             )
         }
 

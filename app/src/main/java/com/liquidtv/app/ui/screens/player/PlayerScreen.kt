@@ -18,8 +18,6 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -49,7 +47,6 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.liquidtv.app.domain.model.MediaType
-import com.liquidtv.app.domain.model.TrackInfo
 import com.liquidtv.app.player.PlayerViewModel
 import com.liquidtv.app.ui.components.LiquidGlassSurface
 import com.liquidtv.app.ui.theme.AppTheme
@@ -221,6 +218,12 @@ fun PlayerScreen(
                     view.player = boundPlayer
                 }
             },
+        )
+
+        SubtitleOverlay(
+            cueText = uiState.activeExternalCueText,
+            style = uiState.subtitleStyle,
+            controlsVisible = uiState.showControls,
         )
 
         // Buffering / Auto-Reconnecting Indicator
@@ -495,208 +498,23 @@ fun PlayerScreen(
             }
         }
 
-        // Audio & Subtitle Track Selection Dialog
+        // Audio, Embedded Subtitles, Online Stremio Search & Subtitle Appearance Dialog
         if (uiState.showTrackSheet) {
-            TrackSelectionOverlay(
-                audioTracks = uiState.audioTracks,
-                subtitleTracks = uiState.subtitleTracks,
-                externalSubtitleError = uiState.externalSubtitleError,
+            PlayerSubtitlesAndTracksSheet(
+                uiState = uiState,
                 onSelectAudio = { viewModel.selectAudioTrack(it) },
                 onSelectSubtitle = { viewModel.selectSubtitleTrack(it) },
-                onLoadExternalSubtitle = { url, lang -> viewModel.loadExternalSubtitle(url, lang) },
+                onToggleExternalSubtitles = { viewModel.toggleExternalSubtitles() },
+                onLoadExternalSubtitleUrl = { url, lang -> viewModel.loadExternalSubtitle(url, lang) },
+                onPickLocalSubtitleUri = { uri -> viewModel.applyLocalSubtitleUri(uri) },
+                onSelectSearchLanguage = { lang -> viewModel.setSubtitleSearchLanguage(lang) },
+                onSearchOnlineSubtitles = { viewModel.searchOnlineSubtitles() },
+                onApplyOnlineSubtitle = { res -> viewModel.applyOnlineSubtitle(res) },
+                onUpdateStyle = { transform -> viewModel.updateSubtitleStyle(transform) },
+                onAdjustDelay = { delta -> viewModel.adjustSubtitleDelay(delta) },
+                onSetDelay = { delayMs -> viewModel.setSubtitleDelay(delayMs) },
                 onClose = { viewModel.closeTrackSheet() },
             )
-        }
-    }
-}
-
-@Composable
-private fun TrackSelectionOverlay(
-    audioTracks: List<TrackInfo>,
-    subtitleTracks: List<TrackInfo>,
-    externalSubtitleError: String?,
-    onSelectAudio: (TrackInfo) -> Unit,
-    onSelectSubtitle: (TrackInfo?) -> Unit,
-    onLoadExternalSubtitle: (String, String) -> Unit,
-    onClose: () -> Unit,
-) {
-    val colors = AppTheme.colors
-    var externalSubUrl by remember { mutableStateOf("") }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(colors.dialogScrim)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClose,
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        LiquidGlassSurface(
-            modifier = Modifier
-                .padding(20.dp)
-                .widthIn(min = 300.dp, max = 560.dp)
-                .heightIn(max = 520.dp)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = {},
-                ),
-            cornerRadius = 24.dp,
-            glassAlpha = 0.94f,
-            glassColor = colors.panel,
-            borderAlpha = 0.75f,
-            borderColor = colors.border,
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(22.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("الصوت والترجمة", style = LiquidTypography.TitleLarge, color = colors.text)
-                    IconButton(onClick = onClose) {
-                        Icon(Icons.Filled.Close, contentDescription = "إغلاق", tint = colors.text)
-                    }
-                }
-
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.weight(1f, fill = false),
-                ) {
-                    item {
-                        Text("مسارات الصوت", style = LiquidTypography.TitleSmall, color = colors.accentText)
-                    }
-                    if (audioTracks.isEmpty()) {
-                        item {
-                            Text("لا توجد مسارات صوتية إضافية في هذا البث.", style = LiquidTypography.BodySmall, color = colors.muted)
-                        }
-                    } else {
-                        items(audioTracks, key = { "a_${it.groupIndex}_${it.trackIndex}" }) { track ->
-                            TrackOptionRow(
-                                label = track.label,
-                                selected = track.isSelected,
-                                onClick = { onSelectAudio(track) },
-                            )
-                        }
-                    }
-
-                    item {
-                        Spacer(Modifier.height(6.dp))
-                        Text("الترجمة والشرح", style = LiquidTypography.TitleSmall, color = colors.accentText)
-                    }
-                    item {
-                        TrackOptionRow(
-                            label = "إيقاف (بدون ترجمة)",
-                            selected = subtitleTracks.none { it.isSelected },
-                            onClick = { onSelectSubtitle(null) },
-                        )
-                    }
-                    if (subtitleTracks.isEmpty()) {
-                        item {
-                            Text("لا توجد مسارات ترجمة مدمجة في هذا البث.", style = LiquidTypography.BodySmall, color = colors.muted)
-                        }
-                    } else {
-                        items(subtitleTracks, key = { "s_${it.groupIndex}_${it.trackIndex}" }) { track ->
-                            TrackOptionRow(
-                                label = track.label,
-                                selected = track.isSelected,
-                                onClick = { onSelectSubtitle(track) },
-                            )
-                        }
-                    }
-
-                    item {
-                        Spacer(Modifier.height(6.dp))
-                        Text("رابط ترجمة خارجية (.srt / .vtt)", style = LiquidTypography.TitleSmall, color = colors.accentText)
-                        Spacer(Modifier.height(6.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            OutlinedTextField(
-                                value = externalSubUrl,
-                                onValueChange = { externalSubUrl = it },
-                                singleLine = true,
-                                placeholder = { Text("http://.../subs.srt", color = colors.muted) },
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = colors.text,
-                                    unfocusedTextColor = colors.text,
-                                    cursorColor = colors.accent,
-                                    focusedBorderColor = colors.focus,
-                                    unfocusedBorderColor = colors.border,
-                                ),
-                                modifier = Modifier.weight(1f),
-                            )
-                            Button(
-                                onClick = { onLoadExternalSubtitle(externalSubUrl, "und") },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = colors.accent,
-                                    contentColor = colors.onAccent,
-                                ),
-                                modifier = Modifier.height(48.dp),
-                            ) {
-                                Text("تحميل")
-                            }
-                        }
-                        externalSubtitleError?.let { err ->
-                            Spacer(Modifier.height(4.dp))
-                            Text(err, style = LiquidTypography.LabelSmall, color = colors.danger)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TrackOptionRow(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val colors = AppTheme.colors
-    val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                when {
-                    selected -> colors.selected
-                    isFocused -> colors.surface
-                    else -> colors.card.copy(alpha = 0.65f)
-                },
-            )
-            .border(
-                width = if (isFocused) 2.dp else 1.dp,
-                color = when {
-                    isFocused -> colors.focus
-                    selected -> colors.accent
-                    else -> colors.border.copy(alpha = 0.55f)
-                },
-                shape = RoundedCornerShape(12.dp),
-            )
-            .clickable(interactionSource, null, onClick = onClick)
-            .focusable(interactionSource = interactionSource)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, style = LiquidTypography.BodyMedium, color = colors.text, modifier = Modifier.weight(1f))
-        if (selected) {
-            Icon(Icons.Filled.Check, contentDescription = "محدد", tint = colors.accentText)
         }
     }
 }

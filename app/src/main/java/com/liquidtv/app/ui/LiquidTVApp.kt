@@ -83,6 +83,7 @@ fun LiquidTVApp(
         currentRoute == Screen.Ambient.route ||
         currentRoute.startsWith("login") ||
         currentRoute == Screen.Subscriptions.route ||
+        currentRoute == Screen.Addons.route ||
         currentRoute.startsWith("series_detail/")
 
     val showNavBar = !isFullScreenOverlayRoute

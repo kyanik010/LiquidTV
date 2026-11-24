@@ -60,6 +60,7 @@ private val LocalSettingsCompactHeight = staticCompositionLocalOf { false }
 
 private enum class SettingsSection(val title: String, val icon: ImageVector) {
     Subscriptions("الاشتراكات والمزامنة", Icons.Filled.Subscriptions),
+    Addons("Addons – الإضافات", Icons.Filled.Extension),
     Themes("الثيمات", Icons.Filled.ColorLens),
     Playback("التشغيل والبث", Icons.Filled.PlayCircle),
     Parental("الرقابة الأبوية", Icons.Filled.Lock),
@@ -91,6 +92,7 @@ private fun themedSwitchColors() = AppTheme.colors.let { colors ->
 @Composable
 fun SettingsScreen(
     onManageSubscriptions: () -> Unit = {},
+    onOpenAddons: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
     updateViewModel: AppUpdateViewModel = hiltViewModel(),
 ) {
@@ -213,6 +215,7 @@ fun SettingsScreen(
                             viewModel = viewModel,
                             updateViewModel = updateViewModel,
                             onManageSubscriptions = onManageSubscriptions,
+                            onOpenAddons = onOpenAddons,
                             onEditRepo = {
                                 repoInput = uiState.githubRepo
                                 showRepoDialog = true
@@ -261,6 +264,7 @@ fun SettingsScreen(
                             viewModel = viewModel,
                             updateViewModel = updateViewModel,
                             onManageSubscriptions = onManageSubscriptions,
+                            onOpenAddons = onOpenAddons,
                             onEditRepo = {
                                 repoInput = uiState.githubRepo
                                 showRepoDialog = true
@@ -537,6 +541,7 @@ private fun SettingsDetailPane(
     viewModel: SettingsViewModel,
     updateViewModel: AppUpdateViewModel,
     onManageSubscriptions: () -> Unit,
+    onOpenAddons: () -> Unit,
     onEditRepo: () -> Unit,
     onRequestPinAction: (PinDialogAction) -> Unit,
     onOpenLockedCategories: () -> Unit,
@@ -654,6 +659,35 @@ private fun SettingsDetailPane(
                                         },
                                         onClick = { viewModel.clearCache() },
                                         testTag = "setting_clear_cache",
+                                    )
+                                }
+                            }
+                            SettingsSection.Addons -> {
+                                item {
+                                    SettingHeader(
+                                        title = "Addons – الإضافات",
+                                        subtitle = "إدارة إضافات Stremio للترجمات والكتالوجات (Cinemeta وOpenSubtitles وسوق الإضافات)",
+                                    )
+                                }
+                                item {
+                                    SettingItemTile(
+                                        title = "إدارة إضافات Stremio والترجمات",
+                                        subtitle = "تصفح السوق الرسمي والمجتمعي، التثبيت برابط Manifest، وتفعيل أو تعطيل المصادر",
+                                        action = {
+                                            Icon(Icons.Filled.Extension, null, tint = colors.accentText)
+                                        },
+                                        onClick = onOpenAddons,
+                                        testTag = "setting_open_addons",
+                                    )
+                                }
+                                item {
+                                    SettingItemTile(
+                                        title = "الإضافات الافتراضية المدمجة",
+                                        subtitle = "Cinemeta (3.0.14) للبيانات وIMDb • OpenSubtitles V3 (1.0.0) • OpenSubtitles PRO (0.1.0)",
+                                        action = {
+                                            Icon(Icons.Filled.Subtitles, null, tint = colors.accentText)
+                                        },
+                                        onClick = onOpenAddons,
                                     )
                                 }
                             }

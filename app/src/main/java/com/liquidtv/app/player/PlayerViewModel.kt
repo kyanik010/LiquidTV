@@ -2,6 +2,8 @@ package com.liquidtv.app.player
 
 import android.content.ComponentName
 import android.content.Context
+import android.net.Uri
+import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.C
@@ -12,19 +14,28 @@ import androidx.media3.common.Tracks
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
+import com.liquidtv.app.data.remote.LoadedExternalSubtitle
+import com.liquidtv.app.data.remote.StremioAddonClient
 import com.liquidtv.app.domain.model.Channel
 import com.liquidtv.app.domain.model.ChannelEpgSummary
-import com.liquidtv.app.domain.model.EpisodeItem
 import com.liquidtv.app.domain.model.MediaType
+import com.liquidtv.app.domain.model.OnlineSubtitleResult
+import com.liquidtv.app.domain.model.SubtitleMediaMetadata
+import com.liquidtv.app.domain.model.SubtitleStyleSettings
 import com.liquidtv.app.domain.model.TrackInfo
 import com.liquidtv.app.domain.model.UserPreferences
+import com.liquidtv.app.domain.repository.AddonPreferencesRepository
 import com.liquidtv.app.domain.repository.ChannelRepository
 import com.liquidtv.app.domain.repository.UserPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -52,12 +63,29 @@ data class PlayerUiState(
     val nextEpisodeId: String? = null,
     val previousEpisodeId: String? = null,
     val externalSubtitleError: String? = null,
+    // Stremio Addons & Zero-Reload Subtitles state
+    val subtitleMetadata: SubtitleMediaMetadata? = null,
+    val subtitleSearchLanguage: String = "ar",
+    val subtitleSearchResults: List<OnlineSubtitleResult> = emptyList(),
+    val resolvedImdbId: String? = null,
+    val isSearchingSubtitles: Boolean = false,
+    val subtitleSearchStatus: String? = null,
+    val subtitleSearchError: String? = null,
+    val isApplyingSubtitle: Boolean = false,
+    val applyingSubtitleUrl: String? = null,
+    val activeExternalSubtitleLabel: String? = null,
+    val externalSubtitlesEnabled: Boolean = false,
+    val hasExternalSubtitleLoaded: Boolean = false,
+    val activeExternalCueText: String? = null,
+    val subtitleStyle: SubtitleStyleSettings = SubtitleStyleSettings(),
 )
 
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     private val channelRepository: ChannelRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
+    private val addonPreferencesRepository: AddonPreferencesRepository,
+    private val stremioAddonClient: StremioAddonClient,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -67,11 +95,15 @@ class PlayerViewModel @Inject constructor(
     private val _boundPlayer = MutableStateFlow<Player?>(null)
     val boundPlayer: StateFlow<Player?> = _boundPlayer.asStateFlow()
 
+    private val externalSubtitleEngine = ExternalSubtitleEngine()
+
     private var controllerFuture: ListenableFuture<MediaController>? = null
-    private var mediaController: MediaController? = null
+    private var controllerConnectJob: Job? = null
+    private var activePlayer: Player? = null
     private var currentPrefs: UserPreferences = UserPreferences()
     private var retryJob: Job? = null
     private var progressJob: Job? = null
+    private var subtitleSyncJob: Job? = null
     private var epgJob: Job? = null
     private var activeSeriesId: String? = null
     private var activeItemKey: String? = null
@@ -80,7 +112,7 @@ class PlayerViewModel @Inject constructor(
 
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
-            val player = mediaController ?: return
+            val player = activePlayer ?: return
             val hasError = playbackState == Player.STATE_IDLE && player.playerError != null
             if (playbackState == Player.STATE_READY) {
                 retryJob?.cancel()
@@ -95,6 +127,7 @@ class PlayerViewModel @Inject constructor(
                         currentPositionMs = player.currentPosition.coerceAtLeast(0L),
                     )
                 }
+                refreshActiveSubtitleCue()
             } else {
                 _state.update {
                     it.copy(
@@ -115,6 +148,15 @@ class PlayerViewModel @Inject constructor(
             if (!isPlaying) {
                 persistResumePosition()
             }
+            refreshActiveSubtitleCue()
+        }
+
+        override fun onPositionDiscontinuity(
+            oldPosition: Player.PositionInfo,
+            newPosition: Player.PositionInfo,
+            reason: Int,
+        ) {
+            refreshActiveSubtitleCue(newPosition.positionMs)
         }
 
         override fun onTracksChanged(tracks: Tracks) {
@@ -137,7 +179,7 @@ class PlayerViewModel @Inject constructor(
     }
 
     private fun connectMediaController() {
-        viewModelScope.launch {
+        controllerConnectJob = viewModelScope.launch {
             try {
                 val sessionToken = SessionToken(
                     context,
@@ -146,10 +188,11 @@ class PlayerViewModel @Inject constructor(
                 val future = MediaController.Builder(context, sessionToken).buildAsync()
                 controllerFuture = future
                 val controller = future.await()
-                mediaController = controller
+                activePlayer = controller
                 controller.addListener(playerListener)
                 _boundPlayer.value = controller
                 startProgressLoop()
+                startSubtitleSyncLoop()
                 pendingStartRequest?.invoke()
                 pendingStartRequest = null
             } catch (e: Exception) {
@@ -162,6 +205,19 @@ class PlayerViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    @VisibleForTesting
+    internal fun attachPlayerForTesting(player: Player) {
+        controllerConnectJob?.cancel()
+        controllerFuture?.let { MediaController.releaseFuture(it) }
+        controllerFuture = null
+        activePlayer?.removeListener(playerListener)
+        activePlayer = player
+        player.addListener(playerListener)
+        _boundPlayer.value = player
+        startSubtitleSyncLoop()
+        refreshActiveSubtitleCue()
     }
 
     private fun observeChannelsAndPreferences() {
@@ -183,6 +239,17 @@ class PlayerViewModel @Inject constructor(
                 _state.update { it.copy(maxRetries = prefs.maxRetries) }
             }
         }
+        viewModelScope.launch {
+            addonPreferencesRepository.subtitleStyle.collect { style ->
+                _state.update { it.copy(subtitleStyle = style) }
+                refreshActiveSubtitleCue()
+            }
+        }
+        viewModelScope.launch {
+            addonPreferencesRepository.preferredSubtitleSearchLanguage.collect { lang ->
+                _state.update { it.copy(subtitleSearchLanguage = lang) }
+            }
+        }
     }
 
     fun loadItem(itemId: String, mediaType: MediaType = MediaType.LIVE) {
@@ -194,6 +261,7 @@ class PlayerViewModel @Inject constructor(
         epgJob?.cancel()
         activeItemKey = key
         activeSeriesId = null
+        resetExternalSubtitlesForNewItem()
 
         viewModelScope.launch {
             when (mediaType) {
@@ -210,17 +278,19 @@ class PlayerViewModel @Inject constructor(
                         return@launch
                     }
                     activeSeriesId = episode.seriesId
+                    val series = channelRepository.getSeriesById(episode.seriesId).firstOrNull()
                     val siblings = channelRepository.getEpisodesForSeries(episode.seriesId).firstOrNull().orEmpty()
                     val epIdx = siblings.indexOfFirst { it.id == episode.id }
                     val prevEp = if (epIdx > 0) siblings[epIdx - 1].id else null
                     val nextEp = if (epIdx in 0 until siblings.lastIndex) siblings[epIdx + 1].id else null
 
+                    val seriesDisplayName = series?.name?.takeIf { it.isNotBlank() }
                     val syntheticChannel = Channel(
                         id = episode.id,
                         subscriptionId = episode.subscriptionId,
                         externalId = episode.externalEpisodeId,
                         mediaType = MediaType.SERIES_EPISODE,
-                        name = "S${episode.seasonNumber}E${episode.episodeNumber} • ${episode.title}",
+                        name = "${seriesDisplayName ?: episode.title} • S${episode.seasonNumber}E${episode.episodeNumber}",
                         streamUrl = episode.streamUrl,
                         logoUrl = episode.coverUrl,
                         groupTitle = "المسلسلات",
@@ -229,10 +299,18 @@ class PlayerViewModel @Inject constructor(
                         durationSec = episode.durationSec,
                         resumePositionMs = episode.resumePositionMs,
                     )
+                    val subtitleMeta = SubtitleMediaMetadata(
+                        title = episode.title,
+                        mediaType = MediaType.SERIES_EPISODE,
+                        seriesName = seriesDisplayName ?: episode.title,
+                        seasonNumber = episode.seasonNumber,
+                        episodeNumber = episode.episodeNumber,
+                    )
                     _state.update {
                         it.copy(
                             channel = syntheticChannel,
                             mediaType = MediaType.SERIES_EPISODE,
+                            subtitleMetadata = subtitleMeta,
                             epgSummary = ChannelEpgSummary(),
                             isError = false,
                             isRetrying = false,
@@ -261,10 +339,15 @@ class PlayerViewModel @Inject constructor(
                     }
                     val allChannels = _state.value.allChannels
                     val index = allChannels.indexOfFirst { it.id == itemId }
+                    val subtitleMeta = SubtitleMediaMetadata(
+                        title = channel.name,
+                        mediaType = channel.mediaType,
+                    )
                     _state.update {
                         it.copy(
                             channel = channel,
                             mediaType = channel.mediaType,
+                            subtitleMetadata = subtitleMeta,
                             currentChannelIndex = index,
                             isError = false,
                             isRetrying = false,
@@ -289,6 +372,23 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
+    private fun resetExternalSubtitlesForNewItem() {
+        externalSubtitleEngine.clear()
+        _state.update {
+            it.copy(
+                subtitleSearchResults = emptyList(),
+                resolvedImdbId = null,
+                subtitleSearchStatus = null,
+                subtitleSearchError = null,
+                activeExternalSubtitleLabel = null,
+                externalSubtitlesEnabled = false,
+                hasExternalSubtitleLoaded = false,
+                activeExternalCueText = null,
+                externalSubtitleError = null,
+            )
+        }
+    }
+
     private fun observeEpgForChannel(channel: Channel) {
         epgJob?.cancel()
         epgJob = viewModelScope.launch {
@@ -309,12 +409,10 @@ class PlayerViewModel @Inject constructor(
     private fun startPlayback(
         channel: Channel,
         resumeMs: Long = 0L,
-        externalSubtitleUrl: String? = null,
-        externalSubtitleLang: String = "und",
     ) {
         lastSubmittedUrl = channel.streamUrl
         val action = {
-            val controller = mediaController
+            val controller = activePlayer
             if (controller != null) {
                 val mediaItem = PlayerMediaHelper.buildMediaItem(
                     mediaId = channel.id,
@@ -323,8 +421,6 @@ class PlayerViewModel @Inject constructor(
                     logoUrl = channel.logoUrl,
                     explicitExtension = channel.containerExtension,
                     headers = channel.httpHeaders,
-                    externalSubtitleUrl = externalSubtitleUrl,
-                    externalSubtitleLang = externalSubtitleLang,
                 )
                 controller.stop()
                 controller.clearMediaItems()
@@ -337,7 +433,7 @@ class PlayerViewModel @Inject constructor(
                 controller.playWhenReady = true
             }
         }
-        if (mediaController != null) {
+        if (activePlayer != null) {
             action()
         } else {
             pendingStartRequest = action
@@ -349,7 +445,7 @@ class PlayerViewModel @Inject constructor(
         val activeChannel = currentState.channel ?: return
 
         if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
-            mediaController?.let {
+            activePlayer?.let {
                 it.seekToDefaultPosition()
                 it.prepare()
             }
@@ -376,7 +472,7 @@ class PlayerViewModel @Inject constructor(
                 delay(PlayerMediaHelper.backoffDelayMs(nextAttempt))
                 if (isActive && _state.value.channel?.id == activeChannel.id) {
                     val resumeAt = if (activeChannel.mediaType != MediaType.LIVE) {
-                        mediaController?.currentPosition?.coerceAtLeast(0L) ?: 0L
+                        activePlayer?.currentPosition?.coerceAtLeast(0L) ?: 0L
                     } else 0L
                     startPlayback(activeChannel, resumeMs = resumeAt)
                 }
@@ -407,20 +503,23 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    fun play() { mediaController?.play() }
-    fun pause() { mediaController?.pause() }
+    fun play() { activePlayer?.play() }
+    fun pause() { activePlayer?.pause() }
 
     fun seekBy(deltaMs: Long) {
-        val controller = mediaController ?: return
+        val controller = activePlayer ?: return
         val duration = controller.duration.coerceAtLeast(0L)
         if (duration > 0L) {
             val target = (controller.currentPosition + deltaMs).coerceIn(0L, duration)
             controller.seekTo(target)
+            refreshActiveSubtitleCue(target)
         }
     }
 
     fun seekTo(positionMs: Long) {
-        mediaController?.seekTo(positionMs.coerceAtLeast(0L))
+        val clamped = positionMs.coerceAtLeast(0L)
+        activePlayer?.seekTo(clamped)
+        refreshActiveSubtitleCue(clamped)
     }
 
     fun nextChannel() {
@@ -472,13 +571,13 @@ class PlayerViewModel @Inject constructor(
             )
         }
         val resumeAt = if (channel.mediaType != MediaType.LIVE) {
-            mediaController?.currentPosition?.coerceAtLeast(0L) ?: 0L
+            activePlayer?.currentPosition?.coerceAtLeast(0L) ?: 0L
         } else 0L
         startPlayback(channel, resumeMs = resumeAt)
     }
 
     fun selectAudioTrack(track: TrackInfo) {
-        val controller = mediaController ?: return
+        val controller = activePlayer ?: return
         val groups = controller.currentTracks.groups
         if (track.groupIndex !in groups.indices) return
         val trackGroup = groups[track.groupIndex].mediaTrackGroup
@@ -491,43 +590,277 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun selectSubtitleTrack(track: TrackInfo?) {
-        val controller = mediaController ?: return
-        val builder = controller.trackSelectionParameters.buildUpon()
+        val controller = activePlayer ?: return
         if (track == null) {
-            builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
-            builder.clearOverridesOfType(C.TRACK_TYPE_TEXT)
+            externalSubtitleEngine.disableAllSubtitles(controller)
+            _state.update {
+                it.copy(
+                    externalSubtitlesEnabled = false,
+                    activeExternalCueText = null,
+                )
+            }
         } else {
-            val groups = controller.currentTracks.groups
-            if (track.groupIndex !in groups.indices) return
-            val trackGroup = groups[track.groupIndex].mediaTrackGroup
-            builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
-            builder.setOverrideForType(TrackSelectionOverride(trackGroup, track.trackIndex))
+            externalSubtitleEngine.activateEmbeddedSubtitleTrack(
+                player = controller,
+                groupIndex = track.groupIndex,
+                trackIndex = track.trackIndex,
+            )
+            _state.update {
+                it.copy(
+                    externalSubtitlesEnabled = false,
+                    activeExternalCueText = null,
+                )
+            }
         }
-        controller.trackSelectionParameters = builder.build()
     }
 
+    fun setSubtitleSearchLanguage(languageCode: String) {
+        viewModelScope.launch {
+            addonPreferencesRepository.setPreferredSubtitleSearchLanguage(languageCode)
+        }
+    }
+
+    fun searchOnlineSubtitles() {
+        val meta = _state.value.subtitleMetadata
+        if (meta == null || !meta.isSearchEligible) {
+            _state.update {
+                it.copy(
+                    subtitleSearchError = "البحث عن الترجمة متاح للأفلام والحلقات فقط.",
+                    isSearchingSubtitles = false,
+                )
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    isSearchingSubtitles = true,
+                    subtitleSearchError = null,
+                    subtitleSearchStatus = "جارٍ البحث عن المعرّف والترجمات عبر الإضافات المثبتة...",
+                )
+            }
+            runCatching {
+                val addons = addonPreferencesRepository.getInstalledAddonsOnce()
+                val lang = _state.value.subtitleSearchLanguage
+                stremioAddonClient.searchSubtitles(meta, lang, addons)
+            }.onSuccess { outcome ->
+                _state.update {
+                    it.copy(
+                        isSearchingSubtitles = false,
+                        resolvedImdbId = outcome.identity.imdbId,
+                        subtitleSearchResults = outcome.results,
+                        subtitleSearchError = null,
+                        subtitleSearchStatus = if (outcome.results.isNotEmpty()) {
+                            "تم العثور على ${outcome.results.size} ترجمة (${outcome.identity.resourceId})"
+                        } else {
+                            "لم يتم العثور على ترجمة مطابقة (${outcome.identity.resourceId})"
+                        },
+                    )
+                }
+            }.onFailure { err ->
+                _state.update {
+                    it.copy(
+                        isSearchingSubtitles = false,
+                        subtitleSearchError = err.message ?: "تعذر البحث عن الترجمة حالياً.",
+                        subtitleSearchStatus = null,
+                    )
+                }
+            }
+        }
+    }
+
+    fun applyOnlineSubtitle(result: OnlineSubtitleResult) {
+        viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    isApplyingSubtitle = true,
+                    applyingSubtitleUrl = result.url,
+                    externalSubtitleError = null,
+                    subtitleSearchError = null,
+                )
+            }
+            runCatching {
+                stremioAddonClient.downloadAndParseSubtitle(
+                    subtitleUrl = result.url,
+                    labelHint = result.label,
+                    preferredLang = result.language,
+                )
+            }.onSuccess { loaded ->
+                activateLoadedSubtitleZeroReload(loaded)
+                _state.update {
+                    it.copy(
+                        isApplyingSubtitle = false,
+                        applyingSubtitleUrl = null,
+                        subtitleSearchStatus = "تم تفعيل الترجمة بدون إعادة تحميل: ${loaded.label}",
+                    )
+                }
+            }.onFailure { err ->
+                _state.update {
+                    it.copy(
+                        isApplyingSubtitle = false,
+                        applyingSubtitleUrl = null,
+                        subtitleSearchError = err.message ?: "تعذر تحميل ملف الترجمة",
+                        externalSubtitleError = err.message ?: "تعذر تحميل ملف الترجمة",
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Zero-reload activation for direct external subtitle URLs (.srt, .vtt, .ass, .ssa, .ttml, .zip).
+     * Never calls stop(), clearMediaItems(), setMediaItem(), or prepare().
+     */
     fun loadExternalSubtitle(url: String, language: String = "und") {
         val trimmed = url.trim()
         if (!trimmed.startsWith("http://", true) && !trimmed.startsWith("https://", true)) {
             _state.update { it.copy(externalSubtitleError = "يجب أن يبدأ رابط الترجمة بـ http:// أو https://") }
             return
         }
-        val channel = _state.value.channel ?: return
-        val pos = mediaController?.currentPosition?.coerceAtLeast(0L) ?: 0L
-        _state.update { it.copy(externalSubtitleError = null) }
-        mediaController?.let { controller ->
-            val updated = controller.trackSelectionParameters
-                .buildUpon()
-                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
-                .build()
-            controller.trackSelectionParameters = updated
+        viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    isApplyingSubtitle = true,
+                    applyingSubtitleUrl = trimmed,
+                    externalSubtitleError = null,
+                )
+            }
+            runCatching {
+                stremioAddonClient.downloadAndParseSubtitle(
+                    subtitleUrl = trimmed,
+                    labelHint = trimmed.substringAfterLast('/').substringBefore('?').ifBlank { "ترجمة خارجية" },
+                    preferredLang = language.ifBlank { "und" },
+                )
+            }.onSuccess { loaded ->
+                activateLoadedSubtitleZeroReload(loaded)
+                _state.update {
+                    it.copy(
+                        isApplyingSubtitle = false,
+                        applyingSubtitleUrl = null,
+                    )
+                }
+            }.onFailure { err ->
+                _state.update {
+                    it.copy(
+                        isApplyingSubtitle = false,
+                        applyingSubtitleUrl = null,
+                        externalSubtitleError = err.message ?: "تعذر تحميل الترجمة الخارجية",
+                    )
+                }
+            }
         }
-        startPlayback(
-            channel = channel,
-            resumeMs = pos,
-            externalSubtitleUrl = trimmed,
-            externalSubtitleLang = language.ifBlank { "und" },
+    }
+
+    /**
+     * Zero-reload activation for user-selected local subtitle URIs via Storage Access Framework.
+     */
+    fun applyLocalSubtitleUri(uri: Uri) {
+        viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    isApplyingSubtitle = true,
+                    externalSubtitleError = null,
+                    subtitleSearchError = null,
+                )
+            }
+            runCatching {
+                stremioAddonClient.readAndParseLocalUri(uri)
+            }.onSuccess { loaded ->
+                activateLoadedSubtitleZeroReload(loaded)
+                _state.update {
+                    it.copy(
+                        isApplyingSubtitle = false,
+                        subtitleSearchStatus = "تم تفعيل الترجمة المحلية: ${loaded.label}",
+                    )
+                }
+            }.onFailure { err ->
+                _state.update {
+                    it.copy(
+                        isApplyingSubtitle = false,
+                        externalSubtitleError = err.message ?: "تعذر قراءة ملف الترجمة المحلي",
+                    )
+                }
+            }
+        }
+    }
+
+    @VisibleForTesting
+    internal fun activateLoadedSubtitleZeroReload(loaded: LoadedExternalSubtitle) {
+        externalSubtitleEngine.setLoadedSubtitles(
+            cues = loaded.cues,
+            label = loaded.label,
+            localFilePath = loaded.localFilePath,
+            player = activePlayer,
         )
+        val cue = externalSubtitleEngine.currentCueText(
+            positionMs = activePlayer?.currentPosition?.coerceAtLeast(0L) ?: _state.value.currentPositionMs,
+            delayMs = _state.value.subtitleStyle.delayMs,
+        )
+        _state.update {
+            it.copy(
+                activeExternalSubtitleLabel = loaded.label,
+                externalSubtitlesEnabled = true,
+                hasExternalSubtitleLoaded = true,
+                activeExternalCueText = cue,
+                externalSubtitleError = null,
+            )
+        }
+    }
+
+    fun toggleExternalSubtitles() {
+        if (!externalSubtitleEngine.hasLoadedTrack()) {
+            _state.update { it.copy(externalSubtitleError = "لا يوجد ملف ترجمة خارجي محمّل حالياً.") }
+            return
+        }
+        val next = !externalSubtitleEngine.isEnabled
+        externalSubtitleEngine.setEnabled(next, activePlayer)
+        val cue = if (next) {
+            externalSubtitleEngine.currentCueText(
+                positionMs = activePlayer?.currentPosition?.coerceAtLeast(0L) ?: _state.value.currentPositionMs,
+                delayMs = _state.value.subtitleStyle.delayMs,
+            )
+        } else {
+            null
+        }
+        _state.update {
+            it.copy(
+                externalSubtitlesEnabled = next,
+                activeExternalCueText = cue,
+            )
+        }
+    }
+
+    fun updateSubtitleStyle(transform: (SubtitleStyleSettings) -> SubtitleStyleSettings) {
+        viewModelScope.launch {
+            addonPreferencesRepository.updateSubtitleStyle(transform)
+        }
+    }
+
+    fun adjustSubtitleDelay(deltaMs: Int) {
+        updateSubtitleStyle { current ->
+            current.copy(delayMs = (current.delayMs + deltaMs).coerceIn(SubtitleStyleSettings.MIN_DELAY_MS, SubtitleStyleSettings.MAX_DELAY_MS))
+        }
+    }
+
+    fun setSubtitleDelay(delayMs: Int) {
+        updateSubtitleStyle { current ->
+            current.copy(delayMs = delayMs.coerceIn(SubtitleStyleSettings.MIN_DELAY_MS, SubtitleStyleSettings.MAX_DELAY_MS))
+        }
+    }
+
+    private fun refreshActiveSubtitleCue(explicitPosMs: Long? = null) {
+        if (!externalSubtitleEngine.isEnabled || !externalSubtitleEngine.hasLoadedTrack()) {
+            if (_state.value.activeExternalCueText != null) {
+                _state.update { it.copy(activeExternalCueText = null) }
+            }
+            return
+        }
+        val pos = (explicitPosMs ?: activePlayer?.currentPosition ?: _state.value.currentPositionMs).coerceAtLeast(0L)
+        val nextCue = externalSubtitleEngine.currentCueText(pos, _state.value.subtitleStyle.delayMs)
+        if (_state.value.activeExternalCueText != nextCue) {
+            _state.update { it.copy(activeExternalCueText = nextCue) }
+        }
     }
 
     fun openTrackSheet() = _state.update { it.copy(showTrackSheet = true, externalSubtitleError = null) }
@@ -539,9 +872,10 @@ class PlayerViewModel @Inject constructor(
     fun stopAndExit() {
         retryJob?.cancel()
         progressJob?.cancel()
+        subtitleSyncJob?.cancel()
         epgJob?.cancel()
         persistResumePosition()
-        mediaController?.let { controller ->
+        activePlayer?.let { controller ->
             controller.stop()
             controller.clearMediaItems()
         }
@@ -552,7 +886,7 @@ class PlayerViewModel @Inject constructor(
         progressJob = viewModelScope.launch {
             var tick = 0
             while (isActive) {
-                val controller = mediaController
+                val controller = activePlayer
                 if (controller != null) {
                     val pos = controller.currentPosition.coerceAtLeast(0L)
                     val dur = controller.duration.coerceAtLeast(0L)
@@ -567,10 +901,25 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
+    private fun startSubtitleSyncLoop() {
+        subtitleSyncJob?.cancel()
+        subtitleSyncJob = viewModelScope.launch {
+            while (isActive) {
+                val controller = activePlayer
+                if (controller != null && externalSubtitleEngine.isEnabled && externalSubtitleEngine.hasLoadedTrack()) {
+                    refreshActiveSubtitleCue(controller.currentPosition)
+                    delay(if (controller.isPlaying) 100L else 250L)
+                } else {
+                    delay(250L)
+                }
+            }
+        }
+    }
+
     private fun persistResumePosition() {
         val currentChannel = _state.value.channel ?: return
         if (currentChannel.mediaType == MediaType.LIVE) return
-        val pos = mediaController?.currentPosition?.coerceAtLeast(0L) ?: return
+        val pos = activePlayer?.currentPosition?.coerceAtLeast(0L) ?: return
         if (pos > 0L) {
             viewModelScope.launch {
                 channelRepository.updateResumePosition(currentChannel.id, currentChannel.mediaType, pos)
@@ -581,9 +930,10 @@ class PlayerViewModel @Inject constructor(
     override fun onCleared() {
         retryJob?.cancel()
         progressJob?.cancel()
+        subtitleSyncJob?.cancel()
         epgJob?.cancel()
-        mediaController?.removeListener(playerListener)
-        mediaController = null
+        activePlayer?.removeListener(playerListener)
+        activePlayer = null
         _boundPlayer.value = null
         controllerFuture?.let { MediaController.releaseFuture(it) }
         controllerFuture = null
