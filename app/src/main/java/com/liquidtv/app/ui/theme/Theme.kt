@@ -20,11 +20,11 @@ import androidx.compose.ui.unit.LayoutDirection
  */
 @Immutable
 data class LiquidGlassTokens(
-    val glassAlpha: Float = 0.72f,
+    val glassAlpha: Float = 0.14f,
     val blurRadius: Float = 20f,
-    val borderAlpha: Float = 0.48f,
+    val borderAlpha: Float = 0.22f,
     val highlightAlpha: Float = 0.34f,
-    val focusBorderAlpha: Float = 0.95f,
+    val focusBorderAlpha: Float = 0.82f,
     val focusScale: Float = 1.06f,
     val cardCornerRadius: Float = 16f,
     val pillCornerRadius: Float = 50f,
@@ -111,17 +111,17 @@ fun LiquidTVTheme(
     val glassTokens = remember(theme.isLight) {
         if (theme.isLight) {
             LiquidGlassTokens(
-                glassAlpha = 0.84f,
-                borderAlpha = 0.65f,
-                highlightAlpha = 0.55f,
-                focusBorderAlpha = 0.95f,
+                glassAlpha = 0.16f,
+                borderAlpha = 0.26f,
+                highlightAlpha = 0.50f,
+                focusBorderAlpha = 0.90f,
             )
         } else {
             LiquidGlassTokens(
-                glassAlpha = 0.72f,
-                borderAlpha = 0.48f,
-                highlightAlpha = 0.28f,
-                focusBorderAlpha = 0.95f,
+                glassAlpha = 0.14f,
+                borderAlpha = 0.22f,
+                highlightAlpha = 0.45f,
+                focusBorderAlpha = 0.82f,
             )
         }
     }

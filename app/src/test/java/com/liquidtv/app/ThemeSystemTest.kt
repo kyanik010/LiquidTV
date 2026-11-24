@@ -93,7 +93,7 @@ class ThemeSystemTest {
     }
 
     @Test
-    fun `AppThemeCatalog exposes all 10 original SONIX themes with exact sort order default and HEX tokens`() {
+    fun `AppThemeCatalog exposes all 10 premium dark themes with exact sort order default and HEX tokens`() {
         val themes = AppThemeCatalog.allThemes
         assertEquals(10, themes.size)
         assertEquals((10..19).toList(), themes.map { it.sortOrder })
@@ -103,76 +103,73 @@ class ThemeSystemTest {
 
         val expectedIds = listOf(
             "royal-navy",
-            "celestial-cyan",
-            "ruby-velvet",
-            "pearl-marble",
             "emerald-palace",
-            "midnight-sapphire",
-            "carrara-marble",
-            "imperial-amethyst",
-            "imperial-bronze",
             "black-onyx",
+            "ruby-velvet",
+            "celestial-cyan",
+            "imperial-amethyst",
+            "carrara-marble",
+            "imperial-bronze",
+            "midnight-sapphire",
+            "pearl-marble",
         )
         assertEquals(expectedIds, themes.map { it.id })
-        assertEquals(expectedIds, themes.map { it.atmosphere.slug })
+        assertEquals(10, themes.map { it.atmosphere }.toSet().size)
 
-        // Light mode classification must hold strictly for Pearl Marble & Carrara Marble
-        themes.forEach { theme ->
-            val expectLight = theme.id == "pearl-marble" || theme.id == "carrara-marble"
-            assertEquals("Light flag mismatch for ${theme.id}", expectLight, theme.isLight)
-        }
+        // All ten app themes are dark; Ambient has its own independent preference.
+        assertTrue(themes.all { !it.isLight })
 
-        // Exact ARGB token verification for every SONIX theme
+        // Exact ARGB token verification for all ten premium palettes
         val expectedHexTokens = mapOf(
             "royal-navy" to listOf(
-                0xFF050B19, 0xFF0B1A33, 0xFF1A3152, 0xFF1B3555, 0xFFF8F6F0, 0xFFC9D5E4,
-                0xFF91A4BC, 0xFF0C1A2D, 0xFF132844, 0xFFE4C27A, 0xFF4D6C91, 0xFFB7D8FF,
-                0xFF28496C, 0xFFF0787C, 0xFF68D5A0, 0xFF376A9D, 0xFFD5A85E,
-            ),
-            "celestial-cyan" to listOf(
-                0xFF04151F, 0xFF082B3A, 0xFF0B5260, 0xFF124052, 0xFFF2FEFF, 0xFFC0E5E8,
-                0xFF82B7BE, 0xFF082432, 0xFF0D3444, 0xFF65E3E8, 0xFF367F8E, 0xFF8AF0F2,
-                0xFF1B596B, 0xFFFF7E91, 0xFF65D8AE, 0xFF25A8B1, 0xFFB9D7C7,
-            ),
-            "ruby-velvet" to listOf(
-                0xFF17060D, 0xFF2A0B19, 0xFF54172F, 0xFF42172D, 0xFFFFF5F5, 0xFFE8CDD4,
-                0xFFB895A2, 0xFF260D1A, 0xFF351426, 0xFFD9A46D, 0xFF87445D, 0xFFF1B7C9,
-                0xFF61233F, 0xFFFF7187, 0xFF72CEA2, 0xFFA13A61, 0xFFD6A16A,
-            ),
-            "pearl-marble" to listOf(
-                0xFFE9E0D1, 0xFFFFFDF7, 0xFFD7C8B3, 0xFFFFFDF8, 0xFF30271F, 0xFF5C5043,
-                0xFF897B6B, 0xFFF9F4EA, 0xFFF1E9DC, 0xFFB28A51, 0xFFC9B99F, 0xFFA17A46,
-                0xFFE6D8C5, 0xFFB94C53, 0xFF337B5A, 0xFFC7B18D, 0xFFA88C67,
+                0xFF050B18, 0xFF10264A, 0xFF183D65, 0xFF10223B, 0xFFF4F8FF, 0xFFC7D5E8,
+                0xFF8EA5C1, 0xFF09182B, 0xFF102B45, 0xFF5B9DFF, 0xFF385A82, 0xFFA8D1FF,
+                0xFF173A60, 0xFFF07887, 0xFF59D6A0, 0xFF2867A6, 0xFF4B83C8,
             ),
             "emerald-palace" to listOf(
-                0xFF04150F, 0xFF0A261B, 0xFF174A35, 0xFF194331, 0xFFF4FBF4, 0xFFC6D9CB,
-                0xFF8EAA98, 0xFF0B2118, 0xFF123326, 0xFFDCC17A, 0xFF46795D, 0xFFB8E6C4,
-                0xFF245A40, 0xFFE8797D, 0xFF66D49A, 0xFF2F9068, 0xFFD2AD62,
-            ),
-            "midnight-sapphire" to listOf(
-                0xFF050B1C, 0xFF0B1740, 0xFF1A3670, 0xFF172D57, 0xFFF4F8FF, 0xFFC8D6EC,
-                0xFF8FA5C7, 0xFF0A1634, 0xFF112348, 0xFF91B8F1, 0xFF3F6398, 0xFFAFCFFF,
-                0xFF244477, 0xFFEF7889, 0xFF68D2A2, 0xFF326CC1, 0xFF8BADE0,
-            ),
-            "carrara-marble" to listOf(
-                0xFFE2E8ED, 0xFFFFFFFF, 0xFFCDD7E0, 0xFFFFFFFF, 0xFF26323D, 0xFF4C5C68,
-                0xFF778794, 0xFFF8FAFC, 0xFFEEF2F5, 0xFF7895AC, 0xFFBCC9D3, 0xFF6F8EA8,
-                0xFFDFE7ED, 0xFFB84D59, 0xFF2F805E, 0xFF9DB6C8, 0xFFB9A58B,
-            ),
-            "imperial-amethyst" to listOf(
-                0xFF100819, 0xFF21102F, 0xFF432052, 0xFF342144, 0xFFFBF6FF, 0xFFDCCCE8,
-                0xFFA998B9, 0xFF1B1027, 0xFF291936, 0xFFD5A8E8, 0xFF725487, 0xFFD9B9F3,
-                0xFF4A2E60, 0xFFF07E98, 0xFF6DCDA5, 0xFF8553B3, 0xFFC18BBE,
-            ),
-            "imperial-bronze" to listOf(
-                0xFF120D09, 0xFF24180F, 0xFF49301A, 0xFF3A2818, 0xFFFFF8EE, 0xFFE5D2BB,
-                0xFFB29A7F, 0xFF21170F, 0xFF302114, 0xFFD9A66A, 0xFF80603B, 0xFFE9C69A,
-                0xFF56391F, 0xFFE97C6F, 0xFF7AC99B, 0xFFA56D3E, 0xFFD5A45E,
+                0xFF04120F, 0xFF10372C, 0xFF1A5945, 0xFF0E2A20, 0xFFF4FBF7, 0xFFC7E7D9,
+                0xFF8EAA98, 0xFF081D17, 0xFF103326, 0xFF36D6A0, 0xFF356C59, 0xFFA0F0D0,
+                0xFF174735, 0xFFE8797D, 0xFF66D49A, 0xFF1C8A64, 0xFF4BBE91,
             ),
             "black-onyx" to listOf(
-                0xFF050609, 0xFF101318, 0xFF252A31, 0xFF252B34, 0xFFF7F8FA, 0xFFCED3DA,
-                0xFF929DA9, 0xFF11151B, 0xFF1B2028, 0xFFD9DDE2, 0xFF66717E, 0xFFD3DCE5,
-                0xFF39414C, 0xFFE77A83, 0xFF72C79D, 0xFF73869A, 0xFFB5A18A,
+                0xFF080907, 0xFF1C1A14, 0xFF3B3020, 0xFF211D15, 0xFFF8F5EC, 0xFFD9D1C0,
+                0xFFA79A80, 0xFF12110D, 0xFF211C14, 0xFFD9B36C, 0xFF665438, 0xFFF0D8A4,
+                0xFF3A2E1C, 0xFFE97C6F, 0xFF7AC99B, 0xFF9D783D, 0xFFD9B36C,
+            ),
+            "ruby-velvet" to listOf(
+                0xFF10070B, 0xFF351321, 0xFF5A2035, 0xFF2A111E, 0xFFFFF5F6, 0xFFE8CDD4,
+                0xFFB895A2, 0xFF1B0C14, 0xFF321524, 0xFFF06A82, 0xFF71354B, 0xFFFFC0CE,
+                0xFF4B1C30, 0xFFFF7187, 0xFF72CEA2, 0xFFB83C61, 0xFFE05B79,
+            ),
+            "celestial-cyan" to listOf(
+                0xFF041116, 0xFF0B3039, 0xFF12515A, 0xFF0D2931, 0xFFF2FEFF, 0xFFC0E5E8,
+                0xFF82B7BE, 0xFF071D24, 0xFF0D333C, 0xFF36C6C9, 0xFF286A73, 0xFFA1F0EE,
+                0xFF14505B, 0xFFFF7E91, 0xFF65D8AE, 0xFF0D8796, 0xFF2FB4B9,
+            ),
+            "imperial-amethyst" to listOf(
+                0xFF0B0714, 0xFF28163E, 0xFF48265F, 0xFF241532, 0xFFFBF6FF, 0xFFDCCCE8,
+                0xFFA998B9, 0xFF170D24, 0xFF2C1A3D, 0xFFB58AFF, 0xFF60447A, 0xFFE0C9FF,
+                0xFF41265A, 0xFFF07E98, 0xFF6DCDA5, 0xFF7847B0, 0xFFA36BD2,
+            ),
+            "carrara-marble" to listOf(
+                0xFF090C11, 0xFF202A36, 0xFF3B4655, 0xFF1B232D, 0xFFF7F8FA, 0xFFCED3DA,
+                0xFF929DA9, 0xFF111821, 0xFF222D39, 0xFFB9C8D9, 0xFF566579, 0xFFE5EDF5,
+                0xFF344456, 0xFFE77A83, 0xFF72C79D, 0xFF6E849C, 0xFFA3B4C7,
+            ),
+            "imperial-bronze" to listOf(
+                0xFF100A08, 0xFF382016, 0xFF60351F, 0xFF2B1A12, 0xFFFFF8F2, 0xFFE5D2BB,
+                0xFFB29A7F, 0xFF1B100B, 0xFF362015, 0xFFE69A62, 0xFF795039, 0xFFFFD0A8,
+                0xFF4C2B19, 0xFFE97C6F, 0xFF7AC99B, 0xFFA85B31, 0xFFD07C49,
+            ),
+            "midnight-sapphire" to listOf(
+                0xFF07091B, 0xFF171D4B, 0xFF293A75, 0xFF171C3A, 0xFFF5F6FF, 0xFFCDD2F4,
+                0xFF969FC9, 0xFF10142D, 0xFF1D2550, 0xFF7185FF, 0xFF4653A0, 0xFFC0C8FF,
+                0xFF2D3973, 0xFFEF7889, 0xFF68D2A2, 0xFF4659CC, 0xFF7788F0,
+            ),
+            "pearl-marble" to listOf(
+                0xFF10090D, 0xFF35202A, 0xFF53333D, 0xFF2A1922, 0xFFFFF5F5, 0xFFE8CDD4,
+                0xFFB895A2, 0xFF1A1017, 0xFF35212B, 0xFFE6A4A0, 0xFF754D5A, 0xFFF8D0C9,
+                0xFF4C2E3A, 0xFFFF7187, 0xFF72CEA2, 0xFFB86E78, 0xFFD58D91,
             ),
         )
 
@@ -189,7 +186,7 @@ class ThemeSystemTest {
     }
 
     @Test
-    fun `All 10 themes preserve strong text, button, and accent contrast across light and dark modes`() {
+    fun `All 10 premium dark themes preserve strong text, button, and accent contrast`() {
         AppThemeCatalog.allThemes.forEach { theme ->
             val p = theme.palette
             assertTrue("${theme.id}: text on background", contrastRatio(p.text, p.background) >= 4.5f)
@@ -277,7 +274,7 @@ class ThemeSystemTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText("الثيم المفعّل حالياً", substring = true).assertIsDisplayed()
 
-        // Select Light theme "لؤلؤة القصور" (Pearl Marble)
+        // Select Rose Gold Noir (stable stored ID: pearl-marble)
         composeRule.onNodeWithTag("settings_content_list")
             .performScrollToNode(hasTestTag("theme_card_pearl-marble"))
         composeRule.onNodeWithTag("theme_card_pearl-marble").performClick()
@@ -287,8 +284,8 @@ class ThemeSystemTest {
         composeRule.waitForIdle()
 
         assertEquals("pearl-marble", activeThemeId)
-        assertTrue(activeIsLight)
-        assertEquals(0xFFE9E0D1.toInt(), activeBgArgb)
+        assertFalse(activeIsLight)
+        assertEquals(0xFF10090D.toInt(), activeBgArgb)
         composeRule.onNodeWithTag("settings_content_list")
             .performScrollToNode(hasTestTag("theme_card_pearl-marble"))
         composeRule.onNodeWithTag("theme_card_pearl-marble")
@@ -312,7 +309,7 @@ class ThemeSystemTest {
 
         assertEquals("ruby-velvet", activeThemeId)
         assertFalse(activeIsLight)
-        assertEquals(0xFF17060D.toInt(), activeBgArgb)
+        assertEquals(0xFF10070B.toInt(), activeBgArgb)
         composeRule.onNodeWithTag("settings_content_list")
             .performScrollToNode(hasTestTag("theme_card_ruby-velvet"))
         composeRule.onNodeWithTag("theme_card_ruby-velvet")
@@ -329,7 +326,7 @@ class ThemeSystemTest {
         composeRule.waitForIdle()
 
         assertEquals("black-onyx", activeThemeId)
-        assertEquals(0xFF050609.toInt(), activeBgArgb)
+        assertEquals(0xFF080907.toInt(), activeBgArgb)
         composeRule.onNodeWithTag("settings_content_list")
             .performScrollToNode(hasTestTag("theme_card_black-onyx"))
         composeRule.onNodeWithTag("theme_card_black-onyx")

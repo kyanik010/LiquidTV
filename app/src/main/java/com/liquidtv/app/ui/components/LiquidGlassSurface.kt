@@ -30,8 +30,8 @@ import com.liquidtv.app.ui.theme.LocalLiquidGlassTokens
 fun LiquidGlassSurface(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 16.dp,
-    glassAlpha: Float = 0.18f,
-    borderAlpha: Float = 0.25f,
+    glassAlpha: Float = 0.14f,
+    borderAlpha: Float = 0.22f,
     highlightAlpha: Float = 0.45f,
     shadowAlpha: Float = 0.3f,
     glassColor: Color = Color.Unspecified,
@@ -52,19 +52,9 @@ fun LiquidGlassSurface(
     val resolvedFocusBorder = colors.focus
     val resolvedGlowColor = if (accentGlowColor != Color.Unspecified) accentGlowColor else colors.focusGlow
 
-    // Scale glass & border opacity smoothly so palette tokens (`card`, `border`) carry real depth
-    val scaledBaseGlassAlpha = if (glassColor != Color.Unspecified) {
-        glassAlpha.coerceIn(0f, 1f)
-    } else {
-        (glassAlpha * if (isLight) 3.4f else 2.6f).coerceIn(
-            if (isLight) 0.56f else 0.34f,
-            if (isLight) 0.94f else 0.78f,
-        )
-    }
-    val scaledBaseBorderAlpha = (borderAlpha * if (isLight) 2.2f else 1.85f).coerceIn(
-        if (isLight) 0.45f else 0.35f,
-        0.92f,
-    )
+    // Apply the requested alpha literally so theme tints never turn glass cards opaque.
+    val scaledBaseGlassAlpha = glassAlpha.coerceIn(0.06f, 0.96f)
+    val scaledBaseBorderAlpha = borderAlpha.coerceIn(0.08f, 0.92f)
 
     // Snappy animations to avoid multi-second frame drops during D-pad navigation
     val focusProgress by animateFloatAsState(
@@ -84,7 +74,7 @@ fun LiquidGlassSurface(
     )
 
     val activeBorderAlpha = scaledBaseBorderAlpha + focusProgress * (tokens.focusBorderAlpha - scaledBaseBorderAlpha)
-    val activeGlassAlpha = (scaledBaseGlassAlpha + focusProgress * 0.14f).coerceIn(0f, 0.96f)
+    val activeGlassAlpha = (scaledBaseGlassAlpha + focusProgress * 0.08f).coerceIn(0f, 0.96f)
     val activeHighlightAlpha = highlightAlpha + focusProgress * 0.18f
 
     val shape = remember(cornerRadius) { RoundedCornerShape(cornerRadius) }
@@ -126,8 +116,8 @@ fun LiquidGlassSurface(
 fun LiquidGlassSurfaceFocusable(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 16.dp,
-    glassAlpha: Float = 0.15f,
-    borderAlpha: Float = 0.2f,
+    glassAlpha: Float = 0.14f,
+    borderAlpha: Float = 0.22f,
     highlightAlpha: Float = 0.35f,
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit,

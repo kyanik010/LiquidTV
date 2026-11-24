@@ -457,7 +457,7 @@ private fun SettingsSectionTab(
             .testTag("settings_section_${section.name.lowercase()}"),
         cornerRadius = 14.dp,
         glassColor = if (isSelected) colors.selected else colors.surface,
-        glassAlpha = if (isSelected) 0.92f else if (isFocused) 0.85f else 0.62f,
+        glassAlpha = if (isSelected) 0.18f else if (isFocused) 0.14f else 0.08f,
         borderAlpha = if (isFocused) 0.95f else if (isSelected) 0.85f else 0.45f,
         borderColor = if (isSelected) colors.accent else colors.border,
         isFocused = isFocused,
@@ -504,7 +504,7 @@ private fun SettingsSectionPill(
             .testTag("settings_section_${section.name.lowercase()}"),
         cornerRadius = 24.dp,
         glassColor = if (isSelected) colors.selected else colors.surface,
-        glassAlpha = if (isSelected) 0.92f else if (isFocused) 0.86f else 0.66f,
+        glassAlpha = if (isSelected) 0.18f else if (isFocused) 0.14f else 0.08f,
         borderAlpha = if (isFocused) 0.95f else if (isSelected) 0.85f else 0.45f,
         borderColor = if (isSelected) colors.accent else colors.border,
         isFocused = isFocused,
@@ -549,7 +549,7 @@ private fun SettingsDetailPane(
         modifier = modifier,
         cornerRadius = 22.dp,
         glassColor = colors.panel,
-        glassAlpha = if (colors.isLight) 0.86f else 0.68f,
+        glassAlpha = 0.16f,
         borderColor = colors.border,
         borderAlpha = 0.55f,
     ) {
@@ -1043,8 +1043,8 @@ private fun ThemeSelectionCard(
             .semantics { selected = isSelected }
             .testTag("theme_card_${theme.id}"),
         cornerRadius = 18.dp,
-        glassColor = if (isSelected) activeColors.selected else activeColors.card,
-        glassAlpha = if (isSelected) 0.92f else 0.78f,
+        glassColor = activeColors.card,
+        glassAlpha = if (isSelected) 0.18f else 0.12f,
         borderColor = when {
             isFocused -> activeColors.focus
             isSelected -> activeColors.accent
@@ -1110,7 +1110,7 @@ private fun ThemeSelectionCard(
                     val navX = (w - navW) / 2f
                     val navY = h * 0.10f
                     drawRoundRect(
-                        color = p.panel.copy(alpha = 0.92f),
+                        color = p.panel.copy(alpha = 0.12f),
                         topLeft = Offset(navX, navY),
                         size = Size(navW, navH),
                         cornerRadius = CornerRadius(navH / 2f),
@@ -1141,7 +1141,7 @@ private fun ThemeSelectionCard(
                         cornerRadius = CornerRadius(6.dp.toPx()),
                     )
                     drawRoundRect(
-                        color = p.selected,
+                        color = p.selected.copy(alpha = 0.24f),
                         topLeft = Offset(sideX + 4.dp.toPx(), bodyTop + 6.dp.toPx()),
                         size = Size(sideW - 8.dp.toPx(), bodyH * 0.28f),
                         cornerRadius = CornerRadius(4.dp.toPx()),
@@ -1151,7 +1151,7 @@ private fun ThemeSelectionCard(
                     val cardW = w * 0.56f
                     val cardX = w * 0.06f
                     drawRoundRect(
-                        color = p.card.copy(alpha = 0.94f),
+                        color = p.card.copy(alpha = 0.14f),
                         topLeft = Offset(cardX, bodyTop),
                         size = Size(cardW, bodyH),
                         cornerRadius = CornerRadius(8.dp.toPx()),
@@ -1338,7 +1338,7 @@ private fun SettingItemTile(
             .let { m -> if (testTag != null) m.testTag(testTag) else m },
         cornerRadius = 16.dp,
         glassColor = if (isFocused) colors.selected else colors.card,
-        glassAlpha = if (isFocused) 0.90f else 0.72f,
+        glassAlpha = if (isFocused) 0.18f else 0.12f,
         borderAlpha = if (isFocused) 0.95f else 0.50f,
         borderColor = if (isFocused) colors.focus else colors.border,
         isFocused = isFocused,

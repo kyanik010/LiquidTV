@@ -57,7 +57,7 @@ fun GlassChannelCard(
             .focusable(interactionSource = interactionSource)
             .onFocusChanged { /* handled via interactionSource */ },
         cornerRadius = 18.dp,
-        glassAlpha = if (isFocused) 0.32f else 0.16f,
+        glassAlpha = if (isFocused) 0.22f else 0.14f,
         borderAlpha = if (isFocused) 0.85f else 0.22f,
         isFocused = isFocused,
         onClick = onClick,
@@ -219,7 +219,7 @@ fun GlassChannelListItem(
             .height(72.dp)
             .focusable(interactionSource = interactionSource),
         cornerRadius = 16.dp,
-        glassAlpha = if (isFocused) 0.32f else 0.14f,
+        glassAlpha = if (isFocused) 0.20f else 0.12f,
         borderAlpha = if (isFocused) 0.85f else 0.20f,
         isFocused = isFocused,
         onClick = onClick,
