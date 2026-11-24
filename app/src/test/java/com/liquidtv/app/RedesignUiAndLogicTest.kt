@@ -409,6 +409,9 @@ class RedesignUiAndLogicTest {
                 }
             }
         }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodes(hasTestTag("live_categories_sidebar")).fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithTag("live_categories_sidebar").assertIsDisplayed()
         composeRule.onNodeWithTag("live_channels_list").assertIsDisplayed()
         composeRule.onNodeWithTag("live_preview_play_button").assertIsDisplayed()
@@ -427,6 +430,9 @@ class RedesignUiAndLogicTest {
                 }
             }
         }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodes(hasTestTag("movies_grid")).fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithTag("movies_grid").assertIsDisplayed()
         composeRule.onNodeWithText("صحراء العاصفة").assertIsDisplayed()
     }
@@ -443,6 +449,9 @@ class RedesignUiAndLogicTest {
                     SeriesScreen(onSeriesClick = {}, viewModel = seriesVm)
                 }
             }
+        }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodes(hasTestTag("series_grid")).fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithTag("series_categories_sidebar").assertIsDisplayed()
         composeRule.onNodeWithTag("series_grid").assertIsDisplayed()
@@ -533,6 +542,9 @@ class RedesignUiAndLogicTest {
             }
         }
 
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodes(hasTestTag("movies_grid")).fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithTag("movies_count").assertIsDisplayed()
         composeRule.onNodeWithTag("movies_categories_sidebar").assertIsDisplayed()
         composeRule.onNodeWithTag("movies_grid").assertIsDisplayed()
@@ -559,6 +571,9 @@ class RedesignUiAndLogicTest {
             }
         }
 
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodes(hasTestTag("series_grid")).fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithTag("series_header").assertIsDisplayed()
         composeRule.onNodeWithTag("series_count").assertIsDisplayed()
         composeRule.onNodeWithTag("series_grid").assertIsDisplayed()
@@ -695,6 +710,10 @@ class RedesignUiAndLogicTest {
                 }
             }
         }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodes(hasTestTag("movies_categories_sidebar")).fetchSemanticsNodes().isNotEmpty() &&
+                composeRule.onAllNodes(hasText("فيلم رقم 6")).fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.waitForIdle()
         val density = composeRule.density.density
         val moviesSidebarW = composeRule.onNodeWithTag("movies_categories_sidebar").fetchSemanticsNode().boundsInRoot.width / density
@@ -730,6 +749,10 @@ class RedesignUiAndLogicTest {
                     SeriesScreen(onSeriesClick = {}, viewModel = seriesVm)
                 }
             }
+        }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodes(hasTestTag("series_categories_sidebar")).fetchSemanticsNodes().isNotEmpty() &&
+                composeRule.onAllNodes(hasText("مسلسل رقم 6")).fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.waitForIdle()
 
@@ -792,6 +815,9 @@ class RedesignUiAndLogicTest {
                     MoviesScreen(onMovieClick = {}, viewModel = moviesVm)
                 }
             }
+        }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodes(hasTestTag("movies_grid")).fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("movies_grid").assertIsDisplayed()
