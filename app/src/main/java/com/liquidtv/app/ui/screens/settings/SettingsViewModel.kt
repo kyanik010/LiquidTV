@@ -3,11 +3,13 @@ package com.liquidtv.app.ui.screens.settings
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.liquidtv.app.data.sonix.SonixSyncState
 import com.liquidtv.app.data.worker.PlaylistSyncWorker
 import com.liquidtv.app.domain.model.Category
 import com.liquidtv.app.domain.model.MediaType
 import com.liquidtv.app.domain.model.Subscription
 import com.liquidtv.app.domain.repository.ChannelRepository
+import com.liquidtv.app.domain.repository.SonixControlRepository
 import com.liquidtv.app.domain.repository.SubscriptionRepository
 import com.liquidtv.app.domain.repository.UserPreferencesRepository
 import com.liquidtv.app.ui.theme.AppThemeCatalog
@@ -19,6 +21,7 @@ import javax.inject.Inject
 
 data class SettingsUiState(
     val activeSubscription: Subscription? = null,
+    val sonixState: SonixSyncState = SonixSyncState(),
     val categories: List<Category> = emptyList(),
     // Playback preferences
     val defaultQuality: String = "Auto",
@@ -55,6 +58,7 @@ class SettingsViewModel @Inject constructor(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val channelRepository: ChannelRepository,
     private val subscriptionRepository: SubscriptionRepository,
+    private val sonixControlRepository: SonixControlRepository? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -66,13 +70,16 @@ class SettingsViewModel @Inject constructor(
 
     private fun loadPreferences() {
         viewModelScope.launch {
+            val sonixFlow = sonixControlRepository?.state ?: MutableStateFlow(SonixSyncState())
             combine(
                 userPreferencesRepository.userPreferences,
                 subscriptionRepository.activeSubscription,
                 channelRepository.getAllCategories(MediaType.LIVE),
-            ) { prefs, sub, categories ->
+                sonixFlow,
+            ) { prefs, sub, categories, sonix ->
                 _uiState.value.copy(
                     activeSubscription = sub,
+                    sonixState = sonix,
                     categories = categories,
                     defaultQuality = prefs.defaultQuality,
                     autoPlay = prefs.autoPlay,
@@ -276,6 +283,24 @@ class SettingsViewModel @Inject constructor(
     fun setAutoCheckUpdates(enabled: Boolean) {
         viewModelScope.launch {
             userPreferencesRepository.setAutoCheckUpdates(enabled)
+        }
+    }
+
+    fun syncWithControlPanel() {
+        val repo = sonixControlRepository ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshing = true, error = null, successMessage = null) }
+            repo.syncNow(force = true)
+                .onSuccess {
+                    _uiState.update {
+                        it.copy(isRefreshing = false, successMessage = "تمت مزامنة حالة الجهاز والإعدادات من لوحة التحكم")
+                    }
+                }
+                .onFailure { throwable ->
+                    _uiState.update {
+                        it.copy(isRefreshing = false, error = throwable.message ?: "فشلت المزامنة مع لوحة التحكم")
+                    }
+                }
         }
     }
 

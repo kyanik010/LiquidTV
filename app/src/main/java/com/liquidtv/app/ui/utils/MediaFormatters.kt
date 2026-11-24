@@ -3,6 +3,8 @@ package com.liquidtv.app.ui.utils
 import com.liquidtv.app.domain.model.EpisodeItem
 import com.liquidtv.app.domain.model.SeasonGroup
 import com.liquidtv.app.domain.model.SubscriptionStatus
+import com.liquidtv.app.data.sonix.SonixAccessStatus
+import com.liquidtv.app.domain.model.SubscriptionOrigin
 import com.liquidtv.app.domain.model.SubscriptionType
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -101,5 +103,23 @@ fun localizedSubscriptionStatusAr(status: SubscriptionStatus): String = when (st
 
 fun localizedSubscriptionTypeAr(type: SubscriptionType): String = when (type) {
     SubscriptionType.XTREAM -> "خادم Xtream"
-    SubscriptionType.M3U -> "قائمة M3U"
+}
+
+fun localizedSubscriptionOriginAr(origin: SubscriptionOrigin): String = when (origin) {
+    SubscriptionOrigin.NORMAL_URL -> "URL عادي"
+    SubscriptionOrigin.PANEL_SERVER -> "سيرفر لوحة التحكم"
+}
+
+fun localizedSonixAccessStatusAr(status: SonixAccessStatus): String = when (status) {
+    SonixAccessStatus.ACTIVE -> "مفعّل"
+    SonixAccessStatus.EXPIRED -> "منتهي الصلاحية"
+    SonixAccessStatus.BLOCKED -> "محظور"
+    SonixAccessStatus.REVOKED -> "ملغي الصلاحية"
+    SonixAccessStatus.UNKNOWN -> "بانتظار المزامنة"
+}
+
+fun formatIsoDateShortAr(iso: String?): String? {
+    if (iso.isNullOrBlank()) return null
+    val rawDate = iso.substringBefore("T").takeIf { it.length == 10 } ?: return iso
+    return rawDate
 }

@@ -32,6 +32,7 @@ import com.liquidtv.app.domain.model.MediaType
 import com.liquidtv.app.domain.model.PlaylistInfo
 import com.liquidtv.app.domain.model.SeriesItem
 import com.liquidtv.app.domain.model.Subscription
+import com.liquidtv.app.domain.model.SubscriptionOrigin
 import com.liquidtv.app.domain.repository.ChannelRepository
 import com.liquidtv.app.domain.repository.SubscriptionRepository
 import com.liquidtv.app.ui.screens.settings.SettingsScreen
@@ -356,15 +357,9 @@ private class StubSubscriptionRepository : SubscriptionRepository {
         serverUrl: String,
         username: String,
         password: String,
-        activate: Boolean,
-    ): Result<Subscription> = Result.failure(UnsupportedOperationException())
-
-    override suspend fun addOrUpdateM3uSubscription(
-        existingId: String?,
-        displayName: String,
-        playlistUrl: String,
-        userAgent: String?,
-        referer: String?,
+        origin: SubscriptionOrigin,
+        panelServerId: String?,
+        panelServerName: String?,
         activate: Boolean,
     ): Result<Subscription> = Result.failure(UnsupportedOperationException())
 
@@ -374,7 +369,6 @@ private class StubSubscriptionRepository : SubscriptionRepository {
     override suspend fun syncActiveEpg(): Result<Unit> = Result.success(Unit)
     override suspend fun deleteSubscription(subscriptionId: String): Result<Unit> = Result.success(Unit)
     override suspend fun getDecryptedXtreamPassword(subscriptionId: String): String? = null
-    override suspend fun getDecryptedM3uUrl(subscriptionId: String): String? = null
 }
 
 private class StubChannelRepository : ChannelRepository {

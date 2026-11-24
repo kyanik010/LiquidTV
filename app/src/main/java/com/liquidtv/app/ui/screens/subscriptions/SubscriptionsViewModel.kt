@@ -2,8 +2,10 @@ package com.liquidtv.app.ui.screens.subscriptions
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.liquidtv.app.data.sonix.SonixSyncState
 import com.liquidtv.app.domain.model.PlaylistInfo
 import com.liquidtv.app.domain.model.Subscription
+import com.liquidtv.app.domain.repository.SonixControlRepository
 import com.liquidtv.app.domain.repository.SubscriptionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -14,6 +16,7 @@ data class SubscriptionsUiState(
     val subscriptions: List<Subscription> = emptyList(),
     val activeSubscription: Subscription? = null,
     val syncInfo: PlaylistInfo = PlaylistInfo(),
+    val sonixState: SonixSyncState = SonixSyncState(),
     val busySubscriptionId: String? = null,
     val message: String? = null,
     val error: String? = null,
@@ -22,11 +25,13 @@ data class SubscriptionsUiState(
 @HiltViewModel
 class SubscriptionsViewModel @Inject constructor(
     private val subscriptionRepository: SubscriptionRepository,
+    private val sonixControlRepository: SonixControlRepository? = null,
 ) : ViewModel() {
 
     private val _busyId = MutableStateFlow<String?>(null)
     private val _message = MutableStateFlow<String?>(null)
     private val _error = MutableStateFlow<String?>(null)
+    private val sonixFlow = sonixControlRepository?.state ?: MutableStateFlow(SonixSyncState())
 
     val uiState: StateFlow<SubscriptionsUiState> = combine(
         combine(
@@ -35,11 +40,13 @@ class SubscriptionsViewModel @Inject constructor(
             subscriptionRepository.syncInfo,
         ) { all, active, sync -> Triple(all, active, sync) },
         combine(_busyId, _message, _error) { busyId, msg, err -> Triple(busyId, msg, err) },
-    ) { (all, active, sync), (busyId, msg, err) ->
+        sonixFlow,
+    ) { (all, active, sync), (busyId, msg, err), sonix ->
         SubscriptionsUiState(
             subscriptions = all,
             activeSubscription = active,
             syncInfo = sync,
+            sonixState = sonix,
             busySubscriptionId = busyId,
             message = msg,
             error = err,
@@ -50,13 +57,26 @@ class SubscriptionsViewModel @Inject constructor(
         initialValue = SubscriptionsUiState(),
     )
 
-    fun activate(subscriptionId: String) {
+    fun refreshPanel() {
+        val repo = sonixControlRepository ?: return
+        viewModelScope.launch {
+            _error.value = null
+            repo.syncNow(force = true)
+                .onSuccess { _message.value = "تم تحديث حالة الجهاز والسيرفرات من لوحة التحكم" }
+                .onFailure { _error.value = it.message ?: "تعذّرت المزامنة مع لوحة التحكم" }
+        }
+    }
+
+    fun activate(subscriptionId: String, onSuccess: () -> Unit = {}) {
         viewModelScope.launch {
             _busyId.value = subscriptionId
             _error.value = null
             subscriptionRepository.activateSubscription(subscriptionId)
-                .onSuccess { _message.value = "تم تفعيل الاشتراك المحدد" }
-                .onFailure { _error.value = it.message ?: "تعذّر تبديل الاشتراك" }
+                .onSuccess {
+                    _message.value = "تم تفعيل قائمة التشغيل المحددة"
+                    onSuccess()
+                }
+                .onFailure { _error.value = it.message ?: "تعذّر تفعيل قائمة التشغيل" }
             _busyId.value = null
         }
     }
@@ -66,7 +86,7 @@ class SubscriptionsViewModel @Inject constructor(
             _busyId.value = subscriptionId
             _error.value = null
             subscriptionRepository.syncSubscription(subscriptionId)
-                .onSuccess { _message.value = "تمت مزامنة الاشتراك بنجاح" }
+                .onSuccess { _message.value = "تمت مزامنة قائمة التشغيل بنجاح" }
                 .onFailure { _error.value = it.message ?: "فشلت المزامنة" }
             _busyId.value = null
         }
@@ -77,8 +97,8 @@ class SubscriptionsViewModel @Inject constructor(
             _busyId.value = subscriptionId
             _error.value = null
             subscriptionRepository.deleteSubscription(subscriptionId)
-                .onSuccess { _message.value = "تم حذف الاشتراك" }
-                .onFailure { _error.value = it.message ?: "فشل حذف الاشتراك" }
+                .onSuccess { _message.value = "تم حذف قائمة التشغيل" }
+                .onFailure { _error.value = it.message ?: "فشل حذف القائمة" }
             _busyId.value = null
         }
     }

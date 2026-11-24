@@ -2,6 +2,7 @@ package com.liquidtv.app.domain.repository
 
 import com.liquidtv.app.domain.model.PlaylistInfo
 import com.liquidtv.app.domain.model.Subscription
+import com.liquidtv.app.domain.model.SubscriptionOrigin
 import kotlinx.coroutines.flow.Flow
 
 interface SubscriptionRepository {
@@ -19,15 +20,9 @@ interface SubscriptionRepository {
         serverUrl: String,
         username: String,
         password: String,
-        activate: Boolean = true,
-    ): Result<Subscription>
-
-    suspend fun addOrUpdateM3uSubscription(
-        existingId: String? = null,
-        displayName: String,
-        playlistUrl: String,
-        userAgent: String? = null,
-        referer: String? = null,
+        origin: SubscriptionOrigin = SubscriptionOrigin.NORMAL_URL,
+        panelServerId: String? = null,
+        panelServerName: String? = null,
         activate: Boolean = true,
     ): Result<Subscription>
 
@@ -41,9 +36,4 @@ interface SubscriptionRepository {
      * Returns decrypted password for an Xtream subscription (for internal API/player calls only).
      */
     suspend fun getDecryptedXtreamPassword(subscriptionId: String): String?
-
-    /**
-     * Returns decrypted M3U URL for an M3U subscription (for internal sync calls only).
-     */
-    suspend fun getDecryptedM3uUrl(subscriptionId: String): String?
 }

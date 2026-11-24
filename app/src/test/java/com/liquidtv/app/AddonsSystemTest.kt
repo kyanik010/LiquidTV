@@ -33,6 +33,7 @@ import com.liquidtv.app.domain.model.PlaylistInfo
 import com.liquidtv.app.domain.model.SeriesItem
 import com.liquidtv.app.domain.model.StremioAddon
 import com.liquidtv.app.domain.model.Subscription
+import com.liquidtv.app.domain.model.SubscriptionOrigin
 import com.liquidtv.app.domain.model.SubtitleStyleSettings
 import com.liquidtv.app.domain.repository.AddonPreferencesRepository
 import com.liquidtv.app.domain.repository.ChannelRepository
@@ -502,10 +503,15 @@ class AddonTestSubscriptionRepository : SubscriptionRepository {
     override suspend fun getSubscriptionById(id: String): Subscription? = null
     override suspend fun hasAnySubscription(): Boolean = false
     override suspend fun addOrUpdateXtreamSubscription(
-        existingId: String?, displayName: String, serverUrl: String, username: String, password: String, activate: Boolean,
-    ): Result<Subscription> = Result.failure(UnsupportedOperationException())
-    override suspend fun addOrUpdateM3uSubscription(
-        existingId: String?, displayName: String, playlistUrl: String, userAgent: String?, referer: String?, activate: Boolean,
+        existingId: String?,
+        displayName: String,
+        serverUrl: String,
+        username: String,
+        password: String,
+        origin: SubscriptionOrigin,
+        panelServerId: String?,
+        panelServerName: String?,
+        activate: Boolean,
     ): Result<Subscription> = Result.failure(UnsupportedOperationException())
     override suspend fun activateSubscription(subscriptionId: String): Result<Unit> = Result.success(Unit)
     override suspend fun syncSubscription(subscriptionId: String): Result<Unit> = Result.success(Unit)
@@ -513,7 +519,6 @@ class AddonTestSubscriptionRepository : SubscriptionRepository {
     override suspend fun syncActiveEpg(): Result<Unit> = Result.success(Unit)
     override suspend fun deleteSubscription(subscriptionId: String): Result<Unit> = Result.success(Unit)
     override suspend fun getDecryptedXtreamPassword(subscriptionId: String): String? = null
-    override suspend fun getDecryptedM3uUrl(subscriptionId: String): String? = null
 }
 
 open class AddonTestChannelRepository : ChannelRepository {

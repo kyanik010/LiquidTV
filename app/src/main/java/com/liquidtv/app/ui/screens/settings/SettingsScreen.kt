@@ -49,7 +49,9 @@ import com.liquidtv.app.ui.theme.LiquidTypography
 import com.liquidtv.app.ui.theme.ThemeDefinition
 import com.liquidtv.app.ui.utils.localizedQualityAr
 import com.liquidtv.app.ui.utils.localizedSubscriptionStatusAr
-import com.liquidtv.app.ui.utils.localizedSubscriptionTypeAr
+import com.liquidtv.app.ui.utils.formatIsoDateShortAr
+import com.liquidtv.app.ui.utils.localizedSonixAccessStatusAr
+import com.liquidtv.app.ui.utils.localizedSubscriptionOriginAr
 import com.liquidtv.app.ui.utils.localizedSubtitleLangAr
 import com.liquidtv.app.ui.utils.localizedThemeAr
 import com.liquidtv.app.updater.AppUpdateViewModel
@@ -575,14 +577,14 @@ private fun SettingsDetailPane(
                         when (selectedSection) {
                             SettingsSection.Subscriptions -> {
                                 item {
-                                    SettingHeader("اشتراكات IPTV والمزامنة", "إدارة حسابات Xtream وM3U والجدول الزمني ودليل البرامج")
+                                    SettingHeader("قوائم التشغيل والمزامنة", "إدارة قوائم Xtream وحالة الجهاز في لوحة التحكم ودليل البرامج")
                                 }
                                 item {
                                     val sub = uiState.activeSubscription
                                     SettingItemTile(
-                                        title = "إدارة الاشتراكات",
+                                        title = "إدارة قوائم التشغيل",
                                         subtitle = if (sub != null) {
-                                            "المفعّل: ${sub.name} (${localizedSubscriptionTypeAr(sub.type)}) • ${localizedSubscriptionStatusAr(sub.connectionStatus)}"
+                                            "المفعّل: ${sub.name} (${localizedSubscriptionOriginAr(sub.origin)}) • ${localizedSubscriptionStatusAr(sub.connectionStatus)}"
                                         } else {
                                             "إضافة أو تعديل أو التبديل بين حسابات IPTV"
                                         },
@@ -591,6 +593,23 @@ private fun SettingsDetailPane(
                                         },
                                         onClick = onManageSubscriptions,
                                         testTag = "setting_manage_subscriptions",
+                                    )
+                                }
+                                item {
+                                    val sonix = uiState.sonixState
+                                    val deviceIdLabel = sonix.deviceCode?.takeIf { it.isNotBlank() } ?: "غير مسجل بعد"
+                                    val subLine = sonix.subscription?.let { pSub ->
+                                        val end = formatIsoDateShortAr(pSub.endsAt)
+                                        if (end != null) " • ينتهي: $end" else ""
+                                    }.orEmpty()
+                                    SettingItemTile(
+                                        title = "لوحة التحكم SONIX (معرّف الجهاز: $deviceIdLabel)",
+                                        subtitle = "حالة الجهاز: ${localizedSonixAccessStatusAr(sonix.accessStatus)}$subLine • اضغط للمزامنة الآن",
+                                        action = {
+                                            Icon(Icons.Filled.Devices, null, tint = colors.accentText)
+                                        },
+                                        onClick = { viewModel.syncWithControlPanel() },
+                                        testTag = "setting_sonix_sync",
                                     )
                                 }
                                 item {
@@ -958,7 +977,7 @@ private fun SettingsDetailPane(
                             }
                             SettingsSection.Updates -> {
                                 item {
-                                    SettingHeader("تحديثات التطبيق وGitHub", "التحقق من الإصدارات الموقّعة وتثبيتها مباشرة")
+                                    SettingHeader("تحديثات التطبيق", "فحص تحديثات لوحة SONIX-CONTROL وإصدارات GitHub الموقّعة")
                                 }
                                 item {
                                     SettingItemTile(
@@ -1035,7 +1054,7 @@ private fun SettingsDetailPane(
                                 item {
                                     SettingItemTile(
                                         title = "محرك التشغيل والبث",
-                                        subtitle = "خدمة تشغيل موحّدة عبر AndroidX Media3 تدعم Xtream Codes وM3U ودليل البرامج XMLTV.",
+                                        subtitle = "خدمة تشغيل موحّدة عبر AndroidX Media3 تدعم Xtream Codes ولوحة SONIX-CONTROL ودليل البرامج XMLTV.",
                                         action = {
                                             Icon(Icons.Filled.LiveTv, null, tint = colors.accentText)
                                         },

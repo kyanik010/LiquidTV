@@ -6,14 +6,17 @@ import com.liquidtv.app.data.datastore.AddonPreferencesDataStore
 import com.liquidtv.app.data.datastore.UserPreferencesDataStore
 import com.liquidtv.app.data.local.LiquidTVDatabase
 import com.liquidtv.app.data.local.dao.*
-import com.liquidtv.app.data.remote.IptvApiService
 import com.liquidtv.app.data.repository.ChannelRepositoryImpl
 import com.liquidtv.app.data.repository.SubscriptionRepositoryImpl
 import com.liquidtv.app.data.security.AndroidKeystoreCredentialCrypto
 import com.liquidtv.app.data.security.CredentialCrypto
 import com.liquidtv.app.data.security.LogSanitizer
+import com.liquidtv.app.data.sonix.HttpSonixControlApi
+import com.liquidtv.app.data.sonix.SonixControlApi
+import com.liquidtv.app.data.sonix.SonixControlRepositoryImpl
 import com.liquidtv.app.domain.repository.AddonPreferencesRepository
 import com.liquidtv.app.domain.repository.ChannelRepository
+import com.liquidtv.app.domain.repository.SonixControlRepository
 import com.liquidtv.app.domain.repository.SubscriptionRepository
 import com.liquidtv.app.domain.repository.UserPreferencesRepository
 import dagger.Binds
@@ -37,7 +40,10 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): LiquidTVDatabase =
         Room.databaseBuilder(context, LiquidTVDatabase::class.java, "liquid_tv.db")
-            .addMigrations(LiquidTVDatabase.MIGRATION_1_2)
+            .addMigrations(
+                LiquidTVDatabase.MIGRATION_1_2,
+                LiquidTVDatabase.MIGRATION_2_3,
+            )
             .build()
 
     @Provides
@@ -96,11 +102,6 @@ object NetworkModule {
         .client(okHttpClient)
         .addConverterFactory(ScalarsConverterFactory.create())
         .build()
-
-    @Provides
-    @Singleton
-    fun provideIptvApiService(retrofit: Retrofit): IptvApiService =
-        retrofit.create(IptvApiService::class.java)
 }
 
 @Module
@@ -110,6 +111,14 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindCredentialCrypto(impl: AndroidKeystoreCredentialCrypto): CredentialCrypto
+
+    @Binds
+    @Singleton
+    abstract fun bindSonixControlApi(impl: HttpSonixControlApi): SonixControlApi
+
+    @Binds
+    @Singleton
+    abstract fun bindSonixControlRepository(impl: SonixControlRepositoryImpl): SonixControlRepository
 
     @Binds
     @Singleton

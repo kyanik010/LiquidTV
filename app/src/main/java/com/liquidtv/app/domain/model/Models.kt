@@ -4,7 +4,11 @@ import kotlinx.serialization.Serializable
 
 enum class SubscriptionType {
     XTREAM,
-    M3U,
+}
+
+enum class SubscriptionOrigin {
+    NORMAL_URL,
+    PANEL_SERVER,
 }
 
 enum class SubscriptionStatus {
@@ -24,12 +28,13 @@ enum class MediaType {
 data class Subscription(
     val id: String,
     val name: String,
-    val type: SubscriptionType,
+    val type: SubscriptionType = SubscriptionType.XTREAM,
+    val origin: SubscriptionOrigin = SubscriptionOrigin.NORMAL_URL,
     val serverUrl: String,
+    val panelServerId: String? = null,
+    val panelServerName: String? = null,
     val username: String? = null,
     val maskedCredentialHint: String? = null,
-    val userAgent: String? = null,
-    val referer: String? = null,
     val xmltvUrl: String? = null,
     val isActive: Boolean = false,
     val connectionStatus: SubscriptionStatus = SubscriptionStatus.DISCONNECTED,
@@ -45,7 +50,7 @@ data class Subscription(
 
 /**
  * Unified channel / playable media domain model supporting Live TV, Movies (VOD),
- * and Series episodes across both Xtream Codes and M3U subscriptions.
+ * and Series episodes for Xtream Codes subscriptions.
  */
 @Serializable
 data class Channel(

@@ -6,13 +6,12 @@ import com.liquidtv.app.data.epg.XmltvParser
 import com.liquidtv.app.data.local.LiquidTVDatabase
 import com.liquidtv.app.data.local.dao.*
 import com.liquidtv.app.data.local.entity.*
-import com.liquidtv.app.data.parser.M3UParser
-import com.liquidtv.app.data.remote.IptvApiService
 import com.liquidtv.app.data.remote.XtreamApiService
 import com.liquidtv.app.data.remote.XtreamAuthResponse
 import com.liquidtv.app.data.security.CredentialCrypto
 import com.liquidtv.app.data.security.LogSanitizer
 import com.liquidtv.app.domain.model.*
+import com.liquidtv.app.domain.repository.SonixControlRepository
 import com.liquidtv.app.domain.repository.SubscriptionRepository
 import com.liquidtv.app.domain.repository.UserPreferencesRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -25,7 +24,6 @@ import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONObject
 import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.TimeUnit
@@ -42,12 +40,11 @@ class SubscriptionRepositoryImpl @Inject constructor(
     private val categoryDao: CategoryDao,
     private val epgDao: EpgDao,
     private val xtreamApi: XtreamApiService,
-    private val iptvApi: IptvApiService,
     private val okHttpClient: OkHttpClient,
-    private val m3uParser: M3UParser,
     private val xmltvParser: XmltvParser,
     private val crypto: CredentialCrypto,
     private val prefs: UserPreferencesRepository,
+    private val sonixControlRepository: SonixControlRepository? = null,
 ) : SubscriptionRepository {
 
     private val syncMutex = Mutex()
@@ -76,6 +73,9 @@ class SubscriptionRepositoryImpl @Inject constructor(
         serverUrl: String,
         username: String,
         password: String,
+        origin: SubscriptionOrigin,
+        panelServerId: String?,
+        panelServerName: String?,
         activate: Boolean,
     ): Result<Subscription> = withContext(Dispatchers.IO) {
         syncMutex.withLock {
@@ -88,9 +88,18 @@ class SubscriptionRepositoryImpl @Inject constructor(
                 val normalizedUrl = xtreamApi.normalizeServerUrl(serverUrl)
                 val timeoutSec = prefs.userPreferences.first().connectionTimeout
 
+                val subId = existingId ?: UUID.randomUUID().toString()
+                val existing = existingId?.let { subscriptionDao.getSubscriptionById(it) }
+                val finalName = displayName.trim().ifBlank {
+                    when (origin) {
+                        SubscriptionOrigin.PANEL_SERVER -> panelServerName?.takeIf { it.isNotBlank() } ?: "سيرفر لوحة التحكم"
+                        SubscriptionOrigin.NORMAL_URL -> normalizedUrl.toHttpUrlOrNull()?.host ?: "قائمة Xtream"
+                    }
+                }
+
                 _syncInfo.value = PlaylistInfo(
-                    subscriptionId = existingId,
-                    name = displayName.ifBlank { normalizedUrl },
+                    subscriptionId = subId,
+                    name = finalName,
                     isLoading = true,
                     loadingProgress = 0.08f,
                     statusMessage = "جارٍ الاتصال بخادم Xtream...",
@@ -103,11 +112,6 @@ class SubscriptionRepositoryImpl @Inject constructor(
                     timeoutSeconds = timeoutSec,
                 )
 
-                val subId = existingId ?: UUID.randomUUID().toString()
-                val existing = existingId?.let { subscriptionDao.getSubscriptionById(it) }
-                val finalName = displayName.trim().ifBlank {
-                    normalizedUrl.toHttpUrlOrNull()?.host ?: "Xtream Subscription"
-                }
                 val xmltvUrl = xtreamApi.buildXmltvUrl(normalizedUrl, cleanUser, cleanPass)
                 val userInfo = authResponse.userInfo
 
@@ -115,10 +119,12 @@ class SubscriptionRepositoryImpl @Inject constructor(
                     id = subId,
                     name = finalName,
                     type = SubscriptionType.XTREAM.name,
+                    origin = origin.name,
                     serverUrl = normalizedUrl,
+                    panelServerId = if (origin == SubscriptionOrigin.PANEL_SERVER) panelServerId else null,
+                    panelServerName = if (origin == SubscriptionOrigin.PANEL_SERVER) panelServerName else null,
                     username = cleanUser,
                     encryptedPassword = crypto.encrypt(cleanPass),
-                    encryptedM3uUrl = null,
                     xmltvUrl = xmltvUrl,
                     isActive = activate || existing?.isActive == true || !hasAnySubscription(),
                     connectionStatus = SubscriptionStatus.CONNECTED.name,
@@ -158,85 +164,21 @@ class SubscriptionRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun addOrUpdateM3uSubscription(
-        existingId: String?,
-        displayName: String,
-        playlistUrl: String,
-        userAgent: String?,
-        referer: String?,
-        activate: Boolean,
-    ): Result<Subscription> = withContext(Dispatchers.IO) {
-        syncMutex.withLock {
-            try {
-                val cleanUrl = playlistUrl.trim()
-                require(cleanUrl.isNotEmpty()) { "رابط قائمة التشغيل مطلوب" }
-                require(
-                    cleanUrl.startsWith("http://", ignoreCase = true) ||
-                        cleanUrl.startsWith("https://", ignoreCase = true),
-                ) {
-                    "يجب أن يبدأ رابط القائمة بـ http:// أو https://"
-                }
-                val parsedUrl = cleanUrl.toHttpUrlOrNull()
-                    ?: throw IllegalArgumentException("رابط قائمة M3U غير صالح")
-
-                val subId = existingId ?: UUID.randomUUID().toString()
-                val existing = existingId?.let { subscriptionDao.getSubscriptionById(it) }
-                val finalName = displayName.trim().ifBlank { parsedUrl.host }
-                val timeoutSec = prefs.userPreferences.first().connectionTimeout
-
-                _syncInfo.value = PlaylistInfo(
-                    subscriptionId = subId,
-                    name = finalName,
-                    isLoading = true,
-                    loadingProgress = 0.08f,
-                    statusMessage = "جارٍ تنزيل قائمة M3U...",
-                )
-
-                val parseResult = downloadAndParseM3u(
-                    subscriptionId = subId,
-                    playlistUrl = cleanUrl,
-                    userAgent = userAgent?.trim()?.takeIf { it.isNotEmpty() },
-                    referer = referer?.trim()?.takeIf { it.isNotEmpty() },
-                    timeoutSec = timeoutSec,
-                )
-
-                val now = System.currentTimeMillis()
-                val entity = SubscriptionEntity(
-                    id = subId,
-                    name = finalName,
-                    type = SubscriptionType.M3U.name,
-                    serverUrl = "${parsedUrl.scheme}://${parsedUrl.host}",
-                    username = null,
-                    encryptedPassword = null,
-                    encryptedM3uUrl = crypto.encrypt(cleanUrl),
-                    userAgent = userAgent?.trim()?.takeIf { it.isNotEmpty() },
-                    referer = referer?.trim()?.takeIf { it.isNotEmpty() },
-                    xmltvUrl = parseResult.xmltvUrl,
-                    isActive = activate || existing?.isActive == true || !hasAnySubscription(),
-                    connectionStatus = SubscriptionStatus.CONNECTED.name,
-                    lastError = null,
-                    lastSyncedAt = now,
-                    createdAt = existing?.createdAt ?: now,
-                )
-
-                persistM3uDataAtomically(entity, parseResult)
-
-                val saved = subscriptionDao.getSubscriptionById(subId) ?: entity
-                Result.success(saved.toDomain())
-            } catch (e: Exception) {
-                val safeMsg = sanitizeError(e)
-                _syncInfo.update {
-                    it.copy(isLoading = false, statusMessage = null, error = safeMsg)
-                }
-                Result.failure(Exception(safeMsg, e))
-            }
-        }
-    }
-
     override suspend fun activateSubscription(subscriptionId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val sub = subscriptionDao.getSubscriptionById(subscriptionId)
-                ?: return@withContext Result.failure(IllegalArgumentException("Subscription not found"))
+                ?: return@withContext Result.failure(IllegalArgumentException("قائمة التشغيل غير موجودة"))
+            if (sub.origin == SubscriptionOrigin.PANEL_SERVER.name) {
+                val panelState = sonixControlRepository?.state?.value
+                if (panelState != null && (panelState.isBlockedOrRevoked || panelState.isPanelExpired)) {
+                    val reason = if (panelState.isBlockedOrRevoked) {
+                        "تم إيقاف هذا الجهاز من لوحة التحكم"
+                    } else {
+                        "انتهت صلاحية اشتراك الجهاز في لوحة التحكم"
+                    }
+                    return@withContext Result.failure(IllegalStateException(reason))
+                }
+            }
             subscriptionDao.setActiveSubscription(subscriptionId)
             val count = channelDao.getAllChannelsOnce(subscriptionId).size
             _syncInfo.value = PlaylistInfo(
@@ -255,7 +197,7 @@ class SubscriptionRepositoryImpl @Inject constructor(
     override suspend fun syncSubscription(subscriptionId: String): Result<Unit> = withContext(Dispatchers.IO) {
         syncMutex.withLock {
             val sub = subscriptionDao.getSubscriptionById(subscriptionId)
-                ?: return@withContext Result.failure(IllegalArgumentException("Subscription not found"))
+                ?: return@withContext Result.failure(IllegalArgumentException("قائمة التشغيل غير موجودة"))
             val timeoutSec = prefs.userPreferences.first().connectionTimeout
 
             try {
@@ -267,49 +209,52 @@ class SubscriptionRepositoryImpl @Inject constructor(
                     statusMessage = "جارٍ الاتصال بـ ${sub.name}...",
                 )
 
-                when (sub.type) {
-                    SubscriptionType.XTREAM.name -> {
-                        val user = sub.username ?: throw IllegalStateException("Missing Xtream username")
-                        val pass = sub.encryptedPassword?.let { crypto.decrypt(it) }
-                            ?: throw IllegalStateException("Missing Xtream password")
-                        val auth = xtreamApi.authenticate(sub.serverUrl, user, pass, timeoutSec)
-                        val updatedSub = sub.copy(
-                            connectionStatus = SubscriptionStatus.CONNECTED.name,
-                            lastError = null,
-                            accountStatus = auth.userInfo?.status,
-                            expDateEpochSec = auth.userInfo?.expDateEpochSec,
-                            maxConnections = auth.userInfo?.maxConnections,
-                            activeConnections = auth.userInfo?.activeConnections,
-                            isTrial = auth.userInfo?.isTrial,
-                        )
-                        subscriptionDao.upsertSubscription(updatedSub)
-                        syncXtreamInternal(updatedSub, pass, auth, timeoutSec)
-                    }
-                    SubscriptionType.M3U.name -> {
-                        val url = sub.encryptedM3uUrl?.let { crypto.decrypt(it) }
-                            ?: throw IllegalStateException("Missing M3U URL")
-                        val parseResult = downloadAndParseM3u(
-                            subscriptionId = sub.id,
-                            playlistUrl = url,
-                            userAgent = sub.userAgent,
-                            referer = sub.referer,
-                            timeoutSec = timeoutSec,
-                        )
-                        val updated = sub.copy(
-                            xmltvUrl = parseResult.xmltvUrl ?: sub.xmltvUrl,
-                            connectionStatus = SubscriptionStatus.CONNECTED.name,
-                            lastError = null,
-                            lastSyncedAt = System.currentTimeMillis(),
-                        )
-                        persistM3uDataAtomically(updated, parseResult)
-                    }
-                    else -> throw IllegalStateException("Unsupported subscription type: ${sub.type}")
+                val sonixSnapshot = sonixControlRepository?.state?.value
+                if (sonixSnapshot?.isBlockedOrRevoked == true) {
+                    throw IllegalStateException("تم إيقاف هذا الجهاز من لوحة التحكم")
                 }
+                if (sonixSnapshot?.isPanelExpired == true) {
+                    throw IllegalStateException("انتهت صلاحية اشتراك الجهاز في لوحة التحكم")
+                }
+
+                var activeServerUrl = sub.serverUrl
+                var activePanelName = sub.panelServerName
+
+                if (sub.origin == SubscriptionOrigin.PANEL_SERVER.name &&
+                    !sub.panelServerId.isNullOrBlank() &&
+                    sonixControlRepository != null
+                ) {
+                    val resolved = sonixControlRepository.resolveAssignedServer(sub.panelServerId)
+                        .getOrElse { err -> throw err }
+                    activeServerUrl = xtreamApi.normalizeServerUrl(resolved.serverUrl)
+                    activePanelName = resolved.name
+                }
+
+                val user = sub.username ?: throw IllegalStateException("اسم المستخدم غير موجود")
+                val pass = sub.encryptedPassword?.let { crypto.decrypt(it) }
+                    ?: throw IllegalStateException("كلمة المرور غير موجودة")
+
+                val auth = xtreamApi.authenticate(activeServerUrl, user, pass, timeoutSec)
+                val updatedSub = sub.copy(
+                    serverUrl = activeServerUrl,
+                    panelServerName = activePanelName,
+                    xmltvUrl = xtreamApi.buildXmltvUrl(activeServerUrl, user, pass),
+                    connectionStatus = SubscriptionStatus.CONNECTED.name,
+                    lastError = null,
+                    accountStatus = auth.userInfo?.status,
+                    expDateEpochSec = auth.userInfo?.expDateEpochSec,
+                    maxConnections = auth.userInfo?.maxConnections,
+                    activeConnections = auth.userInfo?.activeConnections,
+                    isTrial = auth.userInfo?.isTrial,
+                )
+                subscriptionDao.upsertSubscription(updatedSub)
+                syncXtreamInternal(updatedSub, pass, auth, timeoutSec)
                 Result.success(Unit)
             } catch (e: Exception) {
                 val safeMsg = sanitizeError(e)
                 val status = if (safeMsg.contains("expired", ignoreCase = true) ||
-                    safeMsg.contains("منتهي", ignoreCase = true)
+                    safeMsg.contains("منتهي", ignoreCase = true) ||
+                    safeMsg.contains("انتهت", ignoreCase = true)
                 ) {
                     SubscriptionStatus.EXPIRED.name
                 } else {
@@ -326,7 +271,7 @@ class SubscriptionRepositoryImpl @Inject constructor(
 
     override suspend fun syncActiveSubscription(): Result<Unit> {
         val active = subscriptionDao.getActiveSubscriptionOnce()
-            ?: return Result.failure(IllegalStateException("لا يوجد اشتراك IPTV مفعّل"))
+            ?: return Result.failure(IllegalStateException("لا توجد قائمة تشغيل مفعّلة"))
         return syncSubscription(active.id)
     }
 
@@ -345,11 +290,9 @@ class SubscriptionRepositoryImpl @Inject constructor(
                 .connectTimeout(timeoutSec, TimeUnit.SECONDS)
                 .readTimeout((timeoutSec * 3).coerceAtLeast(45L), TimeUnit.SECONDS)
                 .build()
-            val reqBuilder = Request.Builder().url(xmltvUrl).get()
-            sub.userAgent?.let { reqBuilder.header("User-Agent", it) }
-            sub.referer?.let { reqBuilder.header("Referer", it) }
+            val req = Request.Builder().url(xmltvUrl).get().build()
 
-            client.newCall(reqBuilder.build()).execute().use { resp ->
+            client.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) {
                     return@withContext Result.failure(IOException("EPG returned HTTP ${resp.code}"))
                 }
@@ -397,160 +340,6 @@ class SubscriptionRepositoryImpl @Inject constructor(
         subscriptionDao.getSubscriptionById(subscriptionId)?.encryptedPassword?.let {
             runCatching { crypto.decrypt(it) }.getOrNull()
         }
-
-    override suspend fun getDecryptedM3uUrl(subscriptionId: String): String? =
-        subscriptionDao.getSubscriptionById(subscriptionId)?.encryptedM3uUrl?.let {
-            runCatching { crypto.decrypt(it) }.getOrNull()
-        }
-
-    private suspend fun downloadAndParseM3u(
-        subscriptionId: String,
-        playlistUrl: String,
-        userAgent: String?,
-        referer: String?,
-        timeoutSec: Int,
-    ): M3UParser.ParseResult {
-        val headers = LinkedHashMap<String, String>()
-        if (!userAgent.isNullOrBlank()) headers["User-Agent"] = userAgent
-        if (!referer.isNullOrBlank()) headers["Referer"] = referer
-
-        val client = okHttpClient.newBuilder()
-            .connectTimeout(timeoutSec.toLong(), TimeUnit.SECONDS)
-            .readTimeout((timeoutSec * 3L).coerceAtLeast(45L), TimeUnit.SECONDS)
-            .build()
-        val reqBuilder = Request.Builder().url(playlistUrl).get()
-        headers.forEach { (k, v) -> reqBuilder.header(k, v) }
-
-        val response = client.newCall(reqBuilder.build()).execute()
-        response.use { resp ->
-            if (!resp.isSuccessful) {
-                throw IOException("Playlist server returned HTTP ${resp.code}")
-            }
-            val body = resp.body ?: throw IOException("Empty playlist response")
-            val contentLength = body.contentLength()
-            _syncInfo.update {
-                it.copy(loadingProgress = 0.25f, statusMessage = "جارٍ تحليل القنوات...")
-            }
-            val result = body.byteStream().use { stream ->
-                m3uParser.parseStream(
-                    inputStream = stream,
-                    contentLengthBytes = contentLength,
-                    subscriptionId = subscriptionId,
-                    defaultUserAgent = userAgent,
-                    defaultReferer = referer,
-                ) { parseFrac ->
-                    _syncInfo.update {
-                        it.copy(loadingProgress = 0.25f + parseFrac * 0.60f)
-                    }
-                }
-            }
-            if (result.channels.isEmpty()) {
-                throw IllegalArgumentException("لم يتم العثور على قنوات صالحة للتشغيل في قائمة M3U هذه.")
-            }
-            return result
-        }
-    }
-
-    private suspend fun persistM3uDataAtomically(
-        subscription: SubscriptionEntity,
-        parseResult: M3UParser.ParseResult,
-    ) {
-        _syncInfo.update {
-            it.copy(loadingProgress = 0.88f, statusMessage = "جارٍ حفظ ${parseResult.channels.size} قناة...")
-        }
-
-        val preservedChannelState = channelDao.getPreservedUserState(subscription.id)
-            .associateBy { it.id }
-        val existingLockedCategories = categoryDao.getAllCategoriesOnce(subscription.id)
-            .filter { it.isLocked }
-            .map { it.name }
-            .toSet()
-
-        val channelEntities = parseResult.channels.map { ch ->
-            val prev = preservedChannelState[ch.id]
-            val headersJson = if (ch.httpHeaders.isNotEmpty()) {
-                JSONObject(ch.httpHeaders).toString()
-            } else null
-
-            ChannelEntity(
-                id = ch.id,
-                subscriptionId = subscription.id,
-                externalId = ch.externalId,
-                mediaType = ch.mediaType.name,
-                name = ch.name,
-                streamUrl = ch.streamUrl,
-                logoUrl = ch.logoUrl,
-                groupTitle = ch.groupTitle,
-                categoryId = ch.categoryId,
-                tvgId = ch.tvgId,
-                tvgName = ch.tvgName,
-                country = ch.country,
-                language = ch.language,
-                channelNumber = ch.channelNumber,
-                httpHeadersJson = headersJson,
-                isFavorite = prev?.isFavorite ?: false,
-                lastWatchedAt = prev?.lastWatchedAt,
-                resumePositionMs = prev?.resumePositionMs ?: 0L,
-                addedAt = ch.addedAt,
-            )
-        }
-
-        val liveCategories = parseResult.channels
-            .filter { it.mediaType == MediaType.LIVE }
-            .mapNotNull { it.groupTitle?.takeIf { g -> g.isNotBlank() } }
-            .distinct()
-            .mapIndexed { idx, name ->
-                CategoryEntity(
-                    id = "${subscription.id}_LIVE_${name.lowercase()}",
-                    subscriptionId = subscription.id,
-                    externalCategoryId = name,
-                    contentType = MediaType.LIVE.name,
-                    name = name,
-                    sortOrder = idx,
-                    isLocked = name in existingLockedCategories,
-                )
-            }
-        val movieCategories = parseResult.channels
-            .filter { it.mediaType == MediaType.MOVIE }
-            .mapNotNull { it.groupTitle?.takeIf { g -> g.isNotBlank() } }
-            .distinct()
-            .mapIndexed { idx, name ->
-                CategoryEntity(
-                    id = "${subscription.id}_MOVIE_${name.lowercase()}",
-                    subscriptionId = subscription.id,
-                    externalCategoryId = name,
-                    contentType = MediaType.MOVIE.name,
-                    name = name,
-                    sortOrder = idx,
-                    isLocked = name in existingLockedCategories,
-                )
-            }
-
-        database.withTransaction {
-            subscriptionDao.upsertSubscription(subscription)
-            if (subscription.isActive) {
-                subscriptionDao.setActiveSubscription(subscription.id)
-            }
-            seriesDao.deleteSeriesForSubscription(subscription.id)
-            channelDao.replaceChannelsAtomically(subscription.id, null, channelEntities)
-            categoryDao.replaceCategoriesAtomically(subscription.id, MediaType.LIVE.name, liveCategories)
-            categoryDao.replaceCategoriesAtomically(subscription.id, MediaType.MOVIE.name, movieCategories)
-            categoryDao.deleteCategoriesByType(subscription.id, MediaType.SERIES_EPISODE.name)
-        }
-
-        val liveCount = channelEntities.count { it.mediaType == MediaType.LIVE.name }
-        val movieCount = channelEntities.count { it.mediaType == MediaType.MOVIE.name }
-        _syncInfo.value = PlaylistInfo(
-            subscriptionId = subscription.id,
-            name = subscription.name,
-            totalChannels = liveCount,
-            totalMovies = movieCount,
-            totalSeries = 0,
-            lastRefreshed = subscription.lastSyncedAt,
-            isLoading = false,
-            loadingProgress = 1f,
-        )
-    }
 
     private suspend fun syncXtreamInternal(
         subscription: SubscriptionEntity,
@@ -744,30 +533,36 @@ class SubscriptionRepositoryImpl @Inject constructor(
         return LogSanitizer.sanitizeUrl(raw)
     }
 
-    private fun SubscriptionEntity.toDomain(): Subscription = Subscription(
-        id = id,
-        name = name,
-        type = runCatching { SubscriptionType.valueOf(type) }.getOrDefault(SubscriptionType.M3U),
-        serverUrl = serverUrl,
-        username = username,
-        maskedCredentialHint = when (type) {
-            SubscriptionType.XTREAM.name -> username?.let { "المستخدم: $it" }
-            SubscriptionType.M3U.name -> serverUrl
-            else -> null
-        },
-        userAgent = userAgent,
-        referer = referer,
-        xmltvUrl = xmltvUrl,
-        isActive = isActive,
-        connectionStatus = runCatching { SubscriptionStatus.valueOf(connectionStatus) }
-            .getOrDefault(SubscriptionStatus.DISCONNECTED),
-        lastError = lastError,
-        accountStatus = accountStatus,
-        expDateEpochSec = expDateEpochSec,
-        maxConnections = maxConnections,
-        activeConnections = activeConnections,
-        isTrial = isTrial,
-        lastSyncedAt = lastSyncedAt,
-        createdAt = createdAt,
-    )
+    private fun SubscriptionEntity.toDomain(): Subscription {
+        val parsedOrigin = runCatching { SubscriptionOrigin.valueOf(origin) }
+            .getOrDefault(SubscriptionOrigin.NORMAL_URL)
+        return Subscription(
+            id = id,
+            name = name,
+            type = SubscriptionType.XTREAM,
+            origin = parsedOrigin,
+            serverUrl = serverUrl,
+            panelServerId = panelServerId,
+            panelServerName = panelServerName,
+            username = username,
+            maskedCredentialHint = when (parsedOrigin) {
+                SubscriptionOrigin.PANEL_SERVER ->
+                    panelServerName?.takeIf { it.isNotBlank() }?.let { "سيرفر: $it" }
+                        ?: username?.let { "المستخدم: $it" }
+                SubscriptionOrigin.NORMAL_URL -> username?.let { "المستخدم: $it" }
+            },
+            xmltvUrl = xmltvUrl,
+            isActive = isActive,
+            connectionStatus = runCatching { SubscriptionStatus.valueOf(connectionStatus) }
+                .getOrDefault(SubscriptionStatus.DISCONNECTED),
+            lastError = lastError,
+            accountStatus = accountStatus,
+            expDateEpochSec = expDateEpochSec,
+            maxConnections = maxConnections,
+            activeConnections = activeConnections,
+            isTrial = isTrial,
+            lastSyncedAt = lastSyncedAt,
+            createdAt = createdAt,
+        )
+    }
 }

@@ -215,16 +215,25 @@ private fun UpdateAvailableContent(
                 }
             }
 
+            if (info.isMandatory) {
+                Text(
+                    text = "تحديث إجباري مطلوب لمواصلة استخدام المزايا المدعومة",
+                    style = LiquidTypography.LabelMedium,
+                    color = colors.danger,
+                )
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                DialogButton(
-                    text = "لاحقاً",
-                    isPrimary = false,
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f),
-                )
+                if (!info.isMandatory) {
+                    DialogButton(
+                        text = "لاحقاً",
+                        isPrimary = false,
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
                 DialogButton(
                     text = "تحديث الآن",
                     isPrimary = true,

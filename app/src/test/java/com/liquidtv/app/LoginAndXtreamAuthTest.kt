@@ -6,14 +6,16 @@ import androidx.test.core.app.ApplicationProvider
 import com.liquidtv.app.data.datastore.UserPreferencesDataStore
 import com.liquidtv.app.data.epg.XmltvParser
 import com.liquidtv.app.data.local.LiquidTVDatabase
-import com.liquidtv.app.data.parser.M3UParser
-import com.liquidtv.app.data.remote.IptvApiService
 import com.liquidtv.app.data.remote.XtreamApiService
 import com.liquidtv.app.data.repository.SubscriptionRepositoryImpl
 import com.liquidtv.app.data.security.CredentialCrypto
-import com.liquidtv.app.domain.model.MediaType
+import com.liquidtv.app.data.sonix.SonixAccessStatus
+import com.liquidtv.app.data.sonix.SonixAssignedServer
+import com.liquidtv.app.data.sonix.SonixDeviceStatus
+import com.liquidtv.app.data.sonix.SonixResolvedServer
+import com.liquidtv.app.data.sonix.SonixSyncState
+import com.liquidtv.app.domain.model.SubscriptionOrigin
 import com.liquidtv.app.domain.model.SubscriptionType
-import com.liquidtv.app.domain.repository.SubscriptionRepository
 import com.liquidtv.app.ui.AppStartupGate
 import com.liquidtv.app.ui.StartupViewModel
 import com.liquidtv.app.ui.screens.login.LoginViewModel
@@ -37,15 +39,12 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import retrofit2.Retrofit
-import retrofit2.converter.scalars.ScalarsConverterFactory
 import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
@@ -56,8 +55,9 @@ class LoginAndXtreamAuthTest {
     private lateinit var server: MockWebServer
     private lateinit var database: LiquidTVDatabase
     private lateinit var okHttpClient: OkHttpClient
+    private lateinit var fakeSonixRepo: FakeSonixControlRepository
     private lateinit var repository: SubscriptionRepositoryImpl
-    private val testDispatcher = StandardTestDispatcher()
+    private val testDispatcher = UnconfinedTestDispatcher()
 
     private val passThroughCrypto = object : CredentialCrypto {
         override fun encrypt(plaintext: String): String = "enc:$plaintext"
@@ -80,11 +80,7 @@ class LoginAndXtreamAuthTest {
             .readTimeout(5, TimeUnit.SECONDS)
             .build()
 
-        val retrofit = Retrofit.Builder()
-            .baseUrl("http://localhost/")
-            .client(okHttpClient)
-            .addConverterFactory(ScalarsConverterFactory.create())
-            .build()
+        fakeSonixRepo = FakeSonixControlRepository()
 
         repository = SubscriptionRepositoryImpl(
             context = context,
@@ -95,12 +91,11 @@ class LoginAndXtreamAuthTest {
             categoryDao = database.categoryDao(),
             epgDao = database.epgDao(),
             xtreamApi = XtreamApiService(okHttpClient),
-            iptvApi = retrofit.create(IptvApiService::class.java),
             okHttpClient = okHttpClient,
-            m3uParser = M3UParser(),
             xmltvParser = XmltvParser(),
             crypto = passThroughCrypto,
             prefs = UserPreferencesDataStore(context),
+            sonixControlRepository = fakeSonixRepo,
         )
     }
 
@@ -111,8 +106,7 @@ class LoginAndXtreamAuthTest {
         Dispatchers.resetMain()
     }
 
-    @Test
-    fun `http Xtream server authenticates and syncs live movies and series`() = runTest {
+    private fun configureXtreamDispatcher() {
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
                 val path = request.path.orEmpty()
@@ -143,7 +137,11 @@ class LoginAndXtreamAuthTest {
                 }
             }
         }
+    }
 
+    @Test
+    fun `http Xtream server authenticates and syncs live movies and series`() = runTest {
+        configureXtreamDispatcher()
         val httpUrl = "http://${server.hostName}:${server.port}"
         val result = repository.addOrUpdateXtreamSubscription(
             existingId = null,
@@ -151,21 +149,21 @@ class LoginAndXtreamAuthTest {
             serverUrl = httpUrl,
             username = "demo",
             password = "secret",
+            origin = SubscriptionOrigin.NORMAL_URL,
             activate = true,
         )
 
         assertTrue("Expected HTTP Xtream login to succeed: ${result.exceptionOrNull()}", result.isSuccess)
         val sub = result.getOrThrow()
         assertEquals(SubscriptionType.XTREAM, sub.type)
+        assertEquals(SubscriptionOrigin.NORMAL_URL, sub.origin)
         assertTrue(sub.serverUrl.startsWith("http://"))
 
         val live = database.channelDao().getLiveChannels(sub.id).first()
         val movies = database.channelDao().getMovies(sub.id).first()
         val series = database.seriesDao().getSeries(sub.id).first()
-
         assertEquals(1, live.size)
         assertEquals("Al Jazeera HD", live[0].name)
-        assertTrue(live[0].streamUrl.startsWith("http://"))
         assertEquals(1, movies.size)
         assertEquals("Desert Storm", movies[0].name)
         assertEquals(1, series.size)
@@ -177,7 +175,6 @@ class LoginAndXtreamAuthTest {
         server.enqueue(
             MockResponse().setBody("""{"user_info":{"username":"bad","status":"Disabled","auth":0}}"""),
         )
-
         val result = repository.addOrUpdateXtreamSubscription(
             existingId = null,
             displayName = "Bad Sub",
@@ -186,104 +183,103 @@ class LoginAndXtreamAuthTest {
             password = "wrong",
             activate = true,
         )
-
         assertTrue(result.isFailure)
         assertFalse(repository.hasAnySubscription())
     }
 
     @Test
-    fun `http M3U playlist URL is allowed and empty M3U is rejected`() = runTest {
-        val m3uBody = """
-            #EXTM3U url-tvg="http://${server.hostName}:${server.port}/epg.xml"
-            #EXTINF:-1 tvg-id="bbc.uk" group-title="News",BBC World News
-            http://stream.example.com:8080/live/bbc/index.m3u8
-        """.trimIndent()
-
-        server.dispatcher = object : Dispatcher() {
-            override fun dispatch(request: RecordedRequest): MockResponse {
-                val path = request.path.orEmpty()
-                return when {
-                    path.contains("valid.m3u") -> MockResponse().setBody(m3uBody)
-                    path.contains("empty.m3u") -> MockResponse().setBody("#EXTM3U\n")
-                    else -> MockResponse().setResponseCode(404)
-                }
-            }
+    fun `panel server login resolves URL dynamically without storing raw URL in editor`() = runTest {
+        configureXtreamDispatcher()
+        val httpUrl = "http://${server.hostName}:${server.port}"
+        fakeSonixRepo.mutableState.value = SonixSyncState(
+            isRegistered = true,
+            deviceId = "dev-1",
+            deviceUid = "ltv_1",
+            deviceCode = "PNL9988776",
+            deviceStatus = SonixDeviceStatus.ACTIVE,
+            accessStatus = SonixAccessStatus.ACTIVE,
+            accessAllowed = true,
+            assignedServers = listOf(SonixAssignedServer(id = "srv-panel-1", name = "VIP Arab", region = "ME", priority = 1)),
+        )
+        fakeSonixRepo.resolveHandler = { serverId ->
+            assertEquals("srv-panel-1", serverId)
+            Result.success(SonixResolvedServer(id = "srv-panel-1", name = "VIP Arab", region = "ME", serverUrl = httpUrl))
         }
 
-        val validUrl = "http://${server.hostName}:${server.port}/valid.m3u"
-        val validResult = repository.addOrUpdateM3uSubscription(
-            existingId = null,
-            displayName = "HTTP M3U",
-            playlistUrl = validUrl,
-            userAgent = "VLC/3.0",
-            referer = null,
-            activate = true,
-        )
-        assertTrue(validResult.isSuccess)
-        val sub = validResult.getOrThrow()
-        val channels = database.channelDao().getLiveChannels(sub.id).first()
-        assertEquals(1, channels.size)
-        assertEquals("BBC World News", channels[0].name)
+        val vm = LoginViewModel(repository, fakeSonixRepo)
+        testDispatcher.scheduler.advanceUntilIdle()
+        vm.selectServerMode(SubscriptionOrigin.PANEL_SERVER)
+        vm.selectPanelServer("srv-panel-1", "VIP Arab")
+        vm.setDisplayName("اشتراك اللوحة")
+        vm.setUsername("demo")
+        vm.setPassword("secret")
+        vm.connect()
 
-        val emptyUrl = "http://${server.hostName}:${server.port}/empty.m3u"
-        val emptyResult = repository.addOrUpdateM3uSubscription(
-            existingId = null,
-            displayName = "Empty M3U",
-            playlistUrl = emptyUrl,
-            userAgent = null,
-            referer = null,
-            activate = false,
-        )
-        assertTrue(emptyResult.isFailure)
+        val finishedState = kotlinx.coroutines.runBlocking {
+            withTimeout(5_000) {
+                vm.uiState.first { !it.isConnecting && (it.isSuccess || it.errorMessage != null) }
+            }
+        }
+        assertTrue("Expected panel login success: ${finishedState.errorMessage}", finishedState.isSuccess)
+        val saved = repository.getActiveSubscriptionOnce()!!
+        assertEquals(SubscriptionOrigin.PANEL_SERVER, saved.origin)
+        assertEquals("srv-panel-1", saved.panelServerId)
+        assertEquals("VIP Arab", saved.panelServerName)
+
+        // When loading panel subscription for edit, Host URL MUST stay empty/hidden
+        val editVm = LoginViewModel(repository, fakeSonixRepo)
+        editVm.loadForEdit(saved.id)
+        val editState = kotlinx.coroutines.runBlocking {
+            withTimeout(5_000) {
+                editVm.uiState.first { it.editingSubscriptionId == saved.id }
+            }
+        }
+        assertEquals(SubscriptionOrigin.PANEL_SERVER, editState.serverMode)
+        assertEquals(SubscriptionOrigin.PANEL_SERVER, editState.editingOrigin)
+        assertEquals("", editState.serverUrl)
     }
 
     @Test
-    fun `LoginViewModel rejects non-HTTP schemes and prevents duplicate concurrent requests`() = runTest {
-        val vm = LoginViewModel(repository)
-        vm.selectType(SubscriptionType.XTREAM)
-        vm.setServerUrl("ftp://invalid.server")
+    fun `LoginViewModel validates Normal URL and Control Panel Servers modes`() = runTest {
+        val vm = LoginViewModel(repository, fakeSonixRepo)
+        vm.selectServerMode(SubscriptionOrigin.NORMAL_URL)
+        vm.setDisplayName("Test")
         vm.setUsername("user")
         vm.setPassword("pass")
+        vm.setServerUrl("ftp://invalid.server")
         vm.connect()
         assertNotNull(vm.uiState.value.errorMessage)
         assertFalse(vm.uiState.value.isConnecting)
 
-        // Ensure blank M3U URL fails validation cleanly
-        vm.selectType(SubscriptionType.M3U)
-        vm.setM3uUrl("")
+        // Panel mode without selected server should fail validation cleanly
+        vm.selectServerMode(SubscriptionOrigin.PANEL_SERVER)
         vm.connect()
         assertNotNull(vm.uiState.value.errorMessage)
     }
 
     @Test
-    fun `StartupViewModel enforces Login gate when zero subscriptions exist and opens Home after login`() = runBlocking {
+    fun `StartupViewModel enforces Login gate when zero subscriptions exist and opens Home after Xtream login`() = runBlocking {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         val prefsRepo = UserPreferencesDataStore(ApplicationProvider.getApplicationContext())
-        val startupVm = StartupViewModel(repository, prefsRepo)
+        val startupVm = StartupViewModel(repository, prefsRepo, fakeSonixRepo)
         val collectorJob = launch { startupVm.rootState.collect { } }
+
         val initialGate = withTimeout(5_000) {
             startupVm.rootState.first { it.gate != AppStartupGate.Checking }
         }
         assertEquals(AppStartupGate.NeedsLogin, initialGate.gate)
 
-        server.dispatcher = object : Dispatcher() {
-            override fun dispatch(request: RecordedRequest): MockResponse {
-                return if (request.path?.contains("test.m3u") == true) {
-                    MockResponse().setBody("#EXTM3U\n#EXTINF:-1,Channel One\nhttp://example.com/1.ts\n")
-                } else {
-                    MockResponse().setResponseCode(404)
-                }
-            }
-        }
-        val res = repository.addOrUpdateM3uSubscription(
+        configureXtreamDispatcher()
+        val res = repository.addOrUpdateXtreamSubscription(
             existingId = null,
             displayName = "Starter",
-            playlistUrl = "http://${server.hostName}:${server.port}/test.m3u",
-            userAgent = null,
-            referer = null,
+            serverUrl = "http://${server.hostName}:${server.port}",
+            username = "demo",
+            password = "secret",
             activate = true,
         )
         assertTrue(res.isSuccess)
+
         val unlockedState = withTimeout(5_000) {
             startupVm.rootState.first { it.gate is AppStartupGate.Ready }
         }

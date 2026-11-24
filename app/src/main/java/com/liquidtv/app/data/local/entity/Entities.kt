@@ -9,13 +9,13 @@ import androidx.room.PrimaryKey
 data class SubscriptionEntity(
     @PrimaryKey val id: String,
     val name: String,
-    val type: String, // "XTREAM" | "M3U"
+    val type: String = "XTREAM", // "XTREAM"
+    val origin: String = "NORMAL_URL", // "NORMAL_URL" | "PANEL_SERVER"
     val serverUrl: String,
+    val panelServerId: String? = null,
+    val panelServerName: String? = null,
     val username: String? = null,
     val encryptedPassword: String? = null,
-    val encryptedM3uUrl: String? = null,
-    val userAgent: String? = null,
-    val referer: String? = null,
     val xmltvUrl: String? = null,
     val isActive: Boolean = false,
     val connectionStatus: String = "DISCONNECTED",

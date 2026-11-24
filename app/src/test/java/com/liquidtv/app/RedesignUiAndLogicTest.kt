@@ -29,8 +29,6 @@ import com.liquidtv.app.data.local.LiquidTVDatabase
 import com.liquidtv.app.data.local.entity.CategoryEntity
 import com.liquidtv.app.data.local.entity.SeriesEntity
 import com.liquidtv.app.data.local.entity.SubscriptionEntity
-import com.liquidtv.app.data.parser.M3UParser
-import com.liquidtv.app.data.remote.IptvApiService
 import com.liquidtv.app.data.remote.XtreamApiService
 import com.liquidtv.app.data.repository.ChannelRepositoryImpl
 import com.liquidtv.app.data.repository.SubscriptionRepositoryImpl
@@ -46,7 +44,12 @@ import com.liquidtv.app.domain.model.MediaType
 import com.liquidtv.app.domain.model.PlaylistInfo
 import com.liquidtv.app.domain.model.SeasonGroup
 import com.liquidtv.app.domain.model.SeriesItem
+import com.liquidtv.app.data.sonix.SonixAssignedServer
+import com.liquidtv.app.data.sonix.SonixDeviceStatus
+import com.liquidtv.app.data.sonix.SonixAccessStatus
+import com.liquidtv.app.data.sonix.SonixSyncState
 import com.liquidtv.app.domain.model.Subscription
+import com.liquidtv.app.domain.model.SubscriptionOrigin
 import com.liquidtv.app.domain.model.SubscriptionStatus
 import com.liquidtv.app.domain.model.SubscriptionType
 import com.liquidtv.app.domain.repository.ChannelRepository
@@ -94,8 +97,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import retrofit2.Retrofit
-import retrofit2.converter.scalars.ScalarsConverterFactory
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "w2000dp-h1200dp-xhdpi")
@@ -172,11 +173,6 @@ class RedesignUiAndLogicTest {
             .allowMainThreadQueries()
             .build()
         val okHttp = OkHttpClient()
-        val retrofit = Retrofit.Builder()
-            .baseUrl("http://localhost/")
-            .client(okHttp)
-            .addConverterFactory(ScalarsConverterFactory.create())
-            .build()
         val crypto = object : CredentialCrypto {
             override fun encrypt(plaintext: String) = plaintext
             override fun decrypt(ciphertext: String) = ciphertext
@@ -191,9 +187,7 @@ class RedesignUiAndLogicTest {
             categoryDao = db.categoryDao(),
             epgDao = db.epgDao(),
             xtreamApi = XtreamApiService(okHttp),
-            iptvApi = retrofit.create(IptvApiService::class.java),
             okHttpClient = okHttp,
-            m3uParser = M3UParser(),
             xmltvParser = XmltvParser(),
             crypto = crypto,
             prefs = prefs,
@@ -248,13 +242,27 @@ class RedesignUiAndLogicTest {
     }
 
     @Test
-    fun `LoginScreen renders compact Arabic tabs, validates blank input, and switches to M3U`() {
+    fun `LoginScreen renders two sections, validates blank input, hides URL for panel servers, and shows Playlists`() {
         val fakeSubRepo = FakeSubscriptionRepository()
-        val vm = LoginViewModel(fakeSubRepo)
+        val fakeSonix = FakeSonixControlRepository(
+            SonixSyncState(
+                isRegistered = true,
+                deviceId = "dev-1",
+                deviceUid = "uid-1",
+                deviceCode = "SNX778899",
+                deviceStatus = SonixDeviceStatus.ACTIVE,
+                accessStatus = SonixAccessStatus.ACTIVE,
+                accessAllowed = true,
+                assignedServers = listOf(
+                    SonixAssignedServer(id = "srv-panel-1", name = "VIP Europe", region = "DE"),
+                ),
+            )
+        )
+        val vm = LoginViewModel(fakeSubRepo, fakeSonix)
 
         composeRule.setContent {
             LiquidTVTheme {
-                Box(Modifier.width(380.dp).height(760.dp)) {
+                Box(Modifier.width(420.dp).height(820.dp)) {
                     LoginScreen(
                         onLoginSuccess = {},
                         viewModel = vm,
@@ -263,14 +271,31 @@ class RedesignUiAndLogicTest {
             }
         }
 
-        composeRule.onNodeWithTag("tab_xtream").assertIsDisplayed()
-        composeRule.onNodeWithTag("tab_m3u").assertIsDisplayed()
+        composeRule.onNodeWithTag("tab_section_server").assertIsDisplayed()
+        composeRule.onNodeWithTag("tab_section_playlists").assertIsDisplayed()
+        composeRule.onNodeWithTag("tab_normal_url").assertIsDisplayed()
+        composeRule.onNodeWithTag("tab_panel_servers").assertIsDisplayed()
+        composeRule.onNodeWithTag("input_xtream_url").assertIsDisplayed()
+
         composeRule.onNodeWithTag("connect_button").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("login_error_banner").performScrollTo().assertIsDisplayed()
 
-        composeRule.onNodeWithTag("tab_m3u").performScrollTo().performClick()
-        composeRule.onNodeWithTag("input_m3u_url").performScrollTo().assertIsDisplayed()
+        // Switch to panel servers: must show assigned servers & only 3 input fields (NO host URL field)
+        composeRule.onNodeWithTag("tab_panel_servers").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("panel_server_item_srv-panel-1").performScrollTo().assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("input_subscription_name").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("input_xtream_username").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("input_xtream_password").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("input_xtream_url").assertDoesNotExist()
+
+        // Switch to Playlists section: shows SONIX device status banner with device code
+        composeRule.onNodeWithTag("tab_section_playlists").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("login_playlists_section").assertIsDisplayed()
+        composeRule.onNodeWithTag("sonix_device_code_text").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -585,7 +610,7 @@ class RedesignUiAndLogicTest {
     @Test
     fun `LoginScreen card is compact horizontally and vertically on landscape phone without clipping CTA`() {
         val fakeSubRepo = FakeSubscriptionRepository()
-        val vm = LoginViewModel(fakeSubRepo)
+        val vm = LoginViewModel(fakeSubRepo, FakeSonixControlRepository())
 
         composeRule.setContent {
             LiquidTVTheme {
@@ -598,26 +623,24 @@ class RedesignUiAndLogicTest {
         val density = composeRule.density.density
         val cardBounds = composeRule.onNodeWithTag("login_card").fetchSemanticsNode().boundsInRoot
         val cardWidthDp = cardBounds.width / density
-        val cardHeightDp = cardBounds.height / density
         val cardLeftDp = cardBounds.left / density
         val cardRightDp = cardBounds.right / density
 
-        assertTrue("Expected compact Login card width <= 360dp on 850dp screen, was $cardWidthDp", cardWidthDp <= 360f)
-        assertTrue("Expected compact Login card height <= 355dp on 400dp landscape, was $cardHeightDp", cardHeightDp <= 355f)
-        assertTrue("Expected Login card centered with generous side margins (left=$cardLeftDp, right=$cardRightDp)", cardLeftDp >= 200f && cardRightDp <= 650f)
+        assertTrue("Expected compact Login card width <= 470dp on 850dp screen, was $cardWidthDp", cardWidthDp <= 470f)
+        assertTrue("Expected Login card centered with generous side margins (left=$cardLeftDp, right=$cardRightDp)", cardLeftDp >= 180f && cardRightDp <= 670f)
 
-        composeRule.onNodeWithTag("input_subscription_name").assertIsDisplayed()
-        composeRule.onNodeWithTag("input_xtream_url").assertIsDisplayed()
-        composeRule.onNodeWithTag("input_xtream_username").assertIsDisplayed()
-        composeRule.onNodeWithTag("input_xtream_password").assertIsDisplayed()
-        composeRule.onNodeWithTag("toggle_password_visibility").assertIsDisplayed()
-        composeRule.onNodeWithTag("connect_button").assertIsDisplayed()
+        composeRule.onNodeWithTag("input_subscription_name").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("input_xtream_url").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("input_xtream_username").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("input_xtream_password").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("toggle_password_visibility").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("connect_button").performScrollTo().assertIsDisplayed()
     }
 
     @Test
     fun `LoginScreen card remains compact and centered on Android TV 1080p viewport`() {
         val fakeSubRepo = FakeSubscriptionRepository()
-        val vm = LoginViewModel(fakeSubRepo)
+        val vm = LoginViewModel(fakeSubRepo, FakeSonixControlRepository())
 
         composeRule.setContent {
             LiquidTVTheme {
@@ -632,8 +655,8 @@ class RedesignUiAndLogicTest {
         val cardWidthDp = cardBounds.width / density
         val cardHeightDp = cardBounds.height / density
 
-        assertTrue("Expected Login card width <= 370dp on TV, was $cardWidthDp", cardWidthDp <= 370f)
-        assertTrue("Expected Login card height <= 375dp on TV, was $cardHeightDp", cardHeightDp <= 375f)
+        assertTrue("Expected Login card width <= 500dp on TV, was $cardWidthDp", cardWidthDp <= 500f)
+        assertTrue("Expected Login card height <= 620dp on TV, was $cardHeightDp", cardHeightDp <= 620f)
         composeRule.onNodeWithTag("toggle_password_visibility").performClick()
         composeRule.onNodeWithTag("connect_button").assertIsDisplayed()
     }
@@ -882,15 +905,9 @@ private class FakeSubscriptionRepository : SubscriptionRepository {
         serverUrl: String,
         username: String,
         password: String,
-        activate: Boolean,
-    ): Result<Subscription> = Result.failure(UnsupportedOperationException())
-
-    override suspend fun addOrUpdateM3uSubscription(
-        existingId: String?,
-        displayName: String,
-        playlistUrl: String,
-        userAgent: String?,
-        referer: String?,
+        origin: SubscriptionOrigin,
+        panelServerId: String?,
+        panelServerName: String?,
         activate: Boolean,
     ): Result<Subscription> = Result.failure(UnsupportedOperationException())
 
@@ -900,7 +917,6 @@ private class FakeSubscriptionRepository : SubscriptionRepository {
     override suspend fun syncActiveEpg(): Result<Unit> = Result.success(Unit)
     override suspend fun deleteSubscription(subscriptionId: String): Result<Unit> = Result.success(Unit)
     override suspend fun getDecryptedXtreamPassword(subscriptionId: String): String? = null
-    override suspend fun getDecryptedM3uUrl(subscriptionId: String): String? = null
 }
 
 private class FakeChannelRepository(

@@ -2,39 +2,53 @@ package com.liquidtv.app.ui.screens.login
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.liquidtv.app.domain.model.SubscriptionType
+import com.liquidtv.app.data.sonix.SonixSyncState
+import com.liquidtv.app.domain.model.Subscription
+import com.liquidtv.app.domain.model.SubscriptionOrigin
+import com.liquidtv.app.domain.repository.SonixControlRepository
 import com.liquidtv.app.domain.repository.SubscriptionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+enum class LoginSection {
+    SERVER_SELECTION,
+    PLAYLISTS,
+}
+
 data class LoginUiState(
+    val activeSection: LoginSection = LoginSection.SERVER_SELECTION,
     val editingSubscriptionId: String? = null,
-    val selectedType: SubscriptionType = SubscriptionType.XTREAM,
+    val editingOrigin: SubscriptionOrigin? = null,
+    val serverMode: SubscriptionOrigin = SubscriptionOrigin.NORMAL_URL,
+    val selectedPanelServerId: String? = null,
+    val selectedPanelServerName: String? = null,
     val displayName: String = "",
     val serverUrl: String = "",
     val username: String = "",
     val password: String = "",
     val showPassword: Boolean = false,
-    val m3uUrl: String = "",
-    val userAgent: String = "",
-    val referer: String = "",
-    val showAdvancedHeaders: Boolean = false,
     val isConnecting: Boolean = false,
+    val busyPlaylistId: String? = null,
     val progress: Float = 0f,
     val statusMessage: String? = null,
     val errorMessage: String? = null,
+    val playlistMessage: String? = null,
     val isSuccess: Boolean = false,
+    val savedPlaylists: List<Subscription> = emptyList(),
+    val sonixState: SonixSyncState = SonixSyncState(),
 )
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val subscriptionRepository: SubscriptionRepository,
+    private val sonixControlRepository: SonixControlRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LoginUiState())
@@ -44,14 +58,103 @@ class LoginViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            subscriptionRepository.syncInfo.collect { info ->
-                if (_uiState.value.isConnecting) {
-                    _uiState.update {
-                        it.copy(
-                            progress = info.loadingProgress,
-                            statusMessage = info.statusMessage ?: it.statusMessage,
-                        )
+            combine(
+                subscriptionRepository.allSubscriptions,
+                sonixControlRepository.state,
+                subscriptionRepository.syncInfo,
+            ) { playlists, sonix, sync ->
+                Triple(playlists, sonix, sync)
+            }.collect { (playlists, sonix, sync) ->
+                _uiState.update { current ->
+                    // Auto-respect admin policy when not editing an existing item
+                    val resolvedMode = when {
+                        current.editingOrigin == SubscriptionOrigin.PANEL_SERVER -> SubscriptionOrigin.PANEL_SERVER
+                        current.serverMode == SubscriptionOrigin.NORMAL_URL &&
+                            !sonix.settings.allowNormalUrlLogin &&
+                            sonix.settings.allowPanelServers -> SubscriptionOrigin.PANEL_SERVER
+                        current.serverMode == SubscriptionOrigin.PANEL_SERVER &&
+                            !sonix.settings.allowPanelServers &&
+                            sonix.settings.allowNormalUrlLogin -> SubscriptionOrigin.NORMAL_URL
+                        else -> current.serverMode
                     }
+
+                    // Keep selected panel server synced with assigned list if still assigned
+                    val assignedMatch = current.selectedPanelServerId?.let { selId ->
+                        sonix.assignedServers.firstOrNull { it.id == selId }
+                    }
+                    val autoFirstServer = if (
+                        resolvedMode == SubscriptionOrigin.PANEL_SERVER &&
+                        current.selectedPanelServerId == null &&
+                        sonix.assignedServers.size == 1
+                    ) {
+                        sonix.assignedServers.first()
+                    } else null
+
+                    current.copy(
+                        savedPlaylists = playlists,
+                        sonixState = sonix,
+                        serverMode = resolvedMode,
+                        selectedPanelServerId = assignedMatch?.id
+                            ?: autoFirstServer?.id
+                            ?: current.selectedPanelServerId,
+                        selectedPanelServerName = assignedMatch?.name
+                            ?: autoFirstServer?.name
+                            ?: current.selectedPanelServerName,
+                        progress = if (current.isConnecting) sync.loadingProgress else current.progress,
+                        statusMessage = if (current.isConnecting) (sync.statusMessage ?: current.statusMessage) else current.statusMessage,
+                    )
+                }
+            }
+        }
+    }
+
+    fun selectSection(section: LoginSection) {
+        if (_uiState.value.isConnecting) return
+        _uiState.update { it.copy(activeSection = section, errorMessage = null, playlistMessage = null) }
+    }
+
+    fun selectServerMode(mode: SubscriptionOrigin) {
+        val current = _uiState.value
+        if (current.isConnecting) return
+        if (current.editingOrigin == SubscriptionOrigin.PANEL_SERVER && mode == SubscriptionOrigin.NORMAL_URL) {
+            // Never expose/convert a panel-managed playlist to normal Host URL edit
+            return
+        }
+        _uiState.update { state ->
+            val singlePanel = if (
+                mode == SubscriptionOrigin.PANEL_SERVER &&
+                state.selectedPanelServerId.isNullOrBlank() &&
+                state.sonixState.assignedServers.size == 1
+            ) {
+                state.sonixState.assignedServers.first()
+            } else null
+            state.copy(
+                serverMode = mode,
+                selectedPanelServerId = singlePanel?.id ?: state.selectedPanelServerId,
+                selectedPanelServerName = singlePanel?.name ?: state.selectedPanelServerName,
+                errorMessage = null,
+            )
+        }
+    }
+
+    fun selectPanelServer(serverId: String, serverName: String) {
+        if (_uiState.value.isConnecting) return
+        _uiState.update {
+            it.copy(
+                selectedPanelServerId = serverId,
+                selectedPanelServerName = serverName,
+                errorMessage = null,
+            )
+        }
+    }
+
+    fun refreshPanelServers() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(errorMessage = null) }
+            val result = sonixControlRepository.refreshAssignedServers()
+            if (result.isFailure) {
+                _uiState.update {
+                    it.copy(errorMessage = result.exceptionOrNull()?.message ?: "تعذّر تحديث بيانات لوحة التحكم")
                 }
             }
         }
@@ -62,34 +165,51 @@ class LoginViewModel @Inject constructor(
         if (_uiState.value.editingSubscriptionId == subscriptionId) return
         viewModelScope.launch {
             val sub = subscriptionRepository.getSubscriptionById(subscriptionId) ?: return@launch
-            val existingPass = if (sub.type == SubscriptionType.XTREAM) {
-                subscriptionRepository.getDecryptedXtreamPassword(sub.id).orEmpty()
-            } else ""
-            val existingM3u = if (sub.type == SubscriptionType.M3U) {
-                subscriptionRepository.getDecryptedM3uUrl(sub.id).orEmpty()
-            } else ""
-
-            _uiState.update {
-                it.copy(
-                    editingSubscriptionId = sub.id,
-                    selectedType = sub.type,
-                    displayName = sub.name,
-                    serverUrl = if (sub.type == SubscriptionType.XTREAM) sub.serverUrl else "",
-                    username = sub.username.orEmpty(),
-                    password = existingPass,
-                    m3uUrl = existingM3u,
-                    userAgent = sub.userAgent.orEmpty(),
-                    referer = sub.referer.orEmpty(),
-                    showAdvancedHeaders = !sub.userAgent.isNullOrBlank() || !sub.referer.isNullOrBlank(),
-                    errorMessage = null,
-                )
-            }
+            loadSubscriptionIntoEditor(sub)
         }
     }
 
-    fun selectType(type: SubscriptionType) {
-        if (_uiState.value.isConnecting) return
-        _uiState.update { it.copy(selectedType = type, errorMessage = null) }
+    fun startEditingPlaylist(sub: Subscription) {
+        viewModelScope.launch {
+            loadSubscriptionIntoEditor(sub)
+        }
+    }
+
+    fun clearEditMode() {
+        _uiState.update {
+            it.copy(
+                editingSubscriptionId = null,
+                editingOrigin = null,
+                displayName = "",
+                serverUrl = "",
+                username = "",
+                password = "",
+                selectedPanelServerId = null,
+                selectedPanelServerName = null,
+                errorMessage = null,
+            )
+        }
+    }
+
+    private suspend fun loadSubscriptionIntoEditor(sub: Subscription) {
+        val existingPass = subscriptionRepository.getDecryptedXtreamPassword(sub.id).orEmpty()
+        _uiState.update {
+            it.copy(
+                activeSection = LoginSection.SERVER_SELECTION,
+                editingSubscriptionId = sub.id,
+                editingOrigin = sub.origin,
+                serverMode = sub.origin,
+                selectedPanelServerId = sub.panelServerId,
+                selectedPanelServerName = sub.panelServerName,
+                displayName = sub.name,
+                // Security: NEVER copy raw Host URL into form state for PANEL_SERVER playlists
+                serverUrl = if (sub.origin == SubscriptionOrigin.NORMAL_URL) sub.serverUrl else "",
+                username = sub.username.orEmpty(),
+                password = existingPass,
+                errorMessage = null,
+                playlistMessage = null,
+            )
+        }
     }
 
     fun setDisplayName(value: String) = _uiState.update { it.copy(displayName = value, errorMessage = null) }
@@ -97,16 +217,11 @@ class LoginViewModel @Inject constructor(
     fun setUsername(value: String) = _uiState.update { it.copy(username = value, errorMessage = null) }
     fun setPassword(value: String) = _uiState.update { it.copy(password = value, errorMessage = null) }
     fun togglePasswordVisibility() = _uiState.update { it.copy(showPassword = !it.showPassword) }
-    fun setM3uUrl(value: String) = _uiState.update { it.copy(m3uUrl = value, errorMessage = null) }
-    fun setUserAgent(value: String) = _uiState.update { it.copy(userAgent = value, errorMessage = null) }
-    fun setReferer(value: String) = _uiState.update { it.copy(referer = value, errorMessage = null) }
-    fun toggleAdvancedHeaders() = _uiState.update { it.copy(showAdvancedHeaders = !it.showAdvancedHeaders) }
-    fun clearError() = _uiState.update { it.copy(errorMessage = null) }
+    fun clearError() = _uiState.update { it.copy(errorMessage = null, playlistMessage = null) }
 
     fun connect() {
         val current = _uiState.value
         if (current.isConnecting) return
-
         val validationError = validateInputs(current)
         if (validationError != null) {
             _uiState.update { it.copy(errorMessage = validationError) }
@@ -119,29 +234,48 @@ class LoginViewModel @Inject constructor(
                 it.copy(
                     isConnecting = true,
                     progress = 0.05f,
-                    statusMessage = "جارٍ الاتصال بالخادم...",
+                    statusMessage = "جارٍ التحقق والاتصال بالسيرفر...",
                     errorMessage = null,
                     isSuccess = false,
                 )
             }
 
-            val result = when (current.selectedType) {
-                SubscriptionType.XTREAM -> subscriptionRepository.addOrUpdateXtreamSubscription(
-                    existingId = current.editingSubscriptionId,
-                    displayName = current.displayName,
-                    serverUrl = current.serverUrl,
-                    username = current.username,
-                    password = current.password,
-                    activate = true,
-                )
-                SubscriptionType.M3U -> subscriptionRepository.addOrUpdateM3uSubscription(
-                    existingId = current.editingSubscriptionId,
-                    displayName = current.displayName,
-                    playlistUrl = current.m3uUrl,
-                    userAgent = current.userAgent,
-                    referer = current.referer,
-                    activate = true,
-                )
+            val result = when (current.serverMode) {
+                SubscriptionOrigin.NORMAL_URL -> {
+                    subscriptionRepository.addOrUpdateXtreamSubscription(
+                        existingId = current.editingSubscriptionId,
+                        displayName = current.displayName,
+                        serverUrl = current.serverUrl,
+                        username = current.username,
+                        password = current.password,
+                        origin = SubscriptionOrigin.NORMAL_URL,
+                        panelServerId = null,
+                        panelServerName = null,
+                        activate = true,
+                    )
+                }
+                SubscriptionOrigin.PANEL_SERVER -> {
+                    val serverId = current.selectedPanelServerId.orEmpty()
+                    val resolvedRes = sonixControlRepository.resolveAssignedServer(serverId)
+                    if (resolvedRes.isFailure) {
+                        val err = resolvedRes.exceptionOrNull()
+                            ?: IllegalStateException("تعذّر التحقق من السيرفر المحدد في لوحة التحكم")
+                        Result.failure(err)
+                    } else {
+                        val resolved = resolvedRes.getOrThrow()
+                        subscriptionRepository.addOrUpdateXtreamSubscription(
+                            existingId = current.editingSubscriptionId,
+                            displayName = current.displayName,
+                            serverUrl = resolved.serverUrl,
+                            username = current.username,
+                            password = current.password,
+                            origin = SubscriptionOrigin.PANEL_SERVER,
+                            panelServerId = resolved.id,
+                            panelServerName = resolved.name,
+                            activate = true,
+                        )
+                    }
+                }
             }
 
             result.onSuccess {
@@ -168,25 +302,111 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    fun activatePlaylist(subscriptionId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(busyPlaylistId = subscriptionId, errorMessage = null, playlistMessage = null) }
+            subscriptionRepository.activateSubscription(subscriptionId)
+                .onSuccess {
+                    _uiState.update {
+                        it.copy(
+                            busyPlaylistId = null,
+                            playlistMessage = "تم تفعيل قائمة التشغيل",
+                            isSuccess = true,
+                        )
+                    }
+                }
+                .onFailure { err ->
+                    _uiState.update {
+                        it.copy(
+                            busyPlaylistId = null,
+                            errorMessage = err.message ?: "تعذّر تفعيل القائمة",
+                        )
+                    }
+                }
+        }
+    }
+
+    fun syncPlaylist(subscriptionId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(busyPlaylistId = subscriptionId, errorMessage = null, playlistMessage = null) }
+            subscriptionRepository.syncSubscription(subscriptionId)
+                .onSuccess {
+                    _uiState.update {
+                        it.copy(
+                            busyPlaylistId = null,
+                            playlistMessage = "تمت مزامنة قائمة التشغيل بنجاح",
+                        )
+                    }
+                }
+                .onFailure { err ->
+                    _uiState.update {
+                        it.copy(
+                            busyPlaylistId = null,
+                            errorMessage = err.message ?: "فشلت المزامنة",
+                        )
+                    }
+                }
+        }
+    }
+
+    fun deletePlaylist(subscriptionId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(busyPlaylistId = subscriptionId, errorMessage = null, playlistMessage = null) }
+            subscriptionRepository.deleteSubscription(subscriptionId)
+                .onSuccess {
+                    _uiState.update { current ->
+                        val resetEdit = current.editingSubscriptionId == subscriptionId
+                        current.copy(
+                            busyPlaylistId = null,
+                            editingSubscriptionId = if (resetEdit) null else current.editingSubscriptionId,
+                            editingOrigin = if (resetEdit) null else current.editingOrigin,
+                            playlistMessage = "تم حذف قائمة التشغيل",
+                        )
+                    }
+                }
+                .onFailure { err ->
+                    _uiState.update {
+                        it.copy(
+                            busyPlaylistId = null,
+                            errorMessage = err.message ?: "فشل حذف القائمة",
+                        )
+                    }
+                }
+        }
+    }
+
     private fun validateInputs(state: LoginUiState): String? {
-        return when (state.selectedType) {
-            SubscriptionType.XTREAM -> {
+        return when (state.serverMode) {
+            SubscriptionOrigin.NORMAL_URL -> {
+                if (!state.sonixState.settings.allowNormalUrlLogin &&
+                    state.editingOrigin != SubscriptionOrigin.NORMAL_URL
+                ) {
+                    return "تم تعطيل إضافة روابط URL عادية مؤقتاً من لوحة التحكم."
+                }
                 val url = state.serverUrl.trim()
                 when {
-                    url.isEmpty() -> "يرجى إدخال رابط خادم Xtream (يبدأ بـ http:// أو https://)."
-                    !url.startsWith("http://", true) && !url.startsWith("https://", true) ->
-                        "يجب أن يبدأ رابط الخادم بـ http:// أو https://"
+                    state.displayName.isBlank() -> "يرجى إدخال اسم قائمة التشغيل."
                     state.username.isBlank() -> "يرجى إدخال اسم المستخدم."
                     state.password.isBlank() -> "يرجى إدخال كلمة المرور."
+                    url.isEmpty() -> "يرجى إدخال Host URL (يبدأ بـ http:// أو https://)."
+                    !url.startsWith("http://", true) && !url.startsWith("https://", true) ->
+                        "يجب أن يبدأ Host URL بـ http:// أو https://"
                     else -> null
                 }
             }
-            SubscriptionType.M3U -> {
-                val url = state.m3uUrl.trim()
+            SubscriptionOrigin.PANEL_SERVER -> {
+                if (!state.sonixState.settings.allowPanelServers &&
+                    state.editingOrigin != SubscriptionOrigin.PANEL_SERVER
+                ) {
+                    return "تم تعطيل سيرفرات لوحة التحكم مؤقتاً من الإعدادات."
+                }
                 when {
-                    url.isEmpty() -> "يرجى إدخال رابط قائمة M3U (يبدأ بـ http:// أو https://)."
-                    !url.startsWith("http://", true) && !url.startsWith("https://", true) ->
-                        "يجب أن يبدأ رابط القائمة بـ http:// أو https://"
+                    state.sonixState.isBlockedOrRevoked -> "تم إيقاف هذا الجهاز من لوحة التحكم."
+                    state.sonixState.isPanelExpired -> "انتهت صلاحية اشتراك الجهاز في لوحة التحكم."
+                    state.selectedPanelServerId.isNullOrBlank() -> "يرجى اختيار سيرفر من قائمة سيرفرات لوحة التحكم."
+                    state.displayName.isBlank() -> "يرجى إدخال اسم قائمة التشغيل."
+                    state.username.isBlank() -> "يرجى إدخال اسم المستخدم."
+                    state.password.isBlank() -> "يرجى إدخال كلمة المرور."
                     else -> null
                 }
             }

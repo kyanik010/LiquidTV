@@ -22,6 +22,8 @@ android {
     versionName = "1.1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    buildConfigField("String", "SONIX_SUPABASE_URL", "\"https://ganqdgstfriegfwainoz.supabase.co\"")
+    buildConfigField("String", "SONIX_SUPABASE_ANON_KEY", "\"sb_publishable_yOn2frVZ8pJlzscXrzwZpw_8BeGXa1L\"")
     vectorDrawables {
       useSupportLibrary = true
     }

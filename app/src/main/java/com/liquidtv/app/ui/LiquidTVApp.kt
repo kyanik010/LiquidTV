@@ -14,6 +14,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.liquidtv.app.ui.components.AppBackground
+import com.liquidtv.app.ui.components.GlassPanelMessageDialog
+import com.liquidtv.app.ui.components.MaintenanceBannerStrip
+import com.liquidtv.app.ui.components.SonixBlockedAccessOverlay
 import com.liquidtv.app.ui.navigation.LiquidTVNavGraph
 import com.liquidtv.app.ui.navigation.MirrorBubbleNavigation
 import com.liquidtv.app.ui.navigation.NavDestination
@@ -27,6 +30,7 @@ import kotlinx.coroutines.delay
 
 /**
  * Root composable that enforces the subscription startup gate,
+ * SONIX-CONTROL device status/messages/updates overlays,
  * manages the inactivity screensaver timer, and wires Mirror Bubble navigation.
  */
 @Composable
@@ -39,6 +43,8 @@ fun LiquidTVApp(
     val lastInteractionMs = remember { mutableLongStateOf(System.currentTimeMillis()) }
 
     val gate = rootState.gate
+    val sonixState = rootState.sonixState
+
     if (gate is AppStartupGate.Checking) {
         AppBackground(modifier = Modifier.fillMaxSize()) {
             Column(
@@ -53,6 +59,23 @@ fun LiquidTVApp(
                     color = AppTheme.colors.text,
                 )
             }
+        }
+        return
+    }
+
+    if (sonixState.isBlockedOrRevoked) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            SonixBlockedAccessOverlay(
+                sonixState = sonixState,
+                onRetrySync = startupViewModel::refreshPanelStatus,
+                modifier = Modifier.fillMaxSize(),
+            )
+            GlassUpdateDialog(
+                updateState = updateState,
+                onUpdateClick = { info -> updateViewModel.startDownload(info) },
+                onInstallClick = { updateViewModel.installCurrentUpdate() },
+                onDismiss = { updateViewModel.dismiss() },
+            )
         }
         return
     }
@@ -85,7 +108,6 @@ fun LiquidTVApp(
         currentRoute == Screen.Subscriptions.route ||
         currentRoute == Screen.Addons.route ||
         currentRoute.startsWith("series_detail/")
-
     val showNavBar = !isFullScreenOverlayRoute
 
     // Real inactivity screensaver timer respecting user preferences without recomposing on pointer moves
@@ -100,6 +122,7 @@ fun LiquidTVApp(
             !currentRoute.startsWith("player/") &&
             currentRoute != Screen.Ambient.route &&
             !currentRoute.startsWith("login")
+
         if (gate is AppStartupGate.Ready && prefs.ambientEnabled && eligibleRoute) {
             val timeoutMs = (prefs.screenSaverTimeout.coerceAtLeast(1) * 60_000L)
             while (true) {
@@ -180,6 +203,27 @@ fun LiquidTVApp(
                 )
             }
         }
+
+        if (sonixState.settings.maintenanceMode &&
+            sonixState.settings.maintenanceMessage.isNotBlank() &&
+            !currentRoute.orEmpty().startsWith("player/")
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                MaintenanceBannerStrip(message = sonixState.settings.maintenanceMessage)
+            }
+        }
+
+        GlassPanelMessageDialog(
+            message = sonixState.pendingMessages.firstOrNull(),
+            onAcknowledge = startupViewModel::acknowledgeMessage,
+        )
 
         GlassUpdateDialog(
             updateState = updateState,

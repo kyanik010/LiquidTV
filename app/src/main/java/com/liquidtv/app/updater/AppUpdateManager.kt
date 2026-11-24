@@ -10,6 +10,7 @@ import android.provider.Settings
 import androidx.core.content.FileProvider
 import androidx.core.content.pm.PackageInfoCompat
 import com.liquidtv.app.BuildConfig
+import com.liquidtv.app.domain.repository.SonixControlRepository
 import com.liquidtv.app.domain.repository.UserPreferencesRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -30,10 +31,39 @@ class AppUpdateManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val okHttpClient: OkHttpClient,
     private val userPreferencesRepository: UserPreferencesRepository,
+    private val sonixControlRepository: SonixControlRepository? = null,
 ) {
 
     suspend fun checkForUpdate(repoOverride: String? = null): Result<AppUpdateInfo?> = withContext(Dispatchers.IO) {
         try {
+            // 1. Check SONIX-CONTROL releases first unless caller explicitly requested a GitHub repo override
+            if (repoOverride == null && sonixControlRepository != null) {
+                val panelRelease = sonixControlRepository.checkForPanelUpdate().getOrNull()
+                if (panelRelease != null) {
+                    val downloadUrl = panelRelease.apkUrl.trim().ifBlank { panelRelease.releaseUrl.trim() }
+                    val newerByCode = panelRelease.versionCode > BuildConfig.VERSION_CODE
+                    val newerByName = isNewer(panelRelease.versionName, BuildConfig.VERSION_NAME)
+                    if (downloadUrl.startsWith("https://", ignoreCase = true) && (newerByCode || newerByName)) {
+                        val mandatory = panelRelease.updatePolicy.equals("mandatory", ignoreCase = true) ||
+                            BuildConfig.VERSION_CODE < panelRelease.minSupportedVersionCode
+                        return@withContext Result.success(
+                            AppUpdateInfo(
+                                versionName = panelRelease.versionName,
+                                versionCode = panelRelease.versionCode,
+                                releaseTitle = "الإصدار ${panelRelease.versionName}",
+                                releaseNotes = panelRelease.releaseNotes,
+                                apkDownloadUrl = downloadUrl,
+                                apkSize = panelRelease.apkSizeBytes ?: 0L,
+                                sha256 = panelRelease.sha256.takeIf { it.isNotBlank() },
+                                publishedAt = panelRelease.publishedAt,
+                                isMandatory = mandatory,
+                                source = "panel",
+                            ),
+                        )
+                    }
+                }
+            }
+
             val userPrefs = userPreferencesRepository.userPreferences.firstOrNull()
             val rawRepo = repoOverride ?: userPrefs?.githubRepo ?: DEFAULT_REPO
             val repo = sanitizeRepo(rawRepo)
@@ -175,7 +205,7 @@ class AppUpdateManager @Inject constructor(
         updateInfo: AppUpdateInfo,
         onProgress: (Float, Long, Long) -> Unit,
     ): Result<File> = withContext(Dispatchers.IO) {
-        if (!isTrustedGithubDownloadUrl(updateInfo.apkDownloadUrl)) {
+        if (!isTrustedUpdateDownloadUrl(updateInfo, updateInfo.apkDownloadUrl)) {
             return@withContext Result.failure(SecurityException("Blocked untrusted APK download URL"))
         }
 
@@ -200,7 +230,7 @@ class AppUpdateManager @Inject constructor(
 
                 // Verify final redirect host stayed on trusted GitHub infrastructure
                 val finalUrl = response.request.url.toString()
-                if (!isTrustedGithubDownloadUrl(finalUrl)) {
+                if (!isTrustedUpdateDownloadUrl(updateInfo, finalUrl)) {
                     return@withContext Result.failure(SecurityException("Blocked redirect to untrusted download host"))
                 }
 
@@ -370,6 +400,14 @@ class AppUpdateManager @Inject constructor(
 
     private fun isValidRepoFormat(repo: String): Boolean {
         return Regex("^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$").matches(repo)
+    }
+
+    fun isTrustedUpdateDownloadUrl(updateInfo: AppUpdateInfo, rawUrl: String): Boolean {
+        if (updateInfo.source == "panel") {
+            val uri = try { Uri.parse(rawUrl.trim()) } catch (_: Exception) { return false }
+            return uri.scheme?.equals("https", ignoreCase = true) == true && !uri.host.isNullOrBlank()
+        }
+        return isTrustedGithubDownloadUrl(rawUrl)
     }
 
     fun isTrustedGithubDownloadUrl(rawUrl: String): Boolean {

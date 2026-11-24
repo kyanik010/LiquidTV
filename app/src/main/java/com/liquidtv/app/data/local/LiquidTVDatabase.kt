@@ -17,7 +17,7 @@ import com.liquidtv.app.data.local.entity.*
         WatchHistoryEntity::class,
         EpgProgramEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class LiquidTVDatabase : RoomDatabase() {
@@ -202,6 +202,105 @@ abstract class LiquidTVDatabase : RoomDatabase() {
                     """.trimIndent(),
                 )
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_epg_programs_subscriptionId_channelTvgId_startTimeMs_endTimeMs` ON `epg_programs` (`subscriptionId`, `channelTvgId`, `startTimeMs`, `endTimeMs`)")
+            }
+        }
+
+        /**
+         * Safe non-destructive migration from v2 to v3:
+         * - Removes legacy M3U subscriptions (along with their child rows via CASCADE)
+         * - Preserves all existing Xtream subscriptions, encrypted passwords, channels, series,
+         *   episodes, categories, EPG programs, and watch history cleanly
+         * - Adds origin ('NORMAL_URL' | 'PANEL_SERVER'), panelServerId, and panelServerName
+         * - Removes legacy M3U-only columns without triggering FK cascade on surviving Xtream data.
+         */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 1. Remove legacy M3U child rows explicitly first (in case PRAGMA foreign_keys is OFF during onUpgrade), then M3U subscriptions
+                db.execSQL("DELETE FROM `epg_programs` WHERE `subscriptionId` IN (SELECT `id` FROM `subscriptions` WHERE `type` != 'XTREAM')")
+                db.execSQL("DELETE FROM `categories` WHERE `subscriptionId` IN (SELECT `id` FROM `subscriptions` WHERE `type` != 'XTREAM')")
+                db.execSQL("DELETE FROM `episodes` WHERE `subscriptionId` IN (SELECT `id` FROM `subscriptions` WHERE `type` != 'XTREAM')")
+                db.execSQL("DELETE FROM `series` WHERE `subscriptionId` IN (SELECT `id` FROM `subscriptions` WHERE `type` != 'XTREAM')")
+                db.execSQL("DELETE FROM `channels` WHERE `subscriptionId` IN (SELECT `id` FROM `subscriptions` WHERE `type` != 'XTREAM')")
+                db.execSQL("DELETE FROM `subscriptions` WHERE `type` != 'XTREAM'")
+
+                // 2. Preserve all surviving child rows into TEMP tables so dropping `subscriptions` does not cascade-delete them
+                db.execSQL("CREATE TEMP TABLE `_bak_channels` AS SELECT * FROM `channels`")
+                db.execSQL("CREATE TEMP TABLE `_bak_series` AS SELECT * FROM `series`")
+                db.execSQL("CREATE TEMP TABLE `_bak_episodes` AS SELECT * FROM `episodes`")
+                db.execSQL("CREATE TEMP TABLE `_bak_categories` AS SELECT * FROM `categories`")
+                db.execSQL("CREATE TEMP TABLE `_bak_epg_programs` AS SELECT * FROM `epg_programs`")
+
+                // 3. Rebuild `subscriptions` with v3 columns (defaulting existing Xtream rows to NORMAL_URL)
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `subscriptions_new` (
+                        `id` TEXT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `type` TEXT NOT NULL,
+                        `origin` TEXT NOT NULL,
+                        `serverUrl` TEXT NOT NULL,
+                        `panelServerId` TEXT,
+                        `panelServerName` TEXT,
+                        `username` TEXT,
+                        `encryptedPassword` TEXT,
+                        `xmltvUrl` TEXT,
+                        `isActive` INTEGER NOT NULL,
+                        `connectionStatus` TEXT NOT NULL,
+                        `lastError` TEXT,
+                        `accountStatus` TEXT,
+                        `expDateEpochSec` INTEGER,
+                        `maxConnections` INTEGER,
+                        `activeConnections` INTEGER,
+                        `isTrial` INTEGER,
+                        `lastSyncedAt` INTEGER,
+                        `createdAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent(),
+                )
+
+                db.execSQL(
+                    """
+                    INSERT INTO `subscriptions_new` (
+                        `id`, `name`, `type`, `origin`, `serverUrl`, `panelServerId`, `panelServerName`,
+                        `username`, `encryptedPassword`, `xmltvUrl`, `isActive`, `connectionStatus`,
+                        `lastError`, `accountStatus`, `expDateEpochSec`, `maxConnections`,
+                        `activeConnections`, `isTrial`, `lastSyncedAt`, `createdAt`
+                    )
+                    SELECT
+                        `id`, `name`, `type`, 'NORMAL_URL', `serverUrl`, NULL, NULL,
+                        `username`, `encryptedPassword`, `xmltvUrl`, `isActive`, `connectionStatus`,
+                        `lastError`, `accountStatus`, `expDateEpochSec`, `maxConnections`,
+                        `activeConnections`, `isTrial`, `lastSyncedAt`, `createdAt`
+                    FROM `subscriptions`
+                    """.trimIndent(),
+                )
+
+                db.execSQL("DROP TABLE `subscriptions`")
+                db.execSQL("ALTER TABLE `subscriptions_new` RENAME TO `subscriptions`")
+
+                // Ensure one surviving Xtream subscription stays active if an active M3U was removed
+                db.execSQL(
+                    """
+                    UPDATE `subscriptions`
+                    SET `isActive` = 1
+                    WHERE `id` = (SELECT `id` FROM `subscriptions` ORDER BY `createdAt` ASC LIMIT 1)
+                      AND NOT EXISTS (SELECT 1 FROM `subscriptions` WHERE `isActive` = 1)
+                    """.trimIndent(),
+                )
+
+                // 4. Restore surviving child rows in FK parent-before-child order (OR IGNORE handles PRAGMA foreign_keys = OFF cleanly)
+                db.execSQL("INSERT OR IGNORE INTO `channels` SELECT * FROM `_bak_channels`")
+                db.execSQL("INSERT OR IGNORE INTO `series` SELECT * FROM `_bak_series`")
+                db.execSQL("INSERT OR IGNORE INTO `episodes` SELECT * FROM `_bak_episodes`")
+                db.execSQL("INSERT OR IGNORE INTO `categories` SELECT * FROM `_bak_categories`")
+                db.execSQL("INSERT OR IGNORE INTO `epg_programs` SELECT * FROM `_bak_epg_programs`")
+
+                db.execSQL("DROP TABLE `_bak_channels`")
+                db.execSQL("DROP TABLE `_bak_series`")
+                db.execSQL("DROP TABLE `_bak_episodes`")
+                db.execSQL("DROP TABLE `_bak_categories`")
+                db.execSQL("DROP TABLE `_bak_epg_programs`")
             }
         }
     }

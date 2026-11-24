@@ -90,7 +90,15 @@ class AppUpdateViewModel @Inject constructor(
     }
 
     fun dismiss() {
+        val current = _updateState.value
+        if (current is UpdateState.Available && current.info.isMandatory) {
+            return
+        }
         _updateState.value = UpdateState.Idle
+    }
+
+    fun checkAutoUpdateIfEnabled() {
+        checkAutoUpdateOnLaunch()
     }
 
     fun setGithubRepo(repo: String) {
