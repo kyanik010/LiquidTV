@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -280,38 +281,60 @@ class ThemeSystemTest {
         composeRule.onNodeWithTag("settings_content_list")
             .performScrollToNode(hasTestTag("theme_card_pearl-marble"))
         composeRule.onNodeWithTag("theme_card_pearl-marble").performClick()
-        composeRule.waitUntil(timeoutMillis = 5_000) { activeThemeId == "pearl-marble" }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            activeThemeId == "pearl-marble" && settingsVm.uiState.value.appTheme == "pearl-marble"
+        }
         composeRule.waitForIdle()
 
         assertEquals("pearl-marble", activeThemeId)
         assertTrue(activeIsLight)
         assertEquals(0xFFE9E0D1.toInt(), activeBgArgb)
+        composeRule.onNodeWithTag("settings_content_list")
+            .performScrollToNode(hasTestTag("theme_card_pearl-marble"))
+        composeRule.onNodeWithTag("theme_card_pearl-marble")
+            .assertIsDisplayed()
+            .assertIsSelected()
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithTag("theme_active_badge_pearl-marble")
+            composeRule.onAllNodesWithTag("theme_active_badge_pearl-marble", useUnmergedTree = true)
                 .fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithTag("theme_active_badge_pearl-marble").assertIsDisplayed()
+        composeRule.onNodeWithTag("theme_active_badge_pearl-marble", useUnmergedTree = true)
+            .assertIsDisplayed()
 
         // Switch immediately to Dark theme "مخمل العقيق" (Ruby Velvet)
         composeRule.onNodeWithTag("settings_content_list")
             .performScrollToNode(hasTestTag("theme_card_ruby-velvet"))
         composeRule.onNodeWithTag("theme_card_ruby-velvet").performClick()
-        composeRule.waitUntil(timeoutMillis = 5_000) { activeThemeId == "ruby-velvet" }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            activeThemeId == "ruby-velvet" && settingsVm.uiState.value.appTheme == "ruby-velvet"
+        }
         composeRule.waitForIdle()
 
         assertEquals("ruby-velvet", activeThemeId)
         assertFalse(activeIsLight)
         assertEquals(0xFF17060D.toInt(), activeBgArgb)
+        composeRule.onNodeWithTag("settings_content_list")
+            .performScrollToNode(hasTestTag("theme_card_ruby-velvet"))
+        composeRule.onNodeWithTag("theme_card_ruby-velvet")
+            .assertIsDisplayed()
+            .assertIsSelected()
 
         // Scroll to the end and verify Black Onyx (#10, sortOrder 19) is selectable
         composeRule.onNodeWithTag("settings_content_list")
             .performScrollToNode(hasTestTag("theme_card_black-onyx"))
         composeRule.onNodeWithTag("theme_card_black-onyx").performClick()
-        composeRule.waitUntil(timeoutMillis = 5_000) { activeThemeId == "black-onyx" }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            activeThemeId == "black-onyx" && settingsVm.uiState.value.appTheme == "black-onyx"
+        }
         composeRule.waitForIdle()
 
         assertEquals("black-onyx", activeThemeId)
         assertEquals(0xFF050609.toInt(), activeBgArgb)
+        composeRule.onNodeWithTag("settings_content_list")
+            .performScrollToNode(hasTestTag("theme_card_black-onyx"))
+        composeRule.onNodeWithTag("theme_card_black-onyx")
+            .assertIsDisplayed()
+            .assertIsSelected()
     }
 
     private fun contrastRatio(fg: Color, bg: Color): Float {
