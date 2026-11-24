@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -285,6 +286,10 @@ class ThemeSystemTest {
         assertEquals("pearl-marble", activeThemeId)
         assertTrue(activeIsLight)
         assertEquals(0xFFE9E0D1.toInt(), activeBgArgb)
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag("theme_active_badge_pearl-marble")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithTag("theme_active_badge_pearl-marble").assertIsDisplayed()
 
         // Switch immediately to Dark theme "مخمل العقيق" (Ruby Velvet)
