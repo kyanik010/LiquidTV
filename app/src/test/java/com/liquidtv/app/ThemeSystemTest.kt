@@ -44,6 +44,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -76,10 +77,16 @@ class ThemeSystemTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         context = ApplicationProvider.getApplicationContext()
+        runBlocking {
+            UserPreferencesDataStore(context).setAppTheme(AppThemeCatalog.DEFAULT_THEME_ID)
+        }
     }
 
     @After
     fun tearDown() {
+        runBlocking {
+            UserPreferencesDataStore(context).setAppTheme(AppThemeCatalog.DEFAULT_THEME_ID)
+        }
         Dispatchers.resetMain()
     }
 
@@ -201,7 +208,8 @@ class ThemeSystemTest {
     fun `UserPreferencesDataStore persists global app theme independently from screensaver ambient theme`() = runTest {
         val store = UserPreferencesDataStore(context)
 
-        // Default initializes to Royal Navy
+        // Fresh UserPreferences defaults to Royal Navy
+        assertEquals("royal-navy", com.liquidtv.app.domain.model.UserPreferences().appTheme)
         assertEquals("royal-navy", store.getAppTheme().first())
         val initialAmbient = store.getAmbientTheme().first()
 
@@ -222,9 +230,11 @@ class ThemeSystemTest {
     }
 
     @Test
-    fun `Settings Themes section displays all 10 themes and switches global AppTheme immediately`() = runTest {
+    fun `Settings Themes section displays all 10 themes and switches global AppTheme immediately`() {
         val store = UserPreferencesDataStore(context)
-        store.setAppTheme(AppThemeCatalog.DEFAULT_THEME_ID)
+        runBlocking {
+            store.setAppTheme(AppThemeCatalog.DEFAULT_THEME_ID)
+        }
 
         val settingsVm = SettingsViewModel(
             context = context,
@@ -255,6 +265,7 @@ class ThemeSystemTest {
             }
         }
 
+        composeRule.waitUntil(timeoutMillis = 5_000) { activeThemeId == "royal-navy" }
         composeRule.waitForIdle()
         assertEquals("royal-navy", activeThemeId)
         assertFalse(activeIsLight)
@@ -268,6 +279,7 @@ class ThemeSystemTest {
         composeRule.onNodeWithTag("settings_content_list")
             .performScrollToNode(hasTestTag("theme_card_pearl-marble"))
         composeRule.onNodeWithTag("theme_card_pearl-marble").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) { activeThemeId == "pearl-marble" }
         composeRule.waitForIdle()
 
         assertEquals("pearl-marble", activeThemeId)
@@ -279,6 +291,7 @@ class ThemeSystemTest {
         composeRule.onNodeWithTag("settings_content_list")
             .performScrollToNode(hasTestTag("theme_card_ruby-velvet"))
         composeRule.onNodeWithTag("theme_card_ruby-velvet").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) { activeThemeId == "ruby-velvet" }
         composeRule.waitForIdle()
 
         assertEquals("ruby-velvet", activeThemeId)
@@ -289,6 +302,7 @@ class ThemeSystemTest {
         composeRule.onNodeWithTag("settings_content_list")
             .performScrollToNode(hasTestTag("theme_card_black-onyx"))
         composeRule.onNodeWithTag("theme_card_black-onyx").performClick()
+        composeRule.waitUntil(timeoutMillis = 5_000) { activeThemeId == "black-onyx" }
         composeRule.waitForIdle()
 
         assertEquals("black-onyx", activeThemeId)
