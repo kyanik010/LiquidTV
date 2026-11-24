@@ -38,11 +38,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -50,12 +48,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
-import coil.compose.AsyncImage
 import com.liquidtv.app.domain.model.MediaType
 import com.liquidtv.app.domain.model.TrackInfo
 import com.liquidtv.app.player.PlayerViewModel
 import com.liquidtv.app.ui.components.LiquidGlassSurface
-import com.liquidtv.app.ui.components.LiveBadge
 import com.liquidtv.app.ui.theme.AppTheme
 import com.liquidtv.app.ui.theme.LiquidTypography
 import kotlinx.coroutines.delay
@@ -140,14 +136,14 @@ fun PlayerScreen(
                         }
                         KeyEvent.KEYCODE_DPAD_RIGHT -> {
                             if (!uiState.showControls && uiState.mediaType != MediaType.LIVE) {
-                                viewModel.seekBy(15_000L)
+                                viewModel.seekBy(5_000L)
                                 viewModel.showControls()
                                 true
                             } else false
                         }
                         KeyEvent.KEYCODE_DPAD_LEFT -> {
                             if (!uiState.showControls && uiState.mediaType != MediaType.LIVE) {
-                                viewModel.seekBy(-15_000L)
+                                viewModel.seekBy(-5_000L)
                                 viewModel.showControls()
                                 true
                             } else false
@@ -335,132 +331,60 @@ fun PlayerScreen(
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.safeDrawing),
             ) {
-                // Top Info Bar + EPG Program Info
-                uiState.channel?.let { channel ->
-                    LiquidGlassSurface(
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(horizontal = 24.dp, vertical = 20.dp)
-                            .widthIn(max = 660.dp),
-                        cornerRadius = 20.dp,
-                        glassAlpha = 0.88f,
-                        borderAlpha = 0.65f,
-                        borderColor = colors.border,
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                            ) {
-                                if (!channel.logoUrl.isNullOrBlank()) {
-                                    AsyncImage(
-                                        model = channel.logoUrl,
-                                        contentDescription = channel.name,
-                                        modifier = Modifier
-                                            .size(44.dp)
-                                            .clip(RoundedCornerShape(8.dp)),
-                                        contentScale = ContentScale.Fit,
-                                    )
-                                }
-                                Column {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                    ) {
-                                        Text(
-                                            text = channel.name,
-                                            style = LiquidTypography.TitleMedium,
-                                            color = colors.text,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                        if (uiState.mediaType == MediaType.LIVE) {
-                                            LiveBadge()
-                                        }
-                                    }
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        channel.groupTitle?.let {
-                                            Text(it, style = LiquidTypography.LabelSmall, color = colors.accentText)
-                                        }
-                                        channel.country?.let {
-                                            Text("• $it", style = LiquidTypography.LabelSmall, color = colors.muted)
-                                        }
-                                        channel.language?.let {
-                                            Text("• $it", style = LiquidTypography.LabelSmall, color = colors.muted)
-                                        }
-                                    }
-                                }
-                            }
-
-                            // EPG Current & Next
-                            val nowProgram = uiState.epgSummary.current
-                            val nextProgram = uiState.epgSummary.next
-                            if (nowProgram != null || nextProgram != null) {
-                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    nowProgram?.let { curr ->
-                                        Text(
-                                            text = "الآن: ${curr.title}",
-                                            style = LiquidTypography.BodySmall,
-                                            color = colors.accentText,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                        LinearProgressIndicator(
-                                            progress = { curr.progressFraction() },
-                                            color = colors.accent,
-                                            trackColor = colors.border.copy(alpha = 0.40f),
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(4.dp)
-                                                .clip(RoundedCornerShape(2.dp)),
-                                        )
-                                    }
-                                    nextProgram?.let { nxt ->
-                                        Text(
-                                            text = "التالي: ${nxt.title}",
-                                            style = LiquidTypography.LabelSmall,
-                                            color = colors.textSecondary,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
                 // Bottom Dock
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 24.dp, start = 16.dp, end = 16.dp),
+                        .padding(bottom = 16.dp, start = 16.dp, end = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    // VOD / Episode seek bar
+                    // نص الزر المحدد (يظهر فوق شريط الوقت)
+                    focusedActionText?.let { actionText ->
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    color = colors.panel.copy(alpha = 0.92f),
+                                    shape = RoundedCornerShape(20.dp),
+                                )
+                                .border(1.dp, colors.focus.copy(alpha = 0.75f), RoundedCornerShape(20.dp))
+                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                        ) {
+                            Text(
+                                text = actionText,
+                                style = LiquidTypography.LabelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
+                                color = colors.text,
+                            )
+                        }
+                    }
+
+                    // شريط الوقت (VOD فقط) - يطابق عرض شريط الأدوات
                     if (uiState.mediaType != MediaType.LIVE && uiState.durationMs > 0L) {
+                        var sliderDrag by remember { mutableStateOf<Float?>(null) }
+                        val shownPosition = sliderDrag?.toLong() ?: uiState.currentPositionMs
+
                         Row(
                             modifier = Modifier
                                 .widthIn(max = 620.dp)
                                 .fillMaxWidth()
                                 .background(colors.panel.copy(alpha = 0.84f), RoundedCornerShape(16.dp))
                                 .border(1.dp, colors.border.copy(alpha = 0.50f), RoundedCornerShape(16.dp))
-                                .padding(horizontal = 14.dp, vertical = 2.dp),
+                                .padding(horizontal = 14.dp, vertical = 0.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             Text(
-                                text = formatDuration(uiState.currentPositionMs),
+                                text = formatDuration(shownPosition),
                                 style = LiquidTypography.LabelSmall,
                                 color = colors.text,
                             )
                             Slider(
-                                value = uiState.currentPositionMs.toFloat(),
-                                onValueChange = { viewModel.seekTo(it.toLong()) },
+                                value = (sliderDrag ?: uiState.currentPositionMs.toFloat()),
+                                onValueChange = { sliderDrag = it },
+                                onValueChangeFinished = {
+                                    sliderDrag?.let { viewModel.seekTo(it.toLong()) }
+                                    sliderDrag = null
+                                },
                                 valueRange = 0f..uiState.durationMs.toFloat().coerceAtLeast(1f),
                                 colors = SliderDefaults.colors(
                                     thumbColor = colors.accent,
@@ -477,24 +401,7 @@ fun PlayerScreen(
                         }
                     }
 
-                    focusedActionText?.let { actionText ->
-                        Box(
-                            modifier = Modifier
-                                .background(
-                                    color = colors.panel.copy(alpha = 0.92f),
-                                    shape = RoundedCornerShape(20.dp),
-                                )
-                                .border(1.dp, colors.focus.copy(alpha = 0.75f), RoundedCornerShape(20.dp))
-                                .padding(horizontal = 16.dp, vertical = 5.dp),
-                        ) {
-                            Text(
-                                text = actionText,
-                                style = LiquidTypography.LabelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
-                                color = colors.text,
-                            )
-                        }
-                    }
-
+                    // شريط الأدوات (مباشرة تحت شريط الوقت)
                     LiquidGlassSurface(
                         modifier = Modifier.wrapContentWidth(),
                         cornerRadius = 40.dp,
@@ -505,9 +412,9 @@ fun PlayerScreen(
                         Row(
                             modifier = Modifier
                                 .horizontalScroll(rememberScrollState())
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                                .padding(horizontal = 14.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             PlayerControlButton(
                                 icon = Icons.AutoMirrored.Filled.ArrowBack,
@@ -832,7 +739,7 @@ private fun PlayerControlButton(
         label = "btnScale",
     )
 
-    val buttonSize = if (isPrimary) 56.dp else 48.dp
+    val buttonSize = if (isPrimary) 46.dp else 40.dp
 
     Box(
         modifier = modifier
@@ -867,7 +774,7 @@ private fun PlayerControlButton(
             imageVector = icon,
             contentDescription = description,
             tint = if (isFocused || isPrimary) colors.onAccent else resolvedTint,
-            modifier = Modifier.size(if (isPrimary) 28.dp else 22.dp),
+            modifier = Modifier.size(if (isPrimary) 24.dp else 20.dp),
         )
     }
 }

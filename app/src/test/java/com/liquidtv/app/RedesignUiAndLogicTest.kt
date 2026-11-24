@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -68,6 +69,7 @@ import com.liquidtv.app.ui.utils.findContinueWatchingEpisode
 import com.liquidtv.app.ui.utils.formatEpisodeCode
 import com.liquidtv.app.ui.utils.formatSeasonTitleAr
 import com.liquidtv.app.ui.utils.sortSeasons
+import com.liquidtv.app.ui.utils.wideCategoriesSidebarWidth
 import com.liquidtv.app.updater.AppUpdateManager
 import com.liquidtv.app.updater.AppUpdateViewModel
 import kotlinx.coroutines.Dispatchers
@@ -622,7 +624,7 @@ class RedesignUiAndLogicTest {
     }
 
     @Test
-    fun `LiveTVScreen distributes 3-pane widths close to 20-34-46 percent on TV`() {
+    fun `LiveTVScreen distributes 3-pane widths with shared sidebar and 60-40 split in RTL across wide TV viewports`() {
         val fakeChannels = FakeChannelRepository()
         val prefs = UserPreferencesDataStore(context)
         val liveVm = LiveTVViewModel(fakeChannels, prefs, SavedStateHandle())
@@ -636,18 +638,168 @@ class RedesignUiAndLogicTest {
         }
 
         val density = composeRule.density.density
-        val catW = composeRule.onNodeWithTag("live_categories_pane").fetchSemanticsNode().boundsInRoot.width / density
-        val chW = composeRule.onNodeWithTag("live_channels_pane").fetchSemanticsNode().boundsInRoot.width / density
-        val prevW = composeRule.onNodeWithTag("live_preview_pane").fetchSemanticsNode().boundsInRoot.width / density
-        val totalW = catW + chW + prevW
+        val catBounds = composeRule.onNodeWithTag("live_categories_pane").fetchSemanticsNode().boundsInRoot
+        val chBounds = composeRule.onNodeWithTag("live_channels_pane").fetchSemanticsNode().boundsInRoot
+        val prevBounds = composeRule.onNodeWithTag("live_preview_pane").fetchSemanticsNode().boundsInRoot
 
-        val catRatio = catW / totalW
-        val chRatio = chW / totalW
-        val prevRatio = prevW / totalW
+        val catW = catBounds.width / density
+        val chW = chBounds.width / density
+        val prevW = prevBounds.width / density
+        val expectedCatW = wideCategoriesSidebarWidth(960.dp - 14.dp * 2).value
+        val remainingW = chW + prevW
 
-        assertTrue("Expected categories pane ratio ~0.20, was $catRatio", catRatio in 0.18f..0.22f)
-        assertTrue("Expected channels pane ratio ~0.34, was $chRatio", chRatio in 0.32f..0.36f)
-        assertTrue("Expected preview pane ratio ~0.46, was $prevRatio", prevRatio in 0.44f..0.48f)
+        // RTL column order: categories rightmost, channels center, info leftmost
+        assertTrue("Expected categories pane on the right of channels pane in RTL", catBounds.left >= chBounds.right - 2f)
+        assertTrue("Expected channels pane on the right of preview pane in RTL", chBounds.left >= prevBounds.right - 2f)
+        assertTrue("Expected categories width ~$expectedCatW, was $catW", kotlin.math.abs(catW - expectedCatW) <= 2f)
+        assertTrue("Expected channels ratio ~0.60 of remaining, was ${chW / remainingW}", (chW / remainingW) in 0.58f..0.62f)
+        assertTrue("Expected preview ratio ~0.40 of remaining, was ${prevW / remainingW}", (prevW / remainingW) in 0.38f..0.42f)
+    }
+
+    @Test
+    fun `MoviesScreen and SeriesScreen show exactly 5 columns in wide landscape and match LiveTV sidebar width`() {
+        val sixMovies = (1..6).map { i ->
+            Channel(
+                id = "mv-$i",
+                name = "فيلم رقم $i",
+                streamUrl = "http://localhost/movie/$i.mp4",
+                groupTitle = "أكشن",
+                mediaType = MediaType.MOVIE,
+                rating = "8.$i",
+            )
+        }
+        val sixSeries = (1..6).map { i ->
+            SeriesItem(
+                id = "sr-$i",
+                subscriptionId = "sub-1",
+                externalSeriesId = "30$i",
+                name = "مسلسل رقم $i",
+                categoryName = "دراما",
+            )
+        }
+        val fakeChannels = FakeChannelRepository(movies = sixMovies, seriesList = sixSeries)
+        val prefs = UserPreferencesDataStore(context)
+        val moviesVm = MoviesViewModel(fakeChannels, prefs)
+        val seriesVm = SeriesViewModel(fakeChannels, prefs)
+        val liveVm = LiveTVViewModel(fakeChannels, prefs, SavedStateHandle())
+
+        val wideWidths = listOf(800, 960, 1200, 1280, 1600, 1920)
+        wideWidths.forEach { w ->
+            val expectedSidebar = wideCategoriesSidebarWidth((w - (if (w >= 1100) 40 else 28)).dp).value
+            assertTrue("Sidebar width out of [232, 400] bounds for $w: $expectedSidebar", expectedSidebar in 232f..400f)
+        }
+
+        // Verify 5 columns (6th poster wraps to row 2) and identical sidebar widths on 1280dp & 1920dp
+        composeRule.setContent {
+            LiquidTVTheme {
+                Box(Modifier.width(1280.dp).height(720.dp)) {
+                    MoviesScreen(onMovieClick = {}, viewModel = moviesVm)
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        val density = composeRule.density.density
+        val moviesSidebarW = composeRule.onNodeWithTag("movies_categories_sidebar").fetchSemanticsNode().boundsInRoot.width / density
+        val expected1280 = wideCategoriesSidebarWidth(1280.dp - 20.dp * 2).value
+        assertTrue("Expected Movies sidebar ~${expected1280}dp, was $moviesSidebarW", kotlin.math.abs(moviesSidebarW - expected1280) <= 20f)
+
+        val movieBox1 = composeRule.onNodeWithText("فيلم رقم 1").fetchSemanticsNode().boundsInRoot
+        val movieBox5 = composeRule.onNodeWithText("فيلم رقم 5").fetchSemanticsNode().boundsInRoot
+        val movieBox6 = composeRule.onNodeWithText("فيلم رقم 6").fetchSemanticsNode().boundsInRoot
+        assertTrue("Expected posters 1 and 5 on same first row", kotlin.math.abs(movieBox1.top - movieBox5.top) <= 4f * density)
+        assertTrue("Expected poster 6 to wrap to second row (strictly 5 columns)", movieBox6.top > movieBox1.top + 40f * density)
+        assertTrue("Expected poster 6 aligned with column 1 in RTL", kotlin.math.abs(movieBox6.right - movieBox1.right) <= 4f * density)
+        assertEquals(6, seriesVm.uiState.value.series.size)
+        assertEquals(1, liveVm.uiState.value.channels.size)
+    }
+
+    @Test
+    fun `SeriesScreen renders strictly 5 columns and 400dp max-clamped sidebar on 1920dp TV`() {
+        val sixSeries = (1..6).map { i ->
+            SeriesItem(
+                id = "sr-$i",
+                subscriptionId = "sub-1",
+                externalSeriesId = "30$i",
+                name = "مسلسل رقم $i",
+                categoryName = "دراما",
+            )
+        }
+        val fakeChannels = FakeChannelRepository(seriesList = sixSeries)
+        val prefs = UserPreferencesDataStore(context)
+        val seriesVm = SeriesViewModel(fakeChannels, prefs)
+
+        composeRule.setContent {
+            LiquidTVTheme {
+                Box(Modifier.width(1920.dp).height(1080.dp)) {
+                    SeriesScreen(onSeriesClick = {}, viewModel = seriesVm)
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        val density = composeRule.density.density
+        val seriesSidebarW = composeRule.onNodeWithTag("series_categories_sidebar").fetchSemanticsNode().boundsInRoot.width / density
+        // 1920 - 40 = 1880dp -> 31% = 582.8dp -> clamped to 400dp (minus sidebar horizontal padding 16dp = 384dp)
+        val expectedMaxClamped = wideCategoriesSidebarWidth(1920.dp - 20.dp * 2).value
+        assertEquals(400f, expectedMaxClamped, 0.1f)
+        assertTrue("Expected Series sidebar clamped ~400dp (inner ~384dp), was $seriesSidebarW", kotlin.math.abs(seriesSidebarW - expectedMaxClamped) <= 20f)
+
+        val box1 = composeRule.onNodeWithText("مسلسل رقم 1").fetchSemanticsNode().boundsInRoot
+        val box5 = composeRule.onNodeWithText("مسلسل رقم 5").fetchSemanticsNode().boundsInRoot
+        val box6 = composeRule.onNodeWithText("مسلسل رقم 6").fetchSemanticsNode().boundsInRoot
+        assertTrue("Expected series 1 and 5 on same first row", kotlin.math.abs(box1.top - box5.top) <= 4f * density)
+        assertTrue("Expected series 6 to wrap to second row (strictly 5 columns)", box6.top > box1.top + 40f * density)
+        assertTrue("Expected series 6 aligned with column 1 in RTL", kotlin.math.abs(box6.right - box1.right) <= 4f * density)
+    }
+
+    @Test
+    fun `LiveTVScreen maintains RTL 3-pane distribution without overlap on 800dp landscape tablet or large phone`() {
+        val fakeChannels = FakeChannelRepository()
+        val prefs = UserPreferencesDataStore(context)
+        val liveVm = LiveTVViewModel(fakeChannels, prefs, SavedStateHandle())
+
+        composeRule.setContent {
+            LiquidTVTheme {
+                Box(Modifier.width(800.dp).height(480.dp)) {
+                    LiveTVScreen(onChannelClick = {}, viewModel = liveVm)
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        val density = composeRule.density.density
+        val catBounds = composeRule.onNodeWithTag("live_categories_pane").fetchSemanticsNode().boundsInRoot
+        val chBounds = composeRule.onNodeWithTag("live_channels_pane").fetchSemanticsNode().boundsInRoot
+        val prevBounds = composeRule.onNodeWithTag("live_preview_pane").fetchSemanticsNode().boundsInRoot
+
+        val catW = catBounds.width / density
+        val chW = chBounds.width / density
+        val prevW = prevBounds.width / density
+        val expectedCatW = wideCategoriesSidebarWidth(800.dp - 14.dp * 2).value
+        val remainingW = chW + prevW
+
+        assertTrue("Expected RTL order at 800dp: categories right of channels", catBounds.left >= chBounds.right - 2f)
+        assertTrue("Expected RTL order at 800dp: channels right of preview", chBounds.left >= prevBounds.right - 2f)
+        assertTrue("Expected categories ~$expectedCatW at 800dp, was $catW", kotlin.math.abs(catW - expectedCatW) <= 2f)
+        assertTrue("Expected 60/40 split at 800dp", (chW / remainingW) in 0.58f..0.62f && (prevW / remainingW) in 0.38f..0.42f)
+    }
+
+    @Test
+    fun `Small landscape phone 640dp uses non-wide adaptive layout without forcing sidebar or 5 columns`() {
+        val fakeChannels = FakeChannelRepository()
+        val prefs = UserPreferencesDataStore(context)
+        val moviesVm = MoviesViewModel(fakeChannels, prefs)
+
+        composeRule.setContent {
+            LiquidTVTheme {
+                Box(Modifier.width(640.dp).height(360.dp)) {
+                    MoviesScreen(onMovieClick = {}, viewModel = moviesVm)
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("movies_grid").assertIsDisplayed()
+        composeRule.onNodeWithText("التصنيفات").assertIsDisplayed()
     }
 
     @Test
@@ -742,6 +894,28 @@ private class FakeChannelRepository(
             streamUrl = "http://x/1.mp4",
         ),
     ),
+    movies: List<Channel> = listOf(
+        Channel(
+            id = "mv-1",
+            name = "صحراء العاصفة",
+            streamUrl = "http://localhost/movie/1.mp4",
+            groupTitle = "أكشن",
+            mediaType = MediaType.MOVIE,
+            rating = "8.4",
+        ),
+    ),
+    seriesList: List<SeriesItem> = listOf(
+        SeriesItem(
+            id = "sr-1",
+            subscriptionId = "sub-1",
+            externalSeriesId = "303",
+            name = "الأفق",
+            categoryName = "دراما",
+            plot = "ملحمة درامية مشوقة.",
+            releaseDate = "2024-01-01",
+            rating = "8.7",
+        ),
+    ),
 ) : ChannelRepository {
     private val liveFlow = MutableStateFlow(
         listOf(
@@ -756,32 +930,8 @@ private class FakeChannelRepository(
             ),
         )
     )
-    private val moviesFlow = MutableStateFlow(
-        listOf(
-            Channel(
-                id = "mv-1",
-                name = "صحراء العاصفة",
-                streamUrl = "http://localhost/movie/1.mp4",
-                groupTitle = "أكشن",
-                mediaType = MediaType.MOVIE,
-                rating = "8.4",
-            ),
-        )
-    )
-    private val seriesFlow = MutableStateFlow(
-        listOf(
-            SeriesItem(
-                id = "sr-1",
-                subscriptionId = "sub-1",
-                externalSeriesId = "303",
-                name = "الأفق",
-                categoryName = "دراما",
-                plot = "ملحمة درامية مشوقة.",
-                releaseDate = "2024-01-01",
-                rating = "8.7",
-            ),
-        )
-    )
+    private val moviesFlow = MutableStateFlow(movies)
+    private val seriesFlow = MutableStateFlow(seriesList)
     private val episodesFlow = MutableStateFlow(episodes)
     private val epg = ChannelEpgSummary(
         current = EpgProgram(
