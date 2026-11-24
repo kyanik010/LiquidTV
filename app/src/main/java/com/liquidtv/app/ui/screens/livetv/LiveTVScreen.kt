@@ -45,6 +45,7 @@ import com.liquidtv.app.ui.components.LiquidGlassSurface
 import com.liquidtv.app.ui.components.LiveBadge
 import com.liquidtv.app.ui.theme.AppTheme
 import com.liquidtv.app.ui.theme.LiquidTypography
+import com.liquidtv.app.ui.utils.wideCategoriesSidebarWidth
 import com.liquidtv.app.ui.utils.calculateEpgProgress
 import com.liquidtv.app.ui.utils.formatEpgTimeRange
 import java.util.Locale
@@ -88,6 +89,7 @@ fun LiveTVScreen(
                 else -> 12.dp
             }
             val paneSpacing = if (maxWidth >= 1000.dp) 12.dp else 8.dp
+            val categoriesWidth = wideCategoriesSidebarWidth(maxWidth - hPad * 2)
 
             Column(
                 modifier = Modifier
@@ -153,13 +155,13 @@ fun LiveTVScreen(
                             onSelectFavorites = { viewModel.selectFavoritesFilter() },
                             onSelectCategory = { viewModel.selectCategory(it) },
                             modifier = Modifier
-                                .weight(0.20f)
+                                .width(categoriesWidth)
                                 .fillMaxHeight(),
                         )
 
                         LiquidGlassSurface(
                             modifier = Modifier
-                                .weight(0.34f)
+                                .weight(0.6f)
                                 .fillMaxHeight()
                                 .testTag("live_channels_pane"),
                             cornerRadius = 20.dp,
@@ -192,7 +194,7 @@ fun LiveTVScreen(
                             onPlayClick = { ch -> onChannelClick(ch.id) },
                             onFavoriteToggle = { ch -> viewModel.toggleFavorite(ch.id) },
                             modifier = Modifier
-                                .weight(0.46f)
+                                .weight(0.4f)
                                 .fillMaxHeight()
                                 .testTag("live_preview_pane"),
                         )
