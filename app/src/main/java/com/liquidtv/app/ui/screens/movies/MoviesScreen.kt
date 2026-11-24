@@ -36,6 +36,7 @@ import com.liquidtv.app.ui.components.LiquidGlassSurface
 import com.liquidtv.app.ui.theme.AppTheme
 import com.liquidtv.app.ui.theme.LiquidColors
 import com.liquidtv.app.ui.theme.LiquidTypography
+import com.liquidtv.app.ui.utils.wideCategoriesSidebarWidth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,11 +61,7 @@ fun MoviesScreen(
                 isWide -> 14.dp
                 else -> 12.dp
             }
-            val sidebarWidth = when {
-                maxWidth >= 1200.dp -> 215.dp
-                maxWidth >= 960.dp -> 192.dp
-                else -> 168.dp
-            }
+            val sidebarWidth = wideCategoriesSidebarWidth(maxWidth - hPad * 2)
             val gridMinCardWidth = when {
                 isCompactHeight -> 96
                 maxWidth >= 1600.dp -> 148
@@ -224,6 +221,7 @@ fun MoviesScreen(
                             contentPadding = PaddingValues(bottom = 12.dp),
                             minCardWidth = gridMinCardWidth,
                             compactHeight = isCompactHeight,
+                            fixedColumns = 5,
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight(),
@@ -439,6 +437,7 @@ private fun MoviesGridArea(
     contentPadding: PaddingValues,
     minCardWidth: Int,
     compactHeight: Boolean,
+    fixedColumns: Int? = null,
     modifier: Modifier = Modifier,
 ) {
     val colors = AppTheme.colors
@@ -469,7 +468,7 @@ private fun MoviesGridArea(
 
     val gridGap = if (compactHeight) 8.dp else 10.dp
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = minCardWidth.dp),
+        columns = if (fixedColumns != null) GridCells.Fixed(fixedColumns) else GridCells.Adaptive(minSize = minCardWidth.dp),
         contentPadding = contentPadding,
         horizontalArrangement = Arrangement.spacedBy(gridGap),
         verticalArrangement = Arrangement.spacedBy(gridGap),
