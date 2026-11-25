@@ -968,10 +968,12 @@ private fun PanelServerChooserBlock(
 @Composable
 private fun DeviceIdCompactCard(
     deviceCode: String?,
+    deviceUid: String,
     onCopy: (String) -> Unit,
 ) {
     val colors = AppTheme.colors
-    val validCode = deviceCode?.takeIf { it.isNotBlank() }
+    // Show the locally generated stable installation ID immediately; replace it with the panel code after registration.
+    val validCode = deviceCode?.takeIf { it.isNotBlank() } ?: deviceUid.takeIf { it.isNotBlank() }
     var copiedFeedback by remember(validCode) { mutableStateOf(false) }
 
     LaunchedEffect(copiedFeedback) {
@@ -1171,6 +1173,7 @@ private fun PlaylistsSection(
         // Device ID card placed BELOW the saved playlists list (or empty state)
         DeviceIdCompactCard(
             deviceCode = state.sonixState.deviceCode,
+            deviceUid = state.sonixState.deviceUid,
             onCopy = { code ->
                 clipboardManager.setText(AnnotatedString(code))
                 viewModel.notifyDeviceIdCopied(code)
