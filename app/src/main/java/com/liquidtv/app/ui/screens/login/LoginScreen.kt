@@ -112,8 +112,8 @@ fun LoginScreen(
             val isCompactWidth = maxWidth < 480.dp
             val maxCardWidth = when {
                 maxWidth < 720.dp -> maxWidth * 0.98f
-                maxWidth < 1100.dp -> 900.dp
-                else -> 1040.dp
+                maxWidth < 1100.dp -> 470.dp
+                else -> 500.dp
             }
             val fieldInputHeight = if (isCompactHeight) 36.dp else 42.dp
             val verticalGap = if (isCompactHeight) 6.dp else 10.dp
