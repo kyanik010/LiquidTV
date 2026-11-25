@@ -58,7 +58,8 @@ class LoginViewModel @Inject constructor(
     private var connectJob: Job? = null
 
     init {
-        viewModelScope.launch { sonixControlRepository.refreshAvailableServers(forceSync = false) }
+        // Always register/sync this installation and fetch the active server catalog on app startup.
+        viewModelScope.launch { sonixControlRepository.refreshAvailableServers(forceSync = true) }
         viewModelScope.launch {
             combine(
                 subscriptionRepository.allSubscriptions,
