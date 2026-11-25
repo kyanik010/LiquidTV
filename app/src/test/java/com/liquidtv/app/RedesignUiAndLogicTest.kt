@@ -256,6 +256,9 @@ class RedesignUiAndLogicTest {
                 assignedServers = listOf(
                     SonixAssignedServer(id = "srv-panel-1", name = "VIP Europe", region = "DE"),
                 ),
+                availableServers = listOf(
+                    SonixAssignedServer(id = "srv-panel-1", name = "VIP Europe", region = "DE"),
+                ),
             )
         )
         val vm = LoginViewModel(fakeSubRepo, fakeSonix)
@@ -274,28 +277,37 @@ class RedesignUiAndLogicTest {
         composeRule.onNodeWithTag("tab_section_server").assertIsDisplayed()
         composeRule.onNodeWithTag("tab_section_playlists").assertIsDisplayed()
         composeRule.onNodeWithTag("tab_normal_url").assertIsDisplayed()
-        composeRule.onNodeWithTag("tab_panel_servers").assertIsDisplayed()
-        composeRule.onNodeWithTag("input_xtream_url").assertIsDisplayed()
+        composeRule.onNodeWithTag("input_xtream_url").assertDoesNotExist()
+
+        // Expand the ordinary URL option; its four fields appear only after selection.
+        composeRule.onNodeWithTag("tab_normal_url").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("tab_normal_url").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("input_subscription_name").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("input_xtream_url").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("input_xtream_username").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("input_xtream_password").performScrollTo().assertIsDisplayed()
 
         composeRule.onNodeWithTag("connect_button").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("login_error_banner").performScrollTo().assertIsDisplayed()
 
-        // Switch to panel servers: must show assigned servers & only 3 input fields (NO host URL field)
-        composeRule.onNodeWithTag("tab_panel_servers").performScrollTo().performClick()
-        composeRule.waitForIdle()
+        // The public server catalog is listed below the normal URL option.
         composeRule.onNodeWithTag("panel_server_item_srv-panel-1").performScrollTo().assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("input_subscription_name").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_username").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_password").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_url").assertDoesNotExist()
 
-        // Switch to Playlists section: shows SONIX device status banner with device code
+        // Playlists contains the compact device ID card.
         composeRule.onNodeWithTag("tab_section_playlists").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("login_playlists_section").assertIsDisplayed()
-        composeRule.onNodeWithTag("sonix_device_code_text").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("device_id_compact_card").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("device_id_value").assertTextEquals("SNX778899")
     }
 
     @Test
@@ -657,8 +669,10 @@ class RedesignUiAndLogicTest {
 
         assertTrue("Expected Login card width <= 500dp on TV, was $cardWidthDp", cardWidthDp <= 500f)
         assertTrue("Expected Login card height <= 620dp on TV, was $cardHeightDp", cardHeightDp <= 620f)
-        composeRule.onNodeWithTag("toggle_password_visibility").performClick()
-        composeRule.onNodeWithTag("connect_button").assertIsDisplayed()
+        composeRule.onNodeWithTag("tab_normal_url").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("toggle_password_visibility").performScrollTo().performClick()
+        composeRule.onNodeWithTag("connect_button").performScrollTo().assertIsDisplayed()
     }
 
     @Test
