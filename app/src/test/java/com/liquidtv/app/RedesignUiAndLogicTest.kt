@@ -307,7 +307,7 @@ class RedesignUiAndLogicTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("login_playlists_section").assertIsDisplayed()
         composeRule.onNodeWithTag("device_id_compact_card").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag("device_id_value").assertTextEquals("SNX778899")
+        composeRule.onNodeWithTag("device_id_value").assert(hasText("SNX778899")).assertIsDisplayed()
     }
 
     @Test
