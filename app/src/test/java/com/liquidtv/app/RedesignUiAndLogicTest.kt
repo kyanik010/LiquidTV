@@ -509,6 +509,13 @@ class RedesignUiAndLogicTest {
         composeRule.waitForIdle()
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         assertEquals("SNX8899001", clipboard.primaryClip?.getItemAt(0)?.text?.toString())
+
+        // Clicking Edit on a PANEL_SERVER playlist in Card 2 auto-expands ONLY its 3-field form in Card 1 without exposing Host URL.
+        composeRule.onNodeWithTag("playlist_edit_sub-saved-1").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("server_selector_list").assertIsDisplayed()
+        composeRule.onNodeWithTag("panel_server_form_srv-panel-1").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("input_xtream_url").assertDoesNotExist()
     }
 
     @Test
