@@ -39,6 +39,8 @@ class SonixControlRepositoryImpl @Inject constructor(
 
     private val json = Json { ignoreUnknownKeys = true }
     private val syncMutex = Mutex()
+    // Serialize every token read / request / recovery / token write across all actions.
+    private val deviceAuthMutex = Mutex()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val _state = MutableStateFlow(SonixSyncState())
@@ -238,24 +240,27 @@ class SonixControlRepositoryImpl @Inject constructor(
     private suspend fun executeWithTokenRecovery(
         action: String,
         payload: JsonObject,
-    ): SonixApiResult<JsonObject> {
+    ): SonixApiResult<JsonObject> = deviceAuthMutex.withLock {
+        // Keep token lookup, authenticated request, one-time recovery and token persistence
+        // atomic relative to every other protected SONIX action (sync, resolve, ack, update).
         val token = identityStore.getDeviceToken()
         val first = api.callAction(action, payload, token)
         if (first is SonixApiResult.Unauthorized && !token.isNullOrBlank()) {
-            // Admin may have executed token reset ("إعادة الربط"). Clear local token & re-claim once if unclaimed.
+            // A 401 may indicate an administrator reset. Retry without credentials only
+            // after this request exclusively owns the auth flow; never race another action.
             identityStore.clearDeviceToken()
             val retry = api.callAction(action, payload, null)
             if (retry is SonixApiResult.Success) {
                 val issued = retry.data["device_token"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
                 if (issued != null) identityStore.saveDeviceToken(issued)
             }
-            return retry
+            return@withLock retry
         }
         if (first is SonixApiResult.Success) {
             val issued = first.data["device_token"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
             if (issued != null) identityStore.saveDeviceToken(issued)
         }
-        return first
+        first
     }
 
     private suspend fun applySyncPayload(uid: String, data: JsonObject): SonixSyncState {
