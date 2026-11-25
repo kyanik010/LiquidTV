@@ -39,6 +39,9 @@ class FakeSonixControlRepository(
     override suspend fun refreshAssignedServers(): Result<List<SonixAssignedServer>> =
         Result.success(mutableState.value.assignedServers)
 
+    override suspend fun refreshAvailableServers(): Result<List<SonixAssignedServer>> =
+        Result.success(mutableState.value.availableServers)
+
     override suspend fun resolveAssignedServer(serverId: String): Result<SonixResolvedServer> =
         resolveHandler(serverId)
 
