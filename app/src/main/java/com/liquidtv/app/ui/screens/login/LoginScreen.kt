@@ -318,7 +318,7 @@ private fun ServerSelectionSection(
         }
     }
 
-    if (!isPanelLockedEdit && state.sonixState.settings.allowPanelServers) {
+    if (!isPanelLockedEdit && !state.isNormalUrlSelected && state.sonixState.settings.allowPanelServers) {
         PanelServerChooserBlock(
             state = state,
             onRefresh = viewModel::refreshPanelServers,
@@ -470,6 +470,14 @@ private fun ServerSelectionSection(
                 fieldModifier = Modifier.testTag("input_xtream_url"),
             )
         }
+    }
+
+    if (!isPanelLockedEdit && state.isNormalUrlSelected && state.sonixState.settings.allowPanelServers) {
+        PanelServerChooserBlock(
+            state = state,
+            onRefresh = viewModel::refreshPanelServers,
+            onSelectServer = { srv -> viewModel.selectPanelServer(srv.id, srv.name) },
+        )
     }
 
     // Progress indicator
