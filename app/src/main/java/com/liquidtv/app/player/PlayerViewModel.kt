@@ -15,9 +15,15 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.liquidtv.app.data.remote.LoadedExternalSubtitle
+import com.liquidtv.app.data.audio.AudioSourceClassifier
+import com.liquidtv.app.data.audio.ExternalAudioCatalogRepository
 import com.liquidtv.app.data.remote.StremioAddonClient
+import com.liquidtv.app.domain.model.AudioBrandFilter
 import com.liquidtv.app.domain.model.Channel
 import com.liquidtv.app.domain.model.ChannelEpgSummary
+import com.liquidtv.app.domain.model.ExternalAudioChannel
+import com.liquidtv.app.domain.model.ExternalAudioStatus
+import com.liquidtv.app.domain.model.ExternalAudioUiState
 import com.liquidtv.app.domain.model.MediaType
 import com.liquidtv.app.domain.model.OnlineSubtitleResult
 import com.liquidtv.app.domain.model.SubtitleMediaMetadata
@@ -26,7 +32,9 @@ import com.liquidtv.app.domain.model.TrackInfo
 import com.liquidtv.app.domain.model.UserPreferences
 import com.liquidtv.app.domain.repository.AddonPreferencesRepository
 import com.liquidtv.app.domain.repository.ChannelRepository
+import com.liquidtv.app.domain.repository.SubscriptionRepository
 import com.liquidtv.app.domain.repository.UserPreferencesRepository
+import java.net.URI
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
@@ -78,6 +86,8 @@ data class PlayerUiState(
     val hasExternalSubtitleLoaded: Boolean = false,
     val activeExternalCueText: String? = null,
     val subtitleStyle: SubtitleStyleSettings = SubtitleStyleSettings(),
+    // External Audio (الصوت الخارجي) state
+    val externalAudio: ExternalAudioUiState = ExternalAudioUiState(),
 )
 
 @HiltViewModel
@@ -86,6 +96,9 @@ class PlayerViewModel @Inject constructor(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val addonPreferencesRepository: AddonPreferencesRepository,
     private val stremioAddonClient: StremioAddonClient,
+    private val subscriptionRepository: SubscriptionRepository,
+    private val externalAudioCatalogRepository: ExternalAudioCatalogRepository,
+    private val externalAudioController: ExternalAudioController,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -151,12 +164,32 @@ class PlayerViewModel @Inject constructor(
             refreshActiveSubtitleCue()
         }
 
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            if (_state.value.externalAudio.isAttached) {
+                if (playWhenReady) {
+                    externalAudioController.resume()
+                } else {
+                    externalAudioController.pause()
+                }
+            }
+        }
+
         override fun onPositionDiscontinuity(
             oldPosition: Player.PositionInfo,
             newPosition: Player.PositionInfo,
             reason: Int,
         ) {
             refreshActiveSubtitleCue(newPosition.positionMs)
+            if (_state.value.externalAudio.isAttached &&
+                _state.value.mediaType != MediaType.LIVE &&
+                reason == Player.DISCONTINUITY_REASON_SEEK
+            ) {
+                externalAudioController.syncWithVideoPosition(
+                    videoPositionMs = newPosition.positionMs.coerceAtLeast(0L),
+                    isVideoLive = false,
+                    forceSeek = true,
+                )
+            }
         }
 
         override fun onTracksChanged(tracks: Tracks) {
@@ -176,6 +209,7 @@ class PlayerViewModel @Inject constructor(
     init {
         connectMediaController()
         observeChannelsAndPreferences()
+        observeExternalAudioEngine()
     }
 
     private fun connectMediaController() {
@@ -220,6 +254,59 @@ class PlayerViewModel @Inject constructor(
         refreshActiveSubtitleCue()
     }
 
+    private fun observeExternalAudioEngine() {
+        viewModelScope.launch {
+            externalAudioController.engineState.collect { engine ->
+                val currentExt = _state.value.externalAudio
+                val matchedChannel = engine.channelId?.let { id ->
+                    currentExt.activeChannel?.takeIf { it.id == id }
+                        ?: currentExt.channels.firstOrNull { it.id == id }
+                }
+                val isAttached = matchedChannel != null && engine.status != ExternalAudioStatus.IDLE
+                _state.update {
+                    it.copy(
+                        externalAudio = it.externalAudio.copy(
+                            activeChannel = if (engine.status == ExternalAudioStatus.IDLE) null else matchedChannel ?: it.externalAudio.activeChannel,
+                            status = engine.status,
+                            isPcmVerified = engine.isPcmVerified,
+                            statusMessage = engine.statusMessage,
+                            errorMessage = engine.errorMessage,
+                            retryAttempt = engine.retryAttempt,
+                            maxRetries = engine.maxRetries,
+                            connectionLimitWarning = if (engine.status == ExternalAudioStatus.IDLE) null else it.externalAudio.connectionLimitWarning,
+                        ),
+                    )
+                }
+                syncPrimaryPlayerAudioDucking(
+                    isExternalAttached = isAttached,
+                    status = engine.status,
+                    isPcmVerified = engine.isPcmVerified,
+                )
+            }
+        }
+    }
+
+    private fun syncPrimaryPlayerAudioDucking(
+        isExternalAttached: Boolean,
+        status: ExternalAudioStatus,
+        isPcmVerified: Boolean,
+    ) {
+        val controller = activePlayer ?: return
+        val shouldMutePrimary = isExternalAttached && when (status) {
+            ExternalAudioStatus.ACTIVE -> isPcmVerified
+            ExternalAudioStatus.BUFFERING -> isPcmVerified
+            ExternalAudioStatus.IDLE,
+            ExternalAudioStatus.LOADING_CATALOG,
+            ExternalAudioStatus.CONNECTING,
+            ExternalAudioStatus.RECOVERING,
+            ExternalAudioStatus.ERROR -> false
+        }
+        val targetVolume = if (shouldMutePrimary) 0f else 1f
+        if (controller.volume != targetVolume) {
+            controller.volume = targetVolume
+        }
+    }
+
     private fun observeChannelsAndPreferences() {
         viewModelScope.launch {
             channelRepository.getAllChannels().collect { channels ->
@@ -262,6 +349,7 @@ class PlayerViewModel @Inject constructor(
         activeItemKey = key
         activeSeriesId = null
         resetExternalSubtitlesForNewItem()
+        detachExternalAudio()
 
         viewModelScope.launch {
             when (mediaType) {
@@ -513,6 +601,13 @@ class PlayerViewModel @Inject constructor(
             val target = (controller.currentPosition + deltaMs).coerceIn(0L, duration)
             controller.seekTo(target)
             refreshActiveSubtitleCue(target)
+            if (_state.value.externalAudio.isAttached && _state.value.mediaType != MediaType.LIVE) {
+                externalAudioController.syncWithVideoPosition(
+                    videoPositionMs = target,
+                    isVideoLive = false,
+                    forceSeek = true,
+                )
+            }
         }
     }
 
@@ -520,6 +615,13 @@ class PlayerViewModel @Inject constructor(
         val clamped = positionMs.coerceAtLeast(0L)
         activePlayer?.seekTo(clamped)
         refreshActiveSubtitleCue(clamped)
+        if (_state.value.externalAudio.isAttached && _state.value.mediaType != MediaType.LIVE) {
+            externalAudioController.syncWithVideoPosition(
+                videoPositionMs = clamped,
+                isVideoLive = false,
+                forceSeek = true,
+            )
+        }
     }
 
     fun nextChannel() {
@@ -863,7 +965,209 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    fun openTrackSheet() = _state.update { it.copy(showTrackSheet = true, externalSubtitleError = null) }
+    // -------------------------------------------------------------------------
+    // External Audio (الصوت الخارجي) Controls
+    // -------------------------------------------------------------------------
+
+    fun openExternalAudioSheet() {
+        _state.update {
+            it.copy(
+                showTrackSheet = false,
+                externalAudio = it.externalAudio.copy(
+                    isSheetVisible = true,
+                    catalogError = null,
+                ),
+            )
+        }
+        if (_state.value.externalAudio.channels.isEmpty()) {
+            loadExternalAudioCatalog(forceRefresh = false)
+        }
+    }
+
+    fun closeExternalAudioSheet() {
+        _state.update {
+            it.copy(externalAudio = it.externalAudio.copy(isSheetVisible = false))
+        }
+    }
+
+    fun refreshExternalAudioCatalog() {
+        loadExternalAudioCatalog(forceRefresh = true)
+    }
+
+    private fun loadExternalAudioCatalog(forceRefresh: Boolean) {
+        viewModelScope.launch {
+            if (!forceRefresh) {
+                val cached = externalAudioCatalogRepository.loadCached()
+                if (cached.channels.isNotEmpty()) {
+                    _state.update {
+                        it.copy(
+                            externalAudio = it.externalAudio.copy(
+                                channels = cached.channels,
+                                lastUpdatedAt = cached.updatedAt,
+                                catalogWarning = cached.warning,
+                                catalogError = null,
+                            ),
+                        )
+                    }
+                }
+            }
+
+            _state.update {
+                it.copy(
+                    externalAudio = it.externalAudio.copy(
+                        isLoadingCatalog = true,
+                        catalogError = null,
+                        catalogWarning = null,
+                    ),
+                )
+            }
+
+            val result = externalAudioCatalogRepository.syncFromPanel(forceRefresh = forceRefresh)
+            _state.update {
+                it.copy(
+                    externalAudio = it.externalAudio.copy(
+                        isLoadingCatalog = false,
+                        channels = if (result.channels.isNotEmpty()) result.channels else it.externalAudio.channels,
+                        lastUpdatedAt = result.updatedAt ?: it.externalAudio.lastUpdatedAt,
+                        catalogWarning = result.warning,
+                        catalogError = result.error,
+                    ),
+                )
+            }
+        }
+    }
+
+    fun setExternalAudioSearchQuery(query: String) {
+        _state.update {
+            it.copy(externalAudio = it.externalAudio.copy(searchQuery = query))
+        }
+    }
+
+    fun setExternalAudioBrandFilter(filter: AudioBrandFilter) {
+        _state.update {
+            it.copy(externalAudio = it.externalAudio.copy(selectedBrandFilter = filter))
+        }
+    }
+
+    fun selectExternalAudioChannel(channel: ExternalAudioChannel) {
+        viewModelScope.launch {
+            val warning = checkConcurrentConnectionWarning(channel)
+            val extState = _state.value.externalAudio
+            val videoPos = activePlayer?.currentPosition?.coerceAtLeast(0L) ?: _state.value.currentPositionMs
+            val isLive = _state.value.mediaType == MediaType.LIVE
+            val isPrimaryPaused = !(activePlayer?.playWhenReady ?: true)
+
+            _state.update {
+                it.copy(
+                    externalAudio = it.externalAudio.copy(
+                        activeChannel = channel,
+                        status = ExternalAudioStatus.CONNECTING,
+                        statusMessage = "جارٍ الاتصال بـ ${channel.name}...",
+                        errorMessage = null,
+                        isPcmVerified = false,
+                        connectionLimitWarning = warning,
+                    ),
+                )
+            }
+            externalAudioController.attach(
+                channel = channel,
+                initialVideoPositionMs = videoPos,
+                isVideoLive = isLive,
+                initialOffsetMs = extState.syncOffsetMs,
+                volumePercent = extState.volumePercent,
+                loudnessBoostEnabled = extState.loudnessBoostEnabled,
+                startPaused = isPrimaryPaused,
+            )
+        }
+    }
+
+    fun detachExternalAudio() {
+        externalAudioController.detach()
+        activePlayer?.let { controller ->
+            if (controller.volume != 1f) {
+                controller.volume = 1f
+            }
+        }
+        _state.update {
+            it.copy(
+                externalAudio = it.externalAudio.copy(
+                    activeChannel = null,
+                    status = ExternalAudioStatus.IDLE,
+                    statusMessage = null,
+                    errorMessage = null,
+                    retryAttempt = 0,
+                    isPcmVerified = false,
+                    connectionLimitWarning = null,
+                ),
+            )
+        }
+    }
+
+    fun setExternalAudioVolume(percent: Int) {
+        val clamped = percent.coerceIn(0, 100)
+        _state.update {
+            it.copy(externalAudio = it.externalAudio.copy(volumePercent = clamped))
+        }
+        externalAudioController.setVolumePercent(clamped)
+    }
+
+    fun toggleExternalAudioLoudnessBoost() {
+        val next = !_state.value.externalAudio.loudnessBoostEnabled
+        _state.update {
+            it.copy(externalAudio = it.externalAudio.copy(loudnessBoostEnabled = next))
+        }
+        externalAudioController.setLoudnessBoostEnabled(next)
+    }
+
+    fun adjustExternalAudioOffset(deltaMs: Long) {
+        val current = _state.value.externalAudio.syncOffsetMs
+        val next = ExternalAudioSyncPolicy.clampOffsetMs(current + deltaMs)
+        _state.update {
+            it.copy(externalAudio = it.externalAudio.copy(syncOffsetMs = next))
+        }
+        val videoPos = activePlayer?.currentPosition?.coerceAtLeast(0L) ?: _state.value.currentPositionMs
+        externalAudioController.applySyncOffset(
+            offsetMs = next,
+            videoPositionMs = videoPos,
+            isVideoLive = _state.value.mediaType == MediaType.LIVE,
+        )
+    }
+
+    fun resetExternalAudioOffset() {
+        _state.update {
+            it.copy(externalAudio = it.externalAudio.copy(syncOffsetMs = 0L))
+        }
+        val videoPos = activePlayer?.currentPosition?.coerceAtLeast(0L) ?: _state.value.currentPositionMs
+        externalAudioController.applySyncOffset(
+            offsetMs = 0L,
+            videoPositionMs = videoPos,
+            isVideoLive = _state.value.mediaType == MediaType.LIVE,
+        )
+    }
+
+    private suspend fun checkConcurrentConnectionWarning(audioChannel: ExternalAudioChannel): String? {
+        val activeSub = runCatching { subscriptionRepository.getActiveSubscriptionOnce() }.getOrNull() ?: return null
+        if ((activeSub.maxConnections ?: 0) != 1) return null
+        val audioHost = runCatching { URI(audioChannel.streamUrl).host?.lowercase() }.getOrNull() ?: return null
+        val subHost = runCatching { URI(activeSub.serverUrl).host?.lowercase() }.getOrNull()
+        val videoHost = _state.value.channel?.streamUrl?.let { url ->
+            runCatching { URI(url).host?.lowercase() }.getOrNull()
+        }
+        val sameServer = audioHost == subHost || audioHost == videoHost
+        return if (sameServer) {
+            "تنبيه: اشتراكك الحالي يسمح باتصال واحد فقط. تشغيل الصوت الخارجي من نفس الخادم قد يؤدي إلى قطع البث الأساسي."
+        } else {
+            null
+        }
+    }
+
+    fun openTrackSheet() = _state.update {
+        it.copy(
+            showTrackSheet = true,
+            externalSubtitleError = null,
+            externalAudio = it.externalAudio.copy(isSheetVisible = false),
+        )
+    }
     fun closeTrackSheet() = _state.update { it.copy(showTrackSheet = false, externalSubtitleError = null) }
 
     fun showControls() = _state.update { it.copy(showControls = true) }
@@ -874,8 +1178,10 @@ class PlayerViewModel @Inject constructor(
         progressJob?.cancel()
         subtitleSyncJob?.cancel()
         epgJob?.cancel()
+        detachExternalAudio()
         persistResumePosition()
         activePlayer?.let { controller ->
+            controller.volume = 1f
             controller.stop()
             controller.clearMediaItems()
         }
@@ -891,6 +1197,14 @@ class PlayerViewModel @Inject constructor(
                     val pos = controller.currentPosition.coerceAtLeast(0L)
                     val dur = controller.duration.coerceAtLeast(0L)
                     _state.update { it.copy(currentPositionMs = pos, durationMs = dur) }
+                    if (_state.value.externalAudio.isAttached && controller.isPlaying) {
+                        externalAudioController.syncWithVideoPosition(
+                            videoPositionMs = pos,
+                            isVideoLive = _state.value.mediaType == MediaType.LIVE,
+                            videoLiveOffsetMs = controller.currentLiveOffset,
+                            forceSeek = false,
+                        )
+                    }
                     if (tick % 5 == 0 && controller.isPlaying) {
                         persistResumePosition()
                     }
@@ -932,6 +1246,8 @@ class PlayerViewModel @Inject constructor(
         progressJob?.cancel()
         subtitleSyncJob?.cancel()
         epgJob?.cancel()
+        externalAudioController.detach()
+        activePlayer?.volume = 1f
         activePlayer?.removeListener(playerListener)
         activePlayer = null
         _boundPlayer.value = null

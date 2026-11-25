@@ -46,7 +46,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import com.liquidtv.app.domain.model.ExternalAudioStatus
 import com.liquidtv.app.domain.model.MediaType
+import com.liquidtv.app.player.ExternalAudioSyncPolicy
 import com.liquidtv.app.player.PlayerViewModel
 import com.liquidtv.app.ui.components.LiquidGlassSurface
 import com.liquidtv.app.ui.theme.AppTheme
@@ -80,6 +82,7 @@ fun PlayerScreen(
 
     BackHandler {
         when {
+            uiState.externalAudio.isSheetVisible -> viewModel.closeExternalAudioSheet()
             uiState.showTrackSheet -> viewModel.closeTrackSheet()
             uiState.showControls -> viewModel.hideControls()
             else -> handleExit()
@@ -96,15 +99,16 @@ fun PlayerScreen(
         } catch (_: Exception) {}
     }
 
-    LaunchedEffect(uiState.showControls, uiState.showTrackSheet, interactionCounter) {
-        if (uiState.showControls && !uiState.showTrackSheet) {
+    val anySheetOpen = uiState.showTrackSheet || uiState.externalAudio.isSheetVisible
+    LaunchedEffect(uiState.showControls, anySheetOpen, interactionCounter) {
+        if (uiState.showControls && !anySheetOpen) {
             delay(6000)
             viewModel.hideControls()
         }
     }
 
-    LaunchedEffect(uiState.showControls) {
-        if (uiState.showControls && !uiState.showTrackSheet) {
+    LaunchedEffect(uiState.showControls, anySheetOpen) {
+        if (uiState.showControls && !anySheetOpen) {
             delay(150)
             try {
                 playPauseFocusRequester.requestFocus()
@@ -124,7 +128,7 @@ fun PlayerScreen(
                     when (keyEvent.nativeKeyEvent.keyCode) {
                         KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
                         KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
-                            if (!uiState.showControls && !uiState.showTrackSheet) {
+                            if (!uiState.showControls && !anySheetOpen) {
                                 viewModel.showControls()
                                 true
                             } else {
@@ -225,6 +229,53 @@ fun PlayerScreen(
             style = uiState.subtitleStyle,
             controlsVisible = uiState.showControls,
         )
+
+        // External Audio floating status pill (visible when controls shown or connecting/recovering/error)
+        val extAudio = uiState.externalAudio
+        if (extAudio.isAttached && !extAudio.isSheetVisible &&
+            (uiState.showControls || extAudio.status != ExternalAudioStatus.ACTIVE)
+        ) {
+            val pillAccent = when (extAudio.status) {
+                ExternalAudioStatus.ACTIVE -> colors.success
+                ExternalAudioStatus.ERROR -> colors.danger
+                else -> colors.accent
+            }
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .padding(16.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(colors.panel.copy(alpha = 0.88f))
+                    .border(1.dp, pillAccent.copy(alpha = 0.75f), RoundedCornerShape(20.dp))
+                    .clickable { viewModel.openExternalAudioSheet() }
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                    .testTag("external_audio_status_pill"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.GraphicEq,
+                    contentDescription = "حالة الصوت الخارجي",
+                    tint = pillAccent,
+                    modifier = Modifier.size(16.dp),
+                )
+                val pillText = when (extAudio.status) {
+                    ExternalAudioStatus.ACTIVE ->
+                        "صوت خارجي: ${extAudio.activeChannel?.name.orEmpty()} (${ExternalAudioSyncPolicy.formatOffsetAr(extAudio.syncOffsetMs)})"
+                    ExternalAudioStatus.ERROR ->
+                        extAudio.errorMessage ?: "تعذّر تشغيل الصوت الخارجي"
+                    else ->
+                        extAudio.statusMessage ?: "جارٍ توصيل الصوت الخارجي..."
+                }
+                Text(
+                    text = pillText,
+                    style = LiquidTypography.LabelSmall,
+                    color = colors.text,
+                    maxLines = 1,
+                )
+            }
+        }
 
         // Buffering / Auto-Reconnecting Indicator
         if ((uiState.isBuffering || uiState.isRetrying) && !uiState.isError) {
@@ -470,6 +521,25 @@ fun PlayerScreen(
                                 },
                                 modifier = Modifier.testTag("player_tracks_button"),
                             )
+                            val extActiveTint = when (uiState.externalAudio.status) {
+                                ExternalAudioStatus.ACTIVE -> colors.success
+                                ExternalAudioStatus.CONNECTING,
+                                ExternalAudioStatus.BUFFERING,
+                                ExternalAudioStatus.RECOVERING -> colors.accent
+                                ExternalAudioStatus.ERROR -> colors.danger
+                                else -> colors.text
+                            }
+                            PlayerControlButton(
+                                icon = Icons.Filled.GraphicEq,
+                                description = "الصوت الخارجي",
+                                iconTint = extActiveTint,
+                                onFocused = { focusedActionText = "الصوت الخارجي" },
+                                onClick = {
+                                    viewModel.openExternalAudioSheet()
+                                    interactionCounter++
+                                },
+                                modifier = Modifier.testTag("player_external_audio_button"),
+                            )
 
                             if (uiState.mediaType != MediaType.SERIES_EPISODE) {
                                 PlayerControlButton(
@@ -514,6 +584,23 @@ fun PlayerScreen(
                 onAdjustDelay = { delta -> viewModel.adjustSubtitleDelay(delta) },
                 onSetDelay = { delayMs -> viewModel.setSubtitleDelay(delayMs) },
                 onClose = { viewModel.closeTrackSheet() },
+            )
+        }
+
+        // External Audio Sheet (beIN SPORTS / ALWAN)
+        if (uiState.externalAudio.isSheetVisible) {
+            ExternalAudioSheet(
+                state = uiState.externalAudio,
+                onSelectChannel = { viewModel.selectExternalAudioChannel(it) },
+                onDetachAudio = { viewModel.detachExternalAudio() },
+                onRefreshCatalog = { viewModel.refreshExternalAudioCatalog() },
+                onSearchQueryChange = { viewModel.setExternalAudioSearchQuery(it) },
+                onSelectBrandFilter = { viewModel.setExternalAudioBrandFilter(it) },
+                onVolumeChange = { viewModel.setExternalAudioVolume(it) },
+                onToggleLoudnessBoost = { viewModel.toggleExternalAudioLoudnessBoost() },
+                onAdjustSyncOffset = { viewModel.adjustExternalAudioOffset(it) },
+                onResetSyncOffset = { viewModel.resetExternalAudioOffset() },
+                onClose = { viewModel.closeExternalAudioSheet() },
             )
         }
     }

@@ -17,6 +17,15 @@ import com.liquidtv.app.domain.model.OnlineSubtitleResult
 import com.liquidtv.app.domain.model.SubtitleFontOption
 import com.liquidtv.app.domain.model.UserPreferences
 import com.liquidtv.app.domain.repository.UserPreferencesRepository
+import com.liquidtv.app.data.audio.ExternalAudioCatalogRepository
+import com.liquidtv.app.domain.model.ExternalAudioCatalogResult
+import com.liquidtv.app.domain.model.ExternalAudioChannel
+import com.liquidtv.app.domain.model.PlaylistInfo
+import com.liquidtv.app.domain.model.Subscription
+import com.liquidtv.app.domain.model.SubscriptionOrigin
+import com.liquidtv.app.domain.repository.SubscriptionRepository
+import com.liquidtv.app.player.ExternalAudioController
+import com.liquidtv.app.player.ExternalAudioEngineState
 import com.liquidtv.app.player.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -164,11 +173,50 @@ class ZeroReloadSubtitleActivationTest {
         val factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                val fakeSubRepo = object : SubscriptionRepository {
+                    override val allSubscriptions: Flow<List<Subscription>> = flowOf(emptyList())
+                    override val activeSubscription: Flow<Subscription?> = flowOf(null)
+                    override val syncInfo: Flow<PlaylistInfo> = flowOf(PlaylistInfo())
+                    override suspend fun getActiveSubscriptionOnce(): Subscription? = null
+                    override suspend fun getSubscriptionById(id: String): Subscription? = null
+                    override suspend fun hasAnySubscription(): Boolean = false
+                    override suspend fun addOrUpdateXtreamSubscription(
+                        existingId: String?, displayName: String, serverUrl: String, username: String, password: String,
+                        origin: SubscriptionOrigin, panelServerId: String?, panelServerName: String?, activate: Boolean,
+                    ): Result<Subscription> = Result.failure(UnsupportedOperationException())
+                    override suspend fun activateSubscription(subscriptionId: String): Result<Unit> = Result.success(Unit)
+                    override suspend fun syncSubscription(subscriptionId: String): Result<Unit> = Result.success(Unit)
+                    override suspend fun syncActiveSubscription(): Result<Unit> = Result.success(Unit)
+                    override suspend fun syncActiveEpg(): Result<Unit> = Result.success(Unit)
+                    override suspend fun deleteSubscription(subscriptionId: String): Result<Unit> = Result.success(Unit)
+                    override suspend fun getDecryptedXtreamPassword(subscriptionId: String): String? = null
+                }
+                val fakeCatalogRepo = object : ExternalAudioCatalogRepository {
+                    override suspend fun loadCached() = ExternalAudioCatalogResult()
+                    override suspend fun syncFromPanel(forceRefresh: Boolean) = ExternalAudioCatalogResult()
+                }
+                val fakeAudioCtrl = object : ExternalAudioController {
+                    override val engineState = MutableStateFlow(ExternalAudioEngineState())
+                    override fun attach(
+                        channel: ExternalAudioChannel, initialVideoPositionMs: Long, isVideoLive: Boolean,
+                        initialOffsetMs: Long, volumePercent: Int, loudnessBoostEnabled: Boolean, startPaused: Boolean,
+                    ) {}
+                    override fun pause() {}
+                    override fun resume() {}
+                    override fun setVolumePercent(percent: Int) {}
+                    override fun setLoudnessBoostEnabled(enabled: Boolean) {}
+                    override fun applySyncOffset(offsetMs: Long, videoPositionMs: Long, isVideoLive: Boolean) {}
+                    override fun syncWithVideoPosition(videoPositionMs: Long, isVideoLive: Boolean, videoLiveOffsetMs: Long, forceSeek: Boolean) {}
+                    override fun detach() {}
+                }
                 return PlayerViewModel(
                     channelRepository = channelRepo,
                     userPreferencesRepository = prefsRepo,
                     addonPreferencesRepository = addonPrefsRepo,
                     stremioAddonClient = addonClient,
+                    subscriptionRepository = fakeSubRepo,
+                    externalAudioCatalogRepository = fakeCatalogRepo,
+                    externalAudioController = fakeAudioCtrl,
                     context = context,
                 ) as T
             }

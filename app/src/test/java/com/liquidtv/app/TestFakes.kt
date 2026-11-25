@@ -1,6 +1,7 @@
 package com.liquidtv.app
 
 import com.liquidtv.app.data.sonix.*
+import com.liquidtv.app.domain.model.SonixAudioSourceConfig
 import com.liquidtv.app.domain.repository.SonixControlRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +30,9 @@ class FakeSonixControlRepository(
     }
     var panelUpdateHandler: suspend () -> Result<SonixReleaseUpdate?> = {
         Result.success(null)
+    }
+    var audioSourcesHandler: suspend () -> Result<SonixAudioSourceConfig> = {
+        Result.success(mutableState.value.audioSource)
     }
     val acknowledgedMessageIds = mutableListOf<String>()
 
@@ -62,4 +66,7 @@ class FakeSonixControlRepository(
     }
 
     override suspend fun checkForPanelUpdate(): Result<SonixReleaseUpdate?> = panelUpdateHandler()
+
+    override suspend fun fetchAudioSources(): Result<SonixAudioSourceConfig> =
+        audioSourcesHandler()
 }

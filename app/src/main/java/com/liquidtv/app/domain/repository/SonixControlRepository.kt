@@ -4,6 +4,7 @@ import com.liquidtv.app.data.sonix.SonixAssignedServer
 import com.liquidtv.app.data.sonix.SonixReleaseUpdate
 import com.liquidtv.app.data.sonix.SonixResolvedServer
 import com.liquidtv.app.data.sonix.SonixSyncState
+import com.liquidtv.app.domain.model.SonixAudioSourceConfig
 import kotlinx.coroutines.flow.StateFlow
 
 interface SonixControlRepository {
@@ -28,4 +29,6 @@ interface SonixControlRepository {
     suspend fun acknowledgeMessage(messageId: String): Result<Unit>
 
     suspend fun checkForPanelUpdate(): Result<SonixReleaseUpdate?>
+    suspend fun fetchAudioSources(): Result<SonixAudioSourceConfig> =
+        Result.success(state.value.audioSource)
 }

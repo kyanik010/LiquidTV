@@ -13,7 +13,11 @@ import com.liquidtv.app.data.security.CredentialCrypto
 import com.liquidtv.app.data.security.LogSanitizer
 import com.liquidtv.app.data.sonix.HttpSonixControlApi
 import com.liquidtv.app.data.sonix.SonixControlApi
+import com.liquidtv.app.data.audio.DefaultExternalAudioCatalogRepository
+import com.liquidtv.app.data.audio.ExternalAudioCatalogRepository
 import com.liquidtv.app.data.sonix.SonixControlRepositoryImpl
+import com.liquidtv.app.player.ExternalAudioController
+import com.liquidtv.app.player.Media3ExternalAudioController
 import com.liquidtv.app.domain.repository.AddonPreferencesRepository
 import com.liquidtv.app.domain.repository.ChannelRepository
 import com.liquidtv.app.domain.repository.SonixControlRepository
@@ -135,4 +139,16 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindAddonPreferencesRepository(impl: AddonPreferencesDataStore): AddonPreferencesRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindExternalAudioCatalogRepository(
+        impl: DefaultExternalAudioCatalogRepository,
+    ): ExternalAudioCatalogRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindExternalAudioController(
+        impl: Media3ExternalAudioController,
+    ): ExternalAudioController
 }

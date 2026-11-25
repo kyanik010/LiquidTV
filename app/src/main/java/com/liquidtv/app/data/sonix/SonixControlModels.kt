@@ -1,6 +1,7 @@
 package com.liquidtv.app.data.sonix
 
 import kotlinx.serialization.SerialName
+import com.liquidtv.app.domain.model.SonixAudioSourceConfig
 import kotlinx.serialization.Serializable
 
 enum class SonixDeviceStatus {
@@ -115,6 +116,7 @@ data class SonixSyncSnapshot(
     val assignedServers: List<SonixAssignedServer> = emptyList(),
     val availableServers: List<SonixAssignedServer> = emptyList(),
     val pendingMessages: List<SonixMessage> = emptyList(),
+    @SerialName("audio_source") val audioSource: SonixAudioSourceConfig = SonixAudioSourceConfig(),
     val lastSyncedAt: Long? = null,
 )
 
@@ -135,6 +137,7 @@ data class SonixSyncState(
     val assignedServers: List<SonixAssignedServer> = emptyList(),
     val availableServers: List<SonixAssignedServer> = emptyList(),
     val pendingMessages: List<SonixMessage> = emptyList(),
+    val audioSource: SonixAudioSourceConfig = SonixAudioSourceConfig(),
     val lastSyncedAt: Long? = null,
     val lastError: String? = null,
 ) {

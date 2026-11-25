@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
 import com.liquidtv.app.BuildConfig
+import com.liquidtv.app.domain.model.SonixAudioSourceConfig
 import com.liquidtv.app.domain.repository.SonixControlRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -68,6 +69,7 @@ class SonixControlRepositoryImpl @Inject constructor(
                         assignedServers = cached.assignedServers,
                         availableServers = cached.availableServers,
                         pendingMessages = cached.pendingMessages,
+                        audioSource = cached.audioSource,
                         lastSyncedAt = cached.lastSyncedAt,
                     )
                 } else {
@@ -234,6 +236,36 @@ class SonixControlRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun fetchAudioSources(): Result<SonixAudioSourceConfig> {
+        val uid = identityStore.getOrCreateDeviceUid()
+        return when (val res = executeWithTokenRecovery("audio.sources", buildMetadataPayload(uid))) {
+            is SonixApiResult.Success -> {
+                val config = runCatching {
+                    json.decodeFromJsonElement<SonixAudioSourceConfig>(res.data)
+                }.getOrElse {
+                    SonixAudioSourceConfig(
+                        configured = res.data["configured"]?.jsonPrimitive?.booleanOrNull ?: false,
+                        m3uUrl = res.data["m3u_url"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() },
+                        updatedAt = res.data["updated_at"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() },
+                    )
+                }
+                val updated = _state.value.copy(audioSource = config)
+                _state.value = updated
+                identityStore.saveCachedSnapshot(updated.toSnapshot())
+                Result.success(config)
+            }
+            is SonixApiResult.Forbidden -> {
+                val errState = applyForbiddenStatus(uid, res.errorCode)
+                _state.value = errState
+                Result.failure(IllegalStateException(localizeApiError(res.errorCode)))
+            }
+            is SonixApiResult.Unauthorized ->
+                Result.failure(IllegalStateException(localizeApiError(res.errorCode)))
+            is SonixApiResult.Failure ->
+                Result.failure(IllegalStateException(localizeApiError(res.message)))
+        }
+    }
+
     override suspend fun checkForPanelUpdate(): Result<SonixReleaseUpdate?> {
         val uid = identityStore.getOrCreateDeviceUid()
         val payload = buildMetadataPayload(uid)
@@ -311,6 +343,10 @@ class SonixControlRepositoryImpl @Inject constructor(
             ?.takeIf { it.toString() != "null" }
             ?.let { runCatching { json.decodeFromJsonElement<List<SonixMessage>>(it) }.getOrNull() }
             ?: emptyList()
+        val audioSource = data["audio_source"]
+            ?.takeIf { it.toString() != "null" }
+            ?.let { runCatching { json.decodeFromJsonElement<SonixAudioSourceConfig>(it) }.getOrNull() }
+            ?: _state.value.audioSource
 
         val now = System.currentTimeMillis()
         val next = SonixSyncState(
@@ -330,6 +366,7 @@ class SonixControlRepositoryImpl @Inject constructor(
             assignedServers = if (accessAllowed) servers else emptyList(),
             availableServers = _state.value.availableServers,
             pendingMessages = if (deviceStatus == SonixDeviceStatus.ACTIVE) messages else emptyList(),
+            audioSource = if (accessAllowed) audioSource else SonixAudioSourceConfig(),
             lastSyncedAt = now,
             lastError = null,
         )
@@ -358,6 +395,7 @@ class SonixControlRepositoryImpl @Inject constructor(
             accessStatus = nextAccessStatus,
             accessAllowed = false,
             assignedServers = emptyList(),
+            audioSource = SonixAudioSourceConfig(),
             // Keep the public, URL-free server catalog visible even if this device
             // is blocked/revoked; server.resolve remains protected by device auth.
             lastError = localizeApiError(errorCode),
@@ -378,6 +416,7 @@ class SonixControlRepositoryImpl @Inject constructor(
         assignedServers = assignedServers,
         availableServers = availableServers,
         pendingMessages = pendingMessages,
+        audioSource = audioSource,
         lastSyncedAt = lastSyncedAt,
     )
 
