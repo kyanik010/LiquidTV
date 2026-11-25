@@ -95,6 +95,9 @@ class SonixControlRepositoryImpl @Inject constructor(
         _state.update { it.copy(isSyncing = true, lastError = null) }
 
         val uid = identityStore.getOrCreateDeviceUid()
+        // Publish the stable local installation ID before any network request so the
+        // login screen never waits for panel registration to display an identifier.
+        _state.update { it.copy(deviceUid = uid) }
         val metadataPayload = buildMetadataPayload(uid)
         val result = executeWithTokenRecovery("sync", metadataPayload)
         lastForegroundTriggerMs = System.currentTimeMillis()
@@ -137,25 +140,30 @@ class SonixControlRepositoryImpl @Inject constructor(
         refreshAvailableServers(forceSync = false)
 
     override suspend fun refreshAvailableServers(forceSync: Boolean): Result<List<SonixAssignedServer>> {
-        val syncResult = syncNow(force = forceSync)
-        if (syncResult.isFailure) return Result.failure(syncResult.exceptionOrNull() ?: IllegalStateException("تعذّر التحقق من الجهاز"))
-        val current = _state.value
-        if (current.isBlockedOrRevoked) return Result.failure(IllegalStateException("تم إيقاف هذا الجهاز من لوحة التحكم"))
-        if (!current.accessAllowed) return Result.failure(IllegalStateException("اشتراك الجهاز غير نشط في لوحة التحكم"))
         val uid = identityStore.getOrCreateDeviceUid()
-        return when (val result = executeWithTokenRecovery("servers.catalog", buildMetadataPayload(uid))) {
+        _state.update { it.copy(deviceUid = uid) }
+
+        // The catalog contains only active server names/IDs (never server URLs).
+        // Load it independently from device authentication so a fresh installation
+        // can display the panel's server choices immediately.
+        val catalogResult = api.callAction("servers.catalog", buildMetadataPayload(uid), null)
+        when (catalogResult) {
             is SonixApiResult.Success -> {
-                val servers = result.data["servers"]?.let { element ->
+                val servers = catalogResult.data["servers"]?.let { element ->
                     runCatching { json.decodeFromJsonElement<List<SonixAssignedServer>>(element) }.getOrNull()
                 } ?: emptyList()
                 _state.update { it.copy(availableServers = servers) }
                 identityStore.saveCachedSnapshot(_state.value.toSnapshot())
-                Result.success(servers)
             }
-            is SonixApiResult.Forbidden -> Result.failure(IllegalStateException(localizeApiError(result.errorCode)))
-            is SonixApiResult.Unauthorized -> Result.failure(IllegalStateException(localizeApiError(result.errorCode)))
-            is SonixApiResult.Failure -> Result.failure(IllegalStateException(localizeApiError(result.message)))
+            is SonixApiResult.Forbidden -> return Result.failure(IllegalStateException(localizeApiError(catalogResult.errorCode)))
+            is SonixApiResult.Unauthorized -> return Result.failure(IllegalStateException(localizeApiError(catalogResult.errorCode)))
+            is SonixApiResult.Failure -> return Result.failure(IllegalStateException(localizeApiError(catalogResult.message)))
         }
+
+        // Registration/entitlement sync still runs, but it must not hide a catalog
+        // that was successfully loaded when an old device token needs admin relinking.
+        syncNow(force = forceSync)
+        return Result.success(_state.value.availableServers)
     }
 
     override suspend fun resolveAssignedServer(serverId: String): Result<SonixResolvedServer> {
@@ -323,7 +331,8 @@ class SonixControlRepositoryImpl @Inject constructor(
             accessStatus = nextAccessStatus,
             accessAllowed = false,
             assignedServers = emptyList(),
-            availableServers = emptyList(),
+            // Keep the public, URL-free server catalog visible even if this device
+            // is blocked/revoked; server.resolve remains protected by device auth.
             lastError = localizeApiError(errorCode),
         )
         identityStore.saveCachedSnapshot(next.toSnapshot())
