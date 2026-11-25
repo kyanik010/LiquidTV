@@ -192,28 +192,7 @@ fun LoginScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
-                                val deviceLabel = state.sonixState.deviceCode?.let { "Device ID: $it" }
-                                    ?: "اتصال عبر Xtream ولوحة التحكم"
-                                Text(
-                                    text = deviceLabel,
-                                    style = LiquidTypography.LabelSmall,
-                                    color = colors.textSecondary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.testTag("login_header_device_code"),
-                                )
                             }
-
-                            val sonixBadgeColor = when (state.sonixState.accessStatus) {
-                                SonixAccessStatus.ACTIVE -> colors.success
-                                SonixAccessStatus.EXPIRED -> colors.warning
-                                SonixAccessStatus.BLOCKED, SonixAccessStatus.REVOKED -> colors.danger
-                                SonixAccessStatus.UNKNOWN -> colors.muted
-                            }
-                            PlaylistBadgeChip(
-                                text = localizedSonixAccessStatusAr(state.sonixState.accessStatus),
-                                color = sonixBadgeColor,
-                            )
                         }
 
                         // Primary Two-Section Switcher: 1. اختيار السيرفر | 2. قوائم التشغيل
@@ -246,6 +225,10 @@ fun LoginScreen(
                                     .weight(1f)
                                     .testTag("tab_section_playlists"),
                             )
+                        }
+
+                        if (state.activeSection == LoginSection.PLAYLISTS) {
+                            DeviceIdCompactCard(deviceCode = state.sonixState.deviceCode)
                         }
 
                         if (state.activeSection == LoginSection.SERVER_SELECTION) {
@@ -310,38 +293,15 @@ private fun ServerSelectionSection(
     val colors = AppTheme.colors
     val isPanelLockedEdit = state.editingOrigin == SubscriptionOrigin.PANEL_SERVER
 
-    // Sub-mode selector: URL عادي vs سيرفرات لوحة التحكم
-    if (!isPanelLockedEdit) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(50))
-                .background(colors.surface.copy(alpha = 0.72f))
-                .border(1.dp, colors.border.copy(alpha = 0.45f), RoundedCornerShape(50))
-                .padding(2.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            LoginSectionTab(
-                title = "URL عادي",
-                icon = Icons.Filled.Language,
-                selected = state.serverMode == SubscriptionOrigin.NORMAL_URL,
-                enabled = !state.isConnecting && state.sonixState.settings.allowNormalUrlLogin,
-                onClick = { viewModel.selectServerMode(SubscriptionOrigin.NORMAL_URL) },
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("tab_normal_url"),
-            )
-            LoginSectionTab(
-                title = "سيرفرات لوحة التحكم",
-                icon = Icons.Filled.CloudQueue,
-                selected = state.serverMode == SubscriptionOrigin.PANEL_SERVER,
-                enabled = !state.isConnecting && state.sonixState.settings.allowPanelServers,
-                onClick = { viewModel.selectServerMode(SubscriptionOrigin.PANEL_SERVER) },
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("tab_panel_servers"),
-            )
-        }
+    if (!isPanelLockedEdit && state.sonixState.settings.allowNormalUrlLogin) {
+        LoginSectionTab(
+            title = "URL عادي",
+            icon = Icons.Filled.Language,
+            selected = state.isNormalUrlSelected,
+            enabled = !state.isConnecting,
+            onClick = { viewModel.selectServerMode(SubscriptionOrigin.NORMAL_URL) },
+            modifier = Modifier.fillMaxWidth().testTag("tab_normal_url"),
+        )
     }
 
     if (state.editingSubscriptionId != null) {
@@ -365,7 +325,7 @@ private fun ServerSelectionSection(
         }
     }
 
-    if (state.serverMode == SubscriptionOrigin.PANEL_SERVER) {
+    if (!isPanelLockedEdit && state.sonixState.settings.allowPanelServers) {
         PanelServerChooserBlock(
             state = state,
             onRefresh = viewModel::refreshPanelServers,
@@ -374,8 +334,9 @@ private fun ServerSelectionSection(
     }
 
     // Field 1: اسم قائمة التشغيل (shown in both modes; in panel mode only once server selected or editing)
-    val showCredentialFields = state.serverMode == SubscriptionOrigin.NORMAL_URL ||
-        !state.selectedPanelServerId.isNullOrBlank()
+    val showCredentialFields = state.isNormalUrlSelected ||
+        (state.serverMode == SubscriptionOrigin.PANEL_SERVER && !state.selectedPanelServerId.isNullOrBlank()) ||
+        state.editingSubscriptionId != null
 
     if (showCredentialFields) {
         CompactGlassTextField(
@@ -665,7 +626,7 @@ private fun PanelServerChooserBlock(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "السيرفرات المخصصة لهذا الجهاز",
+                text = "السيرفرات المتاحة",
                 style = LiquidTypography.LabelLarge,
                 color = colors.text,
             )
@@ -733,7 +694,7 @@ private fun PanelServerChooserBlock(
                     )
                 }
             }
-            sonix.assignedServers.isEmpty() -> {
+            sonix.availableServers.isEmpty() -> {
                 LiquidGlassSurface(
                     cornerRadius = 12.dp,
                     glassColor = colors.surface,
@@ -743,9 +704,9 @@ private fun PanelServerChooserBlock(
                 ) {
                     Text(
                         text = if (sonix.isSyncing) {
-                            "جارٍ جلب السيرفرات المخصصة من لوحة التحكم..."
+                            "جارٍ جلب السيرفرات المتاحة من لوحة التحكم..."
                         } else {
-                            "لا توجد سيرفرات مخصصة لهذا الجهاز في لوحة التحكم (${sonix.deviceCode ?: "—"})."
+                            "لا توجد سيرفرات متاحة حالياً في لوحة التحكم (${sonix.deviceCode ?: "—"})."
                         },
                         style = LiquidTypography.BodySmall,
                         color = colors.textSecondary,
@@ -755,7 +716,7 @@ private fun PanelServerChooserBlock(
             }
             else -> {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    sonix.assignedServers.forEach { server ->
+                    sonix.availableServers.forEach { server ->
                         val selected = state.selectedPanelServerId == server.id
                         val interaction = remember { MutableInteractionSource() }
                         val focused by interaction.collectIsFocusedAsState()
@@ -828,6 +789,36 @@ private fun PanelServerChooserBlock(
 }
 
 @Composable
+private fun DeviceIdCompactCard(deviceCode: String?) {
+    val colors = AppTheme.colors
+    LiquidGlassSurface(
+        modifier = Modifier.fillMaxWidth().testTag("device_id_compact_card"),
+        cornerRadius = 14.dp,
+        glassColor = colors.surface,
+        glassAlpha = 0.72f,
+        borderColor = colors.border,
+        borderAlpha = 0.55f,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("ID", style = LiquidTypography.LabelSmall, color = colors.muted)
+                Text(
+                    text = deviceCode?.takeIf { it.isNotBlank() } ?: "جارٍ تسجيل الجهاز...",
+                    style = LiquidTypography.TitleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = colors.text,
+                    modifier = Modifier.testTag("device_id_value"),
+                )
+            }
+            Icon(Icons.Filled.Devices, contentDescription = "Device ID", tint = colors.accentText)
+        }
+    }
+}
+
+@Composable
 private fun PlaylistsSection(
     state: LoginUiState,
     viewModel: LoginViewModel,
@@ -840,10 +831,7 @@ private fun PlaylistsSection(
             .testTag("login_playlists_section"),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        SonixDeviceStatusBanner(
-            sonixState = state.sonixState,
-            onRefresh = viewModel::refreshPanelServers,
-        )
+        DeviceIdCompactCard(deviceCode = state.sonixState.deviceCode)
 
         state.playlistMessage?.let { msg ->
             LiquidGlassSurface(

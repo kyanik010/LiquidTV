@@ -27,6 +27,7 @@ data class LoginUiState(
     val editingSubscriptionId: String? = null,
     val editingOrigin: SubscriptionOrigin? = null,
     val serverMode: SubscriptionOrigin = SubscriptionOrigin.NORMAL_URL,
+    val isNormalUrlSelected: Boolean = false,
     val selectedPanelServerId: String? = null,
     val selectedPanelServerName: String? = null,
     val displayName: String = "",
@@ -57,6 +58,7 @@ class LoginViewModel @Inject constructor(
     private var connectJob: Job? = null
 
     init {
+        viewModelScope.launch { sonixControlRepository.refreshAvailableServers() }
         viewModelScope.launch {
             combine(
                 subscriptionRepository.allSubscriptions,
@@ -78,28 +80,16 @@ class LoginViewModel @Inject constructor(
                         else -> current.serverMode
                     }
 
-                    // Keep selected panel server synced with assigned list if still assigned
-                    val assignedMatch = current.selectedPanelServerId?.let { selId ->
-                        sonix.assignedServers.firstOrNull { it.id == selId }
+                    val availableMatch = current.selectedPanelServerId?.let { selId ->
+                        sonix.availableServers.firstOrNull { it.id == selId }
                     }
-                    val autoFirstServer = if (
-                        resolvedMode == SubscriptionOrigin.PANEL_SERVER &&
-                        current.selectedPanelServerId == null &&
-                        sonix.assignedServers.size == 1
-                    ) {
-                        sonix.assignedServers.first()
-                    } else null
 
                     current.copy(
                         savedPlaylists = playlists,
                         sonixState = sonix,
                         serverMode = resolvedMode,
-                        selectedPanelServerId = assignedMatch?.id
-                            ?: autoFirstServer?.id
-                            ?: current.selectedPanelServerId,
-                        selectedPanelServerName = assignedMatch?.name
-                            ?: autoFirstServer?.name
-                            ?: current.selectedPanelServerName,
+                        selectedPanelServerId = availableMatch?.id ?: current.selectedPanelServerId,
+                        selectedPanelServerName = availableMatch?.name ?: current.selectedPanelServerName,
                         progress = if (current.isConnecting) sync.loadingProgress else current.progress,
                         statusMessage = if (current.isConnecting) (sync.statusMessage ?: current.statusMessage) else current.statusMessage,
                     )
@@ -130,8 +120,9 @@ class LoginViewModel @Inject constructor(
             } else null
             state.copy(
                 serverMode = mode,
-                selectedPanelServerId = singlePanel?.id ?: state.selectedPanelServerId,
-                selectedPanelServerName = singlePanel?.name ?: state.selectedPanelServerName,
+                isNormalUrlSelected = mode == SubscriptionOrigin.NORMAL_URL,
+                selectedPanelServerId = if (mode == SubscriptionOrigin.NORMAL_URL) null else state.selectedPanelServerId,
+                selectedPanelServerName = if (mode == SubscriptionOrigin.NORMAL_URL) null else state.selectedPanelServerName,
                 errorMessage = null,
             )
         }
@@ -141,6 +132,8 @@ class LoginViewModel @Inject constructor(
         if (_uiState.value.isConnecting) return
         _uiState.update {
             it.copy(
+                serverMode = SubscriptionOrigin.PANEL_SERVER,
+                isNormalUrlSelected = false,
                 selectedPanelServerId = serverId,
                 selectedPanelServerName = serverName,
                 errorMessage = null,
@@ -151,7 +144,7 @@ class LoginViewModel @Inject constructor(
     fun refreshPanelServers() {
         viewModelScope.launch {
             _uiState.update { it.copy(errorMessage = null) }
-            val result = sonixControlRepository.refreshAssignedServers()
+            val result = sonixControlRepository.refreshAvailableServers()
             if (result.isFailure) {
                 _uiState.update {
                     it.copy(errorMessage = result.exceptionOrNull()?.message ?: "تعذّر تحديث بيانات لوحة التحكم")
@@ -180,6 +173,7 @@ class LoginViewModel @Inject constructor(
             it.copy(
                 editingSubscriptionId = null,
                 editingOrigin = null,
+                isNormalUrlSelected = false,
                 displayName = "",
                 serverUrl = "",
                 username = "",
@@ -199,6 +193,7 @@ class LoginViewModel @Inject constructor(
                 editingSubscriptionId = sub.id,
                 editingOrigin = sub.origin,
                 serverMode = sub.origin,
+                isNormalUrlSelected = sub.origin == SubscriptionOrigin.NORMAL_URL,
                 selectedPanelServerId = sub.panelServerId,
                 selectedPanelServerName = sub.panelServerName,
                 displayName = sub.name,

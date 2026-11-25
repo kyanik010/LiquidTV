@@ -123,6 +123,27 @@ class SonixControlRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun refreshAvailableServers(): Result<List<SonixAssignedServer>> {
+        val syncResult = syncNow(force = true)
+        if (syncResult.isFailure) return Result.failure(syncResult.exceptionOrNull() ?: IllegalStateException("تعذّر التحقق من الجهاز"))
+        val current = _state.value
+        if (current.isBlockedOrRevoked) return Result.failure(IllegalStateException("تم إيقاف هذا الجهاز من لوحة التحكم"))
+        if (!current.accessAllowed) return Result.failure(IllegalStateException("اشتراك الجهاز غير نشط في لوحة التحكم"))
+        val uid = identityStore.getOrCreateDeviceUid()
+        return when (val result = executeWithTokenRecovery("servers.catalog", buildMetadataPayload(uid))) {
+            is SonixApiResult.Success -> {
+                val servers = result.data["servers"]?.let { element ->
+                    runCatching { json.decodeFromJsonElement<List<SonixAssignedServer>>(element) }.getOrNull()
+                } ?: emptyList()
+                _state.update { it.copy(availableServers = servers) }
+                Result.success(servers)
+            }
+            is SonixApiResult.Forbidden -> Result.failure(IllegalStateException(localizeApiError(result.errorCode)))
+            is SonixApiResult.Unauthorized -> Result.failure(IllegalStateException(localizeApiError(result.errorCode)))
+            is SonixApiResult.Failure -> Result.failure(IllegalStateException(localizeApiError(result.message)))
+        }
+    }
+
     override suspend fun resolveAssignedServer(serverId: String): Result<SonixResolvedServer> {
         val uid = identityStore.getOrCreateDeviceUid()
         val payload = buildMetadataPayload(uid, extra = mapOf("server_id" to JsonPrimitive(serverId)))
@@ -258,6 +279,7 @@ class SonixControlRepositoryImpl @Inject constructor(
             subscription = subscription,
             settings = settings,
             assignedServers = if (accessAllowed) servers else emptyList(),
+            availableServers = _state.value.availableServers,
             pendingMessages = if (deviceStatus == SonixDeviceStatus.ACTIVE) messages else emptyList(),
             lastSyncedAt = now,
             lastError = null,
@@ -287,6 +309,7 @@ class SonixControlRepositoryImpl @Inject constructor(
             accessStatus = nextAccessStatus,
             accessAllowed = false,
             assignedServers = emptyList(),
+            availableServers = emptyList(),
             lastError = localizeApiError(errorCode),
         )
         identityStore.saveCachedSnapshot(next.toSnapshot())
@@ -345,7 +368,7 @@ class SonixControlRepositoryImpl @Inject constructor(
         "device_blocked" -> "تم حظر هذا الجهاز من لوحة التحكم."
         "device_revoked" -> "تم إلغاء صلاحية هذا الجهاز من لوحة التحكم."
         "subscription_expired" -> "انتهت صلاحية اشتراك هذا الجهاز في لوحة التحكم."
-        "server_not_assigned" -> "هذا السيرفر غير مخصص لهذا الجهاز أو تم إيقافه."
+        "server_not_assigned" -> "السيرفر المحدد غير متاح أو تم إيقافه."
         "invalid_device_uid" -> "معرّف الجهاز غير صالح."
         else -> if (code.startsWith("HTTP ")) "تعذّر الاتصال بلوحة التحكم ($code)" else code.ifBlank { "تعذّر الاتصال بلوحة التحكم" }
     }
