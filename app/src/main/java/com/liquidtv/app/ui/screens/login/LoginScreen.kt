@@ -2,7 +2,6 @@ package com.liquidtv.app.ui.screens.login
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -51,6 +50,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -67,13 +67,14 @@ import com.liquidtv.app.ui.theme.LiquidTypography
 import kotlinx.coroutines.delay
 
 /**
- * Two-section Liquid Glass login & playlists screen:
- * 1. اختار السيرفر:
- *    - URL عادي (expandable/collapsible, 4 fields in order: Playlist Name, Username, Password, Host URL)
- *    - Active SONIX-CONTROL servers below URL عادي (3 fields only: Playlist Name, Username, Password; NO Host URL)
- * 2. قوائم التشغيل:
+ * Two completely independent side-by-side Liquid Glass cards:
+ * 1. اختيار السيرفر (`server_selection_main_card`):
+ *    - Single collapsed toggle titled «اختيار سيرفر» by default
+ *    - When expanded, shows «افتراضي URL» (4 fields) and active SONIX-CONTROL servers (3 fields each, NO Host URL)
+ *    - Expanding one server option automatically collapses any previously expanded option
+ * 2. قوائم التشغيل (`playlists_main_card`):
  *    - Saved Xtream playlists (Connect/Activate, Sync, Edit, Delete) or empty state
- *    - Device ID card below playlists showing SONIX-CONTROL device_code + Copy action
+ *    - Device ID card inside playlists card showing SONIX-CONTROL device_code + Copy action
  */
 @Composable
 fun LoginScreen(
@@ -98,8 +99,12 @@ fun LoginScreen(
         }
     }
 
-    BackHandler(enabled = allowBack && !state.isConnecting) {
-        onBack()
+    BackHandler(enabled = !state.isConnecting && (state.isServerSelectorExpanded || allowBack)) {
+        if (state.isServerSelectorExpanded) {
+            viewModel.collapseServerSelector()
+        } else if (allowBack) {
+            onBack()
+        }
     }
 
     AppBackground(modifier = Modifier.fillMaxSize()) {
@@ -109,135 +114,126 @@ fun LoginScreen(
                 .windowInsetsPadding(WindowInsets.safeDrawing),
         ) {
             val isCompactHeight = maxHeight < 480.dp
-            val isCompactWidth = maxWidth < 480.dp
-            val maxCardWidth = when {
-                maxWidth < 720.dp -> maxWidth * 0.98f
-                maxWidth < 1100.dp -> 470.dp
-                else -> 500.dp
+            val isCompactWidth = maxWidth < 520.dp
+            val isCompactCards = maxWidth < 600.dp
+            val maxContainerWidth = when {
+                maxWidth < 680.dp -> maxWidth
+                maxWidth < 1100.dp -> minOf(maxWidth * 0.96f, 760.dp)
+                else -> minOf(maxWidth * 0.88f, 920.dp)
             }
-            val fieldInputHeight = if (isCompactHeight) 36.dp else 42.dp
-            val verticalGap = if (isCompactHeight) 6.dp else 10.dp
+            val fieldInputHeight = when {
+                isCompactHeight -> 36.dp
+                isCompactWidth -> 38.dp
+                else -> 42.dp
+            }
+            val cardsGap = if (isCompactWidth) 6.dp else 12.dp
+            val outerHorizontalPadding = if (isCompactWidth) 6.dp else 16.dp
+            val outerVerticalPadding = if (isCompactHeight) 8.dp else 16.dp
+            val effectiveContainerWidth = minOf(maxWidth - outerHorizontalPadding * 2, maxContainerWidth)
+            val singleCardWidth = (effectiveContainerWidth - cardsGap) / 2f
+            val stackDeviceIdVertically = singleCardWidth < 235.dp
 
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(scrollState)
-                    .padding(horizontal = if (isCompactWidth) 6.dp else 14.dp, vertical = if (isCompactHeight) 8.dp else 16.dp),
+                    .padding(horizontal = outerHorizontalPadding, vertical = outerVerticalPadding),
                 contentAlignment = Alignment.Center,
             ) {
                 val colors = AppTheme.colors
-                LiquidGlassSurface(
+                Column(
                     modifier = Modifier
-                        .widthIn(max = maxCardWidth)
+                        .widthIn(max = maxContainerWidth)
                         .fillMaxWidth()
                         .testTag("login_card"),
-                    cornerRadius = 22.dp,
-                    glassAlpha = 0.24f,
-                    borderAlpha = 0.38f,
+                    verticalArrangement = Arrangement.spacedBy(if (isCompactHeight) 8.dp else 12.dp),
                 ) {
-                    Column(
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(
-                                horizontal = when {
-                                    isCompactWidth -> 8.dp
-                                    isCompactHeight -> 14.dp
-                                    else -> 18.dp
-                                },
-                                vertical = if (isCompactHeight) 8.dp else 12.dp,
-                            ),
-                        verticalArrangement = Arrangement.spacedBy(verticalGap),
+                            .padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            if (allowBack) {
-                                IconButton(
-                                    onClick = { if (!state.isConnecting) onBack() },
-                                    modifier = Modifier
-                                        .size(48.dp)
-                                        .clip(CircleShape)
-                                        .background(colors.surface.copy(alpha = 0.82f))
-                                        .border(1.dp, colors.border.copy(alpha = 0.55f), CircleShape),
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                        contentDescription = "رجوع",
-                                        tint = colors.text,
-                                        modifier = Modifier.size(18.dp),
-                                    )
-                                }
-                            }
-                            Box(
+                        if (allowBack) {
+                            IconButton(
+                                onClick = { if (!state.isConnecting) onBack() },
                                 modifier = Modifier
-                                    .size(34.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(
-                                        Brush.linearGradient(
-                                            listOf(colors.accent, colors.waveOne),
-                                        ),
-                                    ),
-                                contentAlignment = Alignment.Center,
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(colors.surface.copy(alpha = 0.82f))
+                                    .border(1.dp, colors.border.copy(alpha = 0.55f), CircleShape),
                             ) {
                                 Icon(
-                                    imageVector = Icons.Filled.LiveTv,
-                                    contentDescription = "LIQUID TV",
-                                    tint = colors.onAccent,
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "رجوع",
+                                    tint = colors.text,
                                     modifier = Modifier.size(18.dp),
                                 )
                             }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = if (state.editingSubscriptionId != null) "تعديل قائمة التشغيل" else "LIQUID TV",
-                                    style = LiquidTypography.TitleMedium.copy(
-                                        brush = Brush.linearGradient(
-                                            listOf(colors.text, colors.accentText),
-                                        ),
-                                    ),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
                         }
-
-                        // Two persistent, equally sized cards. They remain side by side on narrow phones.
-                        Row(
+                        Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(IntrinsicSize.Min)
-                                .testTag("login_two_cards_row"),
-                            horizontalArrangement = Arrangement.spacedBy(if (isCompactWidth) 6.dp else 10.dp),
-                            verticalAlignment = Alignment.Top,
+                                .size(if (isCompactWidth) 32.dp else 36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(colors.accent, colors.waveOne),
+                                    ),
+                                ),
+                            contentAlignment = Alignment.Center,
                         ) {
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight(),
-                            ) {
-                                ServerSelectionSection(
-                                    state = state,
-                                    fieldInputHeight = fieldInputHeight,
-                                    isCompactHeight = isCompactHeight,
-                                    primaryInputRequester = primaryInputRequester,
-                                    viewModel = viewModel,
-                                    modifier = Modifier.fillMaxHeight(),
-                                )
-                            }
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight(),
-                            ) {
-                                PlaylistsSection(
-                                    state = state,
-                                    viewModel = viewModel,
-                                    onRequestDelete = { pendingDelete = it },
-                                    modifier = Modifier.fillMaxHeight(),
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Filled.LiveTv,
+                                contentDescription = "LIQUID TV",
+                                tint = colors.onAccent,
+                                modifier = Modifier.size(18.dp),
+                            )
                         }
+                        Text(
+                            text = if (state.editingSubscriptionId != null) "تعديل قائمة التشغيل" else "LIQUID TV",
+                            style = LiquidTypography.TitleMedium.copy(
+                                brush = Brush.linearGradient(
+                                    listOf(colors.text, colors.accentText),
+                                ),
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+
+                    // Two completely independent equal-width, equal-height Liquid Glass cards side by side.
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Min)
+                            .testTag("login_two_cards_row"),
+                        horizontalArrangement = Arrangement.spacedBy(cardsGap),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        ServerSelectionSection(
+                            state = state,
+                            fieldInputHeight = fieldInputHeight,
+                            isCompactHeight = isCompactHeight,
+                            isCompactCards = isCompactCards,
+                            primaryInputRequester = primaryInputRequester,
+                            viewModel = viewModel,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                        )
+                        PlaylistsSection(
+                            state = state,
+                            isCompactHeight = isCompactHeight,
+                            isCompactCards = isCompactCards,
+                            stackDeviceIdVertically = stackDeviceIdVertically,
+                            viewModel = viewModel,
+                            onRequestDelete = { pendingDelete = it },
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                        )
                     }
                 }
             }
@@ -279,53 +275,87 @@ private fun ServerSelectionSection(
     state: LoginUiState,
     fieldInputHeight: Dp,
     isCompactHeight: Boolean,
+    isCompactCards: Boolean,
     primaryInputRequester: FocusRequester,
     viewModel: LoginViewModel,
     modifier: Modifier = Modifier,
 ) {
     val colors = AppTheme.colors
+    val sonix = state.sonixState
     val isPanelLockedEdit = state.editingOrigin == SubscriptionOrigin.PANEL_SERVER
+
+    val catalogServers = remember(sonix.hasLoadedCatalog, sonix.availableServers, sonix.assignedServers) {
+        if (sonix.hasLoadedCatalog) {
+            sonix.availableServers
+        } else {
+            sonix.availableServers.ifEmpty { sonix.assignedServers }
+        }
+    }
+    val lockedFallbackServer = remember(isPanelLockedEdit, catalogServers, state.selectedPanelServerId, state.selectedPanelServerName) {
+        val selId = state.selectedPanelServerId
+        if (isPanelLockedEdit && !selId.isNullOrBlank() && catalogServers.none { it.id == selId }) {
+            SonixAssignedServer(
+                id = selId,
+                name = state.selectedPanelServerName?.takeIf { it.isNotBlank() } ?: "سيرفر لوحة التحكم",
+            )
+        } else {
+            null
+        }
+    }
+    val displayServers = remember(catalogServers, lockedFallbackServer) {
+        if (lockedFallbackServer != null) catalogServers + lockedFallbackServer else catalogServers
+    }
+
     val isNormalUrlOpen = !isPanelLockedEdit &&
-        state.sonixState.settings.allowNormalUrlLogin &&
+        state.isServerSelectorExpanded &&
         state.isNormalUrlSelected
-    val isPanelFormOpen = !isNormalUrlOpen &&
+    val isPanelFormOpen = state.isServerSelectorExpanded &&
+        !isNormalUrlOpen &&
         state.serverMode == SubscriptionOrigin.PANEL_SERVER &&
         (!state.selectedPanelServerId.isNullOrBlank() || isPanelLockedEdit)
+    val showNormalUrlOption = !isPanelLockedEdit &&
+        (sonix.settings.allowNormalUrlLogin || !sonix.catalogError.isNullOrBlank() || catalogServers.isEmpty())
 
+    // Do NOT attach animateContentSize() here so IntrinsicSize.Min keeps both side-by-side cards strictly equal height.
     LiquidGlassSurface(
         modifier = modifier
             .fillMaxWidth()
             .fillMaxHeight()
-            .animateContentSize()
             .testTag("server_selection_main_card"),
-        cornerRadius = 16.dp,
+        cornerRadius = 18.dp,
         glassColor = colors.panel,
-        glassAlpha = 0.48f,
+        glassAlpha = 0.50f,
         borderColor = colors.border,
         borderAlpha = 0.45f,
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = if (isCompactHeight) 10.dp else 12.dp),
+                .fillMaxSize()
+                .padding(
+                    horizontal = if (isCompactCards) 8.dp else 14.dp,
+                    vertical = if (isCompactHeight) 10.dp else 14.dp,
+                ),
             verticalArrangement = Arrangement.spacedBy(if (isCompactHeight) 8.dp else 10.dp),
         ) {
-            // Main Card Title: اختار السيرفر
+            // Card 1 Header: اختيار السيرفر
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(if (isCompactCards) 6.dp else 8.dp),
             ) {
                 Icon(
                     imageVector = Icons.Filled.Dns,
                     contentDescription = null,
                     tint = colors.accentText,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(if (isCompactCards) 16.dp else 18.dp),
                 )
                 Text(
-                    text = "اختار السيرفر",
-                    style = LiquidTypography.TitleSmall.copy(fontWeight = FontWeight.Bold),
+                    text = "اختيار السيرفر",
+                    style = (if (isCompactCards) LiquidTypography.LabelLarge else LiquidTypography.TitleSmall)
+                        .copy(fontWeight = FontWeight.Bold),
                     color = colors.text,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
 
@@ -337,197 +367,156 @@ private fun ServerSelectionSection(
                 ) {
                     Text(
                         text = if (isPanelLockedEdit) {
-                            "وضع التعديل: سيرفر لوحة التحكم (رابط السيرفر محمي)"
+                            "وضع التعديل: سيرفر لوحة التحكم"
                         } else {
                             "وضع تعديل قائمة التشغيل"
                         },
                         style = LiquidTypography.LabelSmall,
                         color = colors.accentText,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
                     TextButton(onClick = viewModel::clearEditMode, enabled = !state.isConnecting) {
-                        Text("إلغاء التعديل", color = colors.textSecondary)
+                        Text("إلغاء", style = LiquidTypography.LabelSmall, color = colors.textSecondary)
                     }
                 }
             }
 
-            // Option 1: URL عادي (Expandable / Collapsible)
-            if (!isPanelLockedEdit && state.sonixState.settings.allowNormalUrlLogin) {
-                LiquidGlassSurface(
+            // Single collapsed selector option shown initially: «اختيار سيرفر»
+            ServerSelectorToggleButton(
+                expanded = state.isServerSelectorExpanded,
+                enabled = !state.isConnecting,
+                isCompactCards = isCompactCards,
+                selectedSummary = when {
+                    isNormalUrlOpen -> "افتراضي URL"
+                    isPanelFormOpen -> state.selectedPanelServerName
+                    else -> null
+                },
+                onClick = viewModel::toggleServerSelector,
+            )
+
+            if (state.isServerSelectorExpanded) {
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag("normal_url_option_card"),
-                    cornerRadius = 14.dp,
-                    glassColor = if (isNormalUrlOpen) colors.selected else colors.surface,
-                    glassAlpha = if (isNormalUrlOpen) 0.56f else 0.72f,
-                    borderColor = if (isNormalUrlOpen) colors.accent else colors.border,
-                    borderAlpha = if (isNormalUrlOpen) 0.75f else 0.45f,
+                        .testTag("server_selector_list"),
+                    verticalArrangement = Arrangement.spacedBy(if (isCompactCards) 6.dp else 8.dp),
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        NormalUrlAccordionHeader(
-                            expanded = isNormalUrlOpen,
-                            enabled = !state.isConnecting,
-                            onClick = viewModel::toggleNormalUrlSection,
-                        )
-
-                        if (isNormalUrlOpen) {
-                            // Exact 4-field vertical order:
-                            // 1. اسم قائمة التشغيل | 2. اسم المستخدم | 3. كلمة المرور | 4. Host URL
-                            CompactGlassTextField(
-                                value = state.displayName,
-                                onValueChange = viewModel::setDisplayName,
-                                label = "اسم قائمة التشغيل",
-                                placeholder = "مثال: قائمة المنزل",
-                                leadingIcon = Icons.AutoMirrored.Filled.Label,
-                                enabled = !state.isConnecting,
-                                imeAction = ImeAction.Next,
-                                inputHeight = fieldInputHeight,
-                                fieldModifier = Modifier
-                                    .focusRequester(primaryInputRequester)
-                                    .testTag("input_subscription_name"),
-                            )
-
-                            CompactGlassTextField(
-                                value = state.username,
-                                onValueChange = viewModel::setUsername,
-                                label = "اسم المستخدم",
-                                placeholder = "username",
-                                leadingIcon = Icons.Filled.Person,
-                                enabled = !state.isConnecting,
-                                imeAction = ImeAction.Next,
-                                inputHeight = fieldInputHeight,
-                                fieldModifier = Modifier.testTag("input_xtream_username"),
-                            )
-
-                            PasswordGlassTextField(
-                                value = state.password,
-                                onValueChange = viewModel::setPassword,
-                                showPassword = state.showPassword,
-                                onToggleVisibility = viewModel::togglePasswordVisibility,
-                                enabled = !state.isConnecting,
-                                imeAction = ImeAction.Next,
-                                onDone = null,
-                                inputHeight = fieldInputHeight,
-                            )
-
-                            CompactGlassTextField(
-                                value = state.serverUrl,
-                                onValueChange = viewModel::setServerUrl,
-                                label = "Host URL",
-                                placeholder = "https://example.com:8080 أو http://...",
-                                leadingIcon = Icons.Filled.Language,
-                                enabled = !state.isConnecting,
-                                keyboardType = KeyboardType.Uri,
-                                imeAction = ImeAction.Done,
-                                onDone = viewModel::connect,
-                                inputHeight = fieldInputHeight,
-                                fieldModifier = Modifier.testTag("input_xtream_url"),
-                            )
-
-                            LoginStatusAndSubmitBlock(
-                                state = state,
-                                isCompactHeight = isCompactHeight,
-                                onConnect = viewModel::connect,
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Option 2: Active SONIX-CONTROL servers directly below URL عادي
-            if (state.sonixState.settings.allowPanelServers || isPanelLockedEdit) {
-                LiquidGlassSurface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("panel_servers_option_card"),
-                    cornerRadius = 14.dp,
-                    glassColor = if (isPanelFormOpen) colors.selected else colors.surface,
-                    glassAlpha = if (isPanelFormOpen) 0.50f else 0.68f,
-                    borderColor = if (isPanelFormOpen) colors.accent else colors.border,
-                    borderAlpha = if (isPanelFormOpen) 0.72f else 0.45f,
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        if (!isPanelLockedEdit) {
-                            PanelServerChooserBlock(
-                                state = state,
-                                onRefresh = viewModel::refreshPanelServers,
-                                onSelectServer = { srv -> viewModel.selectPanelServer(srv.id, srv.name) },
-                            )
-                        } else {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    // Option 1: افتراضي URL (Traditional Xtream login — never disabled if panel fails or is empty)
+                    if (showNormalUrlOption) {
+                        LiquidGlassSurface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("normal_url_option_card"),
+                            cornerRadius = 14.dp,
+                            glassColor = if (isNormalUrlOpen) colors.selected else colors.surface,
+                            glassAlpha = if (isNormalUrlOpen) 0.56f else 0.72f,
+                            borderColor = if (isNormalUrlOpen) colors.accent else colors.border,
+                            borderAlpha = if (isNormalUrlOpen) 0.75f else 0.45f,
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(if (isCompactCards) 8.dp else 10.dp),
+                                verticalArrangement = Arrangement.spacedBy(if (isCompactCards) 6.dp else 8.dp),
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Dns,
-                                    contentDescription = null,
-                                    tint = colors.accentText,
-                                    modifier = Modifier.size(16.dp),
+                                NormalUrlAccordionHeader(
+                                    expanded = isNormalUrlOpen,
+                                    enabled = !state.isConnecting,
+                                    isCompactCards = isCompactCards,
+                                    onClick = viewModel::toggleNormalUrlSection,
                                 )
-                                Text(
-                                    text = state.selectedPanelServerName ?: "سيرفر لوحة التحكم",
-                                    style = LiquidTypography.TitleSmall,
-                                    color = colors.text,
-                                )
+
+                                if (isNormalUrlOpen) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("default_url_form"),
+                                        verticalArrangement = Arrangement.spacedBy(if (isCompactCards) 6.dp else 8.dp),
+                                    ) {
+                                        // 4 fields in strict order:
+                                        // 1. اسم قائمة التشغيل | 2. اسم المستخدم | 3. كلمة المرور | 4. Host URL
+                                        CompactGlassTextField(
+                                            value = state.displayName,
+                                            onValueChange = viewModel::setDisplayName,
+                                            label = "اسم قائمة التشغيل",
+                                            placeholder = "مثال: قائمة المنزل",
+                                            leadingIcon = Icons.AutoMirrored.Filled.Label,
+                                            enabled = !state.isConnecting,
+                                            imeAction = ImeAction.Next,
+                                            inputHeight = fieldInputHeight,
+                                            isCompactCards = isCompactCards,
+                                            fieldModifier = Modifier
+                                                .focusRequester(primaryInputRequester)
+                                                .testTag("input_subscription_name"),
+                                        )
+
+                                        CompactGlassTextField(
+                                            value = state.username,
+                                            onValueChange = viewModel::setUsername,
+                                            label = "اسم المستخدم",
+                                            placeholder = "username",
+                                            leadingIcon = Icons.Filled.Person,
+                                            enabled = !state.isConnecting,
+                                            imeAction = ImeAction.Next,
+                                            inputHeight = fieldInputHeight,
+                                            isCompactCards = isCompactCards,
+                                            fieldModifier = Modifier.testTag("input_xtream_username"),
+                                        )
+
+                                        PasswordGlassTextField(
+                                            value = state.password,
+                                            onValueChange = viewModel::setPassword,
+                                            showPassword = state.showPassword,
+                                            onToggleVisibility = viewModel::togglePasswordVisibility,
+                                            enabled = !state.isConnecting,
+                                            imeAction = ImeAction.Next,
+                                            onDone = null,
+                                            inputHeight = fieldInputHeight,
+                                            isCompactCards = isCompactCards,
+                                        )
+
+                                        CompactGlassTextField(
+                                            value = state.serverUrl,
+                                            onValueChange = viewModel::setServerUrl,
+                                            label = "Host URL",
+                                            placeholder = "https://example.com:8080 أو http://...",
+                                            leadingIcon = Icons.Filled.Language,
+                                            enabled = !state.isConnecting,
+                                            keyboardType = KeyboardType.Uri,
+                                            imeAction = ImeAction.Done,
+                                            onDone = viewModel::connect,
+                                            inputHeight = fieldInputHeight,
+                                            isCompactCards = isCompactCards,
+                                            fieldModifier = Modifier.testTag("input_xtream_url"),
+                                        )
+
+                                        LoginStatusAndSubmitBlock(
+                                            state = state,
+                                            isCompactHeight = isCompactHeight,
+                                            isCompactCards = isCompactCards,
+                                            onConnect = viewModel::connect,
+                                        )
+                                    }
+                                }
                             }
                         }
+                    }
 
-                        if (isPanelFormOpen) {
-                            // ONLY 3 fields for SONIX-CONTROL servers (NEVER show Host URL):
-                            // 1. اسم قائمة التشغيل | 2. اسم المستخدم | 3. كلمة المرور
-                            CompactGlassTextField(
-                                value = state.displayName,
-                                onValueChange = viewModel::setDisplayName,
-                                label = "اسم قائمة التشغيل",
-                                placeholder = "مثال: اشتراك ${state.selectedPanelServerName ?: "السيرفر"}",
-                                leadingIcon = Icons.AutoMirrored.Filled.Label,
-                                enabled = !state.isConnecting,
-                                imeAction = ImeAction.Next,
-                                inputHeight = fieldInputHeight,
-                                fieldModifier = Modifier
-                                    .focusRequester(primaryInputRequester)
-                                    .testTag("input_subscription_name"),
-                            )
-
-                            CompactGlassTextField(
-                                value = state.username,
-                                onValueChange = viewModel::setUsername,
-                                label = "اسم المستخدم",
-                                placeholder = "username",
-                                leadingIcon = Icons.Filled.Person,
-                                enabled = !state.isConnecting,
-                                imeAction = ImeAction.Next,
-                                inputHeight = fieldInputHeight,
-                                fieldModifier = Modifier.testTag("input_xtream_username"),
-                            )
-
-                            PasswordGlassTextField(
-                                value = state.password,
-                                onValueChange = viewModel::setPassword,
-                                showPassword = state.showPassword,
-                                onToggleVisibility = viewModel::togglePasswordVisibility,
-                                enabled = !state.isConnecting,
-                                imeAction = ImeAction.Done,
-                                onDone = viewModel::connect,
-                                inputHeight = fieldInputHeight,
-                            )
-
-                            LoginStatusAndSubmitBlock(
-                                state = state,
-                                isCompactHeight = isCompactHeight,
-                                onConnect = viewModel::connect,
-                            )
-                        }
+                    // Option 2: Dynamic SONIX-CONTROL servers list (each item expands ONLY its own 3-field form)
+                    if (sonix.settings.allowPanelServers || isPanelLockedEdit) {
+                        PanelServersAccordionSection(
+                            state = state,
+                            displayServers = displayServers,
+                            isPanelLockedEdit = isPanelLockedEdit,
+                            isPanelFormOpen = isPanelFormOpen,
+                            fieldInputHeight = fieldInputHeight,
+                            isCompactHeight = isCompactHeight,
+                            isCompactCards = isCompactCards,
+                            primaryInputRequester = primaryInputRequester,
+                            viewModel = viewModel,
+                        )
                     }
                 }
             }
@@ -540,9 +529,91 @@ private fun ServerSelectionSection(
 }
 
 @Composable
+private fun ServerSelectorToggleButton(
+    expanded: Boolean,
+    enabled: Boolean,
+    isCompactCards: Boolean,
+    selectedSummary: String?,
+    onClick: () -> Unit,
+) {
+    val colors = AppTheme.colors
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (expanded) colors.selected else colors.surface.copy(alpha = 0.80f))
+            .border(
+                width = if (isFocused) 2.dp else 1.dp,
+                color = when {
+                    isFocused -> colors.focus
+                    expanded -> colors.accent
+                    else -> colors.border.copy(alpha = 0.55f)
+                },
+                shape = RoundedCornerShape(12.dp),
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = enabled,
+                onClick = onClick,
+            )
+            .focusable(interactionSource = interactionSource)
+            .padding(
+                horizontal = if (isCompactCards) 8.dp else 12.dp,
+                vertical = if (isCompactCards) 8.dp else 10.dp,
+            )
+            .testTag("server_selector_toggle"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(if (isCompactCards) 6.dp else 8.dp),
+            modifier = Modifier.weight(1f),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Tune,
+                contentDescription = null,
+                tint = if (expanded) colors.accentText else colors.textSecondary,
+                modifier = Modifier.size(if (isCompactCards) 16.dp else 18.dp),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "اختيار سيرفر",
+                    style = (if (isCompactCards) LiquidTypography.LabelLarge else LiquidTypography.TitleSmall)
+                        .copy(fontWeight = FontWeight.SemiBold),
+                    color = colors.text,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (!expanded && !selectedSummary.isNullOrBlank()) {
+                    Text(
+                        text = selectedSummary,
+                        style = LiquidTypography.LabelSmall,
+                        color = colors.accentText,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+        Icon(
+            imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+            contentDescription = if (expanded) "طي قائمة السيرفرات" else "فتح قائمة السيرفرات",
+            tint = colors.accentText,
+            modifier = Modifier.size(if (isCompactCards) 18.dp else 20.dp),
+        )
+    }
+}
+
+@Composable
 private fun NormalUrlAccordionHeader(
     expanded: Boolean,
     enabled: Boolean,
+    isCompactCards: Boolean,
     onClick: () -> Unit,
 ) {
     val colors = AppTheme.colors
@@ -555,7 +626,7 @@ private fun NormalUrlAccordionHeader(
             .clip(RoundedCornerShape(12.dp))
             .background(if (expanded) colors.selected.copy(alpha = 0.72f) else colors.panel.copy(alpha = 0.58f))
             .border(
-                width = if (isFocused) 2.dp else if (expanded) 1.dp else 1.dp,
+                width = if (isFocused) 2.dp else 1.dp,
                 color = if (isFocused) colors.focus else if (expanded) colors.accent else colors.border.copy(alpha = 0.45f),
                 shape = RoundedCornerShape(12.dp),
             )
@@ -566,33 +637,406 @@ private fun NormalUrlAccordionHeader(
                 onClick = onClick,
             )
             .focusable(interactionSource = interactionSource)
-            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .padding(
+                horizontal = if (isCompactCards) 8.dp else 12.dp,
+                vertical = if (isCompactCards) 8.dp else 10.dp,
+            )
             .testTag("tab_normal_url"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (isCompactCards) 6.dp else 8.dp),
+            modifier = Modifier.weight(1f),
         ) {
             Icon(
                 imageVector = Icons.Filled.Language,
                 contentDescription = null,
                 tint = if (expanded) colors.accentText else colors.textSecondary,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(if (isCompactCards) 16.dp else 18.dp),
             )
             Text(
-                text = "URL عادي",
-                style = LiquidTypography.TitleSmall.copy(fontWeight = FontWeight.SemiBold),
+                text = "افتراضي URL",
+                style = (if (isCompactCards) LiquidTypography.LabelLarge else LiquidTypography.TitleSmall)
+                    .copy(fontWeight = FontWeight.SemiBold),
                 color = colors.text,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         Icon(
             imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-            contentDescription = if (expanded) "إغلاق URL عادي" else "فتح URL عادي",
+            contentDescription = if (expanded) "إغلاق افتراضي URL" else "فتح افتراضي URL",
             tint = colors.accentText,
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(if (isCompactCards) 18.dp else 20.dp),
         )
+    }
+}
+
+@Composable
+private fun PanelServersAccordionSection(
+    state: LoginUiState,
+    displayServers: List<SonixAssignedServer>,
+    isPanelLockedEdit: Boolean,
+    isPanelFormOpen: Boolean,
+    fieldInputHeight: Dp,
+    isCompactHeight: Boolean,
+    isCompactCards: Boolean,
+    primaryInputRequester: FocusRequester,
+    viewModel: LoginViewModel,
+) {
+    val colors = AppTheme.colors
+    val sonix = state.sonixState
+    val isRefreshing = sonix.isSyncing || sonix.isCatalogLoading
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("panel_servers_container"),
+        verticalArrangement = Arrangement.spacedBy(if (isCompactCards) 6.dp else 8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = if (isCompactCards) "السيرفرات المتاحة" else "سيرفرات لوحة التحكم",
+                style = if (isCompactCards) LiquidTypography.LabelMedium else LiquidTypography.LabelLarge,
+                color = colors.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+
+            val refreshInteraction = remember { MutableInteractionSource() }
+            val refreshFocused by refreshInteraction.collectIsFocusedAsState()
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier
+                    .heightIn(min = 36.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(if (refreshFocused) colors.selected else colors.panel.copy(alpha = 0.78f))
+                    .border(
+                        width = if (refreshFocused) 2.dp else 1.dp,
+                        color = if (refreshFocused) colors.focus else colors.border.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(50),
+                    )
+                    .clickable(
+                        interactionSource = refreshInteraction,
+                        indication = null,
+                        enabled = !isRefreshing && !state.isConnecting,
+                        onClick = viewModel::refreshPanelServers,
+                    )
+                    .focusable(interactionSource = refreshInteraction)
+                    .padding(horizontal = if (isCompactCards) 8.dp else 10.dp, vertical = 5.dp)
+                    .testTag("refresh_panel_servers_button"),
+            ) {
+                if (isRefreshing) {
+                    CircularProgressIndicator(
+                        color = colors.accent,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(13.dp),
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.Refresh,
+                        contentDescription = "تحديث السيرفرات",
+                        tint = colors.accentText,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+                Text(
+                    text = if (isRefreshing) "جارٍ التحديث..." else "تحديث",
+                    style = LiquidTypography.LabelSmall,
+                    color = colors.text,
+                    maxLines = 1,
+                )
+            }
+        }
+
+        when {
+            sonix.isBlockedOrRevoked -> {
+                LiquidGlassSurface(
+                    cornerRadius = 12.dp,
+                    glassColor = colors.danger,
+                    glassAlpha = 0.22f,
+                    borderColor = colors.danger,
+                    modifier = Modifier.testTag("panel_servers_blocked"),
+                ) {
+                    Text(
+                        text = "تم حظر هذا الجهاز من لوحة التحكم. لا يمكن استخدام سيرفرات اللوحة.",
+                        style = LiquidTypography.BodySmall,
+                        color = colors.text,
+                        modifier = Modifier.padding(10.dp),
+                    )
+                }
+            }
+
+            sonix.isPanelExpired -> {
+                LiquidGlassSurface(
+                    cornerRadius = 12.dp,
+                    glassColor = colors.warning,
+                    glassAlpha = 0.22f,
+                    borderColor = colors.warning,
+                    modifier = Modifier.testTag("panel_servers_expired"),
+                ) {
+                    Text(
+                        text = "انتهت صلاحية اشتراك الجهاز (${sonix.deviceCode ?: ""}). يمكنك استخدام افتراضي URL.",
+                        style = LiquidTypography.BodySmall,
+                        color = colors.text,
+                        modifier = Modifier.padding(10.dp),
+                    )
+                }
+            }
+
+            sonix.isCatalogLoading && displayServers.isEmpty() -> {
+                LiquidGlassSurface(
+                    cornerRadius = 12.dp,
+                    glassColor = colors.surface,
+                    glassAlpha = 0.68f,
+                    borderColor = colors.border,
+                    modifier = Modifier.testTag("panel_servers_loading"),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        CircularProgressIndicator(
+                            color = colors.accent,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text(
+                            text = "جارٍ تحميل السيرفرات من لوحة التحكم...",
+                            style = LiquidTypography.BodySmall,
+                            color = colors.textSecondary,
+                        )
+                    }
+                }
+            }
+
+            !sonix.catalogError.isNullOrBlank() -> {
+                LiquidGlassSurface(
+                    cornerRadius = 12.dp,
+                    glassColor = colors.warning,
+                    glassAlpha = 0.20f,
+                    borderColor = colors.warning,
+                    modifier = Modifier.testTag("panel_servers_error"),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(
+                            text = sonix.catalogError,
+                            style = LiquidTypography.BodySmall,
+                            color = colors.text,
+                        )
+                        Text(
+                            text = "يمكنك استخدام «افتراضي URL» أعلاه أو إعادة المحاولة.",
+                            style = LiquidTypography.LabelSmall,
+                            color = colors.textSecondary,
+                        )
+                    }
+                }
+            }
+
+            displayServers.isEmpty() -> {
+                LiquidGlassSurface(
+                    cornerRadius = 12.dp,
+                    glassColor = colors.surface,
+                    glassAlpha = 0.65f,
+                    borderColor = colors.border,
+                    modifier = Modifier.testTag("panel_servers_empty"),
+                ) {
+                    Text(
+                        text = "لا توجد سيرفرات متاحة حالياً في لوحة التحكم (${sonix.deviceCode ?: "—"}).",
+                        style = LiquidTypography.BodySmall,
+                        color = colors.textSecondary,
+                        modifier = Modifier.padding(10.dp),
+                    )
+                }
+            }
+        }
+
+        if (!sonix.isBlockedOrRevoked && !sonix.isPanelExpired && displayServers.isNotEmpty()) {
+            displayServers.forEach { server ->
+                val isThisServerExpanded = isPanelFormOpen && state.selectedPanelServerId == server.id
+                val isItemEnabled = !state.isConnecting && (!isPanelLockedEdit || isThisServerExpanded)
+
+                LiquidGlassSurface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("panel_server_card_${server.id}"),
+                    cornerRadius = 14.dp,
+                    glassColor = if (isThisServerExpanded) colors.selected else colors.surface,
+                    glassAlpha = if (isThisServerExpanded) 0.56f else 0.72f,
+                    borderColor = if (isThisServerExpanded) colors.accent else colors.border,
+                    borderAlpha = if (isThisServerExpanded) 0.78f else 0.45f,
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(if (isCompactCards) 8.dp else 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(if (isCompactCards) 6.dp else 8.dp),
+                    ) {
+                        val interaction = remember { MutableInteractionSource() }
+                        val focused by interaction.collectIsFocusedAsState()
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 48.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (isThisServerExpanded) colors.selected.copy(alpha = 0.72f) else colors.panel.copy(alpha = 0.62f),
+                                )
+                                .border(
+                                    width = if (focused) 2.dp else if (isThisServerExpanded) 1.5.dp else 1.dp,
+                                    color = when {
+                                        focused -> colors.focus
+                                        isThisServerExpanded -> colors.accent
+                                        else -> colors.border.copy(alpha = 0.45f)
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                )
+                                .clickable(
+                                    interactionSource = interaction,
+                                    indication = null,
+                                    enabled = isItemEnabled,
+                                    onClick = { viewModel.selectPanelServer(server.id, server.name) },
+                                )
+                                .focusable(interactionSource = interaction)
+                                .padding(
+                                    horizontal = if (isCompactCards) 8.dp else 12.dp,
+                                    vertical = if (isCompactCards) 8.dp else 10.dp,
+                                )
+                                .testTag("panel_server_item_${server.id}"),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(if (isCompactCards) 6.dp else 10.dp),
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Icon(
+                                    imageVector = if (isThisServerExpanded) Icons.Filled.CheckCircle else Icons.Filled.Dns,
+                                    contentDescription = null,
+                                    tint = if (isThisServerExpanded) colors.accent else colors.accentText,
+                                    modifier = Modifier.size(if (isCompactCards) 16.dp else 18.dp),
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = server.name,
+                                        style = (if (isCompactCards) LiquidTypography.LabelLarge else LiquidTypography.TitleSmall)
+                                            .copy(fontWeight = FontWeight.SemiBold),
+                                        color = colors.text,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    server.region?.takeIf { it.isNotBlank() }?.let { region ->
+                                        Text(
+                                            text = "المنطقة: $region",
+                                            style = LiquidTypography.LabelSmall,
+                                            color = colors.muted,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                }
+                            }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                if (isThisServerExpanded && !isCompactCards) {
+                                    PlaylistBadgeChip(text = "محدد", color = colors.accentText, compactMode = true)
+                                }
+                                Icon(
+                                    imageVector = if (isThisServerExpanded) {
+                                        Icons.Filled.KeyboardArrowUp
+                                    } else {
+                                        Icons.Filled.KeyboardArrowDown
+                                    },
+                                    contentDescription = if (isThisServerExpanded) {
+                                        "إغلاق ${server.name}"
+                                    } else {
+                                        "فتح ${server.name}"
+                                    },
+                                    tint = colors.accentText,
+                                    modifier = Modifier.size(if (isCompactCards) 18.dp else 20.dp),
+                                )
+                            }
+                        }
+
+                        // Expand ONLY this selected server's 3-field form (NEVER Host URL).
+                        if (isThisServerExpanded) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("panel_server_form_${server.id}"),
+                                verticalArrangement = Arrangement.spacedBy(if (isCompactCards) 6.dp else 8.dp),
+                            ) {
+                                CompactGlassTextField(
+                                    value = state.displayName,
+                                    onValueChange = viewModel::setDisplayName,
+                                    label = "اسم قائمة التشغيل",
+                                    placeholder = "مثال: اشتراكي الرئيسي",
+                                    leadingIcon = Icons.AutoMirrored.Filled.Label,
+                                    enabled = !state.isConnecting,
+                                    imeAction = ImeAction.Next,
+                                    inputHeight = fieldInputHeight,
+                                    isCompactCards = isCompactCards,
+                                    fieldModifier = Modifier
+                                        .focusRequester(primaryInputRequester)
+                                        .testTag("input_subscription_name"),
+                                )
+
+                                CompactGlassTextField(
+                                    value = state.username,
+                                    onValueChange = viewModel::setUsername,
+                                    label = "اسم المستخدم",
+                                    placeholder = "username",
+                                    leadingIcon = Icons.Filled.Person,
+                                    enabled = !state.isConnecting,
+                                    imeAction = ImeAction.Next,
+                                    inputHeight = fieldInputHeight,
+                                    isCompactCards = isCompactCards,
+                                    fieldModifier = Modifier.testTag("input_xtream_username"),
+                                )
+
+                                PasswordGlassTextField(
+                                    value = state.password,
+                                    onValueChange = viewModel::setPassword,
+                                    showPassword = state.showPassword,
+                                    onToggleVisibility = viewModel::togglePasswordVisibility,
+                                    enabled = !state.isConnecting,
+                                    imeAction = ImeAction.Done,
+                                    onDone = viewModel::connect,
+                                    inputHeight = fieldInputHeight,
+                                    isCompactCards = isCompactCards,
+                                )
+
+                                LoginStatusAndSubmitBlock(
+                                    state = state,
+                                    isCompactHeight = isCompactHeight,
+                                    isCompactCards = isCompactCards,
+                                    onConnect = viewModel::connect,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -606,6 +1050,7 @@ private fun PasswordGlassTextField(
     imeAction: ImeAction,
     onDone: (() -> Unit)?,
     inputHeight: Dp,
+    isCompactCards: Boolean,
 ) {
     val colors = AppTheme.colors
     CompactGlassTextField(
@@ -620,19 +1065,20 @@ private fun PasswordGlassTextField(
         imeAction = imeAction,
         onDone = onDone,
         inputHeight = inputHeight,
+        isCompactCards = isCompactCards,
         fieldModifier = Modifier.testTag("input_xtream_password"),
         trailingContent = {
             IconButton(
                 onClick = onToggleVisibility,
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(if (isCompactCards) 30.dp else 36.dp)
                     .testTag("toggle_password_visibility"),
             ) {
                 Icon(
                     imageVector = if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
                     contentDescription = "إظهار أو إخفاء كلمة المرور",
                     tint = colors.muted,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(if (isCompactCards) 14.dp else 16.dp),
                 )
             }
         },
@@ -643,6 +1089,7 @@ private fun PasswordGlassTextField(
 private fun LoginStatusAndSubmitBlock(
     state: LoginUiState,
     isCompactHeight: Boolean,
+    isCompactCards: Boolean,
     onConnect: () -> Unit,
 ) {
     val colors = AppTheme.colors
@@ -675,6 +1122,8 @@ private fun LoginStatusAndSubmitBlock(
                         text = state.statusMessage ?: "جارٍ الاتصال...",
                         style = LiquidTypography.LabelMedium,
                         color = colors.text,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 LinearProgressIndicator(
@@ -723,6 +1172,7 @@ private fun LoginStatusAndSubmitBlock(
                 onClick = onConnect,
             )
             .focusable(interactionSource = connectInteraction)
+            .padding(horizontal = 10.dp)
             .testTag("connect_button"),
         contentAlignment = Alignment.Center,
     ) {
@@ -732,8 +1182,11 @@ private fun LoginStatusAndSubmitBlock(
                 state.editingSubscriptionId != null -> "حفظ وإعادة الاتصال"
                 else -> "تسجيل الدخول"
             },
-            style = LiquidTypography.TitleSmall.copy(fontWeight = FontWeight.Bold),
+            style = (if (isCompactCards) LiquidTypography.LabelLarge else LiquidTypography.TitleSmall)
+                .copy(fontWeight = FontWeight.Bold),
             color = colors.onAccent,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -773,196 +1226,10 @@ private fun LoginErrorBanner(message: String) {
 }
 
 @Composable
-private fun PanelServerChooserBlock(
-    state: LoginUiState,
-    onRefresh: () -> Unit,
-    onSelectServer: (SonixAssignedServer) -> Unit,
-) {
-    val colors = AppTheme.colors
-    val sonix = state.sonixState
-    val catalogServers = remember(sonix.availableServers, sonix.assignedServers) {
-        sonix.availableServers.ifEmpty { sonix.assignedServers }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("panel_servers_container"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "السيرفرات المتاحة",
-                style = LiquidTypography.LabelLarge,
-                color = colors.text,
-            )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier
-                    .heightIn(min = 40.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(colors.panel.copy(alpha = 0.78f))
-                    .border(1.dp, colors.border.copy(alpha = 0.5f), RoundedCornerShape(50))
-                    .clickable(enabled = !sonix.isSyncing && !state.isConnecting, onClick = onRefresh)
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                    .testTag("refresh_panel_servers_button"),
-            ) {
-                if (sonix.isSyncing) {
-                    CircularProgressIndicator(
-                        color = colors.accent,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(14.dp),
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Filled.Refresh,
-                        contentDescription = "تحديث السيرفرات",
-                        tint = colors.accentText,
-                        modifier = Modifier.size(15.dp),
-                    )
-                }
-                Text(
-                    text = if (sonix.isSyncing) "جارٍ التحديث..." else "تحديث",
-                    style = LiquidTypography.LabelSmall,
-                    color = colors.text,
-                )
-            }
-        }
-
-        when {
-            sonix.isBlockedOrRevoked -> {
-                LiquidGlassSurface(
-                    cornerRadius = 12.dp,
-                    glassColor = colors.danger,
-                    glassAlpha = 0.22f,
-                    borderColor = colors.danger,
-                ) {
-                    Text(
-                        text = "تم حظر هذا الجهاز من لوحة التحكم. لا يمكن استخدام سيرفرات اللوحة.",
-                        style = LiquidTypography.BodySmall,
-                        color = colors.text,
-                        modifier = Modifier.padding(12.dp),
-                    )
-                }
-            }
-            sonix.isPanelExpired -> {
-                LiquidGlassSurface(
-                    cornerRadius = 12.dp,
-                    glassColor = colors.warning,
-                    glassAlpha = 0.22f,
-                    borderColor = colors.warning,
-                ) {
-                    Text(
-                        text = "انتهت صلاحية اشتراك الجهاز في لوحة التحكم (${sonix.deviceCode ?: ""}). يمكنك استخدام URL عادي أو تجديد اشتراك الجهاز.",
-                        style = LiquidTypography.BodySmall,
-                        color = colors.text,
-                        modifier = Modifier.padding(12.dp),
-                    )
-                }
-            }
-            catalogServers.isEmpty() -> {
-                LiquidGlassSurface(
-                    cornerRadius = 12.dp,
-                    glassColor = colors.panel,
-                    glassAlpha = 0.62f,
-                    borderColor = colors.border,
-                    modifier = Modifier.testTag("panel_servers_empty"),
-                ) {
-                    Text(
-                        text = if (sonix.isSyncing) {
-                            "جارٍ جلب السيرفرات المتاحة من لوحة التحكم..."
-                        } else {
-                            "لا توجد سيرفرات متاحة حالياً في لوحة التحكم (${sonix.deviceCode ?: "—"})."
-                        },
-                        style = LiquidTypography.BodySmall,
-                        color = colors.textSecondary,
-                        modifier = Modifier.padding(12.dp),
-                    )
-                }
-            }
-            else -> {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    catalogServers.forEach { server ->
-                        val selected = !state.isNormalUrlSelected && state.selectedPanelServerId == server.id
-                        val interaction = remember { MutableInteractionSource() }
-                        val focused by interaction.collectIsFocusedAsState()
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 48.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(
-                                    if (selected) colors.selected else colors.panel.copy(alpha = 0.65f),
-                                )
-                                .border(
-                                    width = if (focused || selected) 1.5.dp else 1.dp,
-                                    color = when {
-                                        focused -> colors.focus
-                                        selected -> colors.accent
-                                        else -> colors.border.copy(alpha = 0.45f)
-                                    },
-                                    shape = RoundedCornerShape(12.dp),
-                                )
-                                .clickable(
-                                    interactionSource = interaction,
-                                    indication = null,
-                                    enabled = !state.isConnecting,
-                                    onClick = { onSelectServer(server) },
-                                )
-                                .focusable(interactionSource = interaction)
-                                .padding(horizontal = 12.dp, vertical = 10.dp)
-                                .testTag("panel_server_item_${server.id}"),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                modifier = Modifier.weight(1f),
-                            ) {
-                                Icon(
-                                    imageVector = if (selected) Icons.Filled.CheckCircle else Icons.Filled.Dns,
-                                    contentDescription = null,
-                                    tint = if (selected) colors.accent else colors.accentText,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                                Column {
-                                    Text(
-                                        text = server.name,
-                                        style = LiquidTypography.TitleSmall,
-                                        color = colors.text,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    server.region?.takeIf { it.isNotBlank() }?.let { region ->
-                                        Text(
-                                            text = "المنطقة: $region",
-                                            style = LiquidTypography.LabelSmall,
-                                            color = colors.muted,
-                                        )
-                                    }
-                                }
-                            }
-                            if (selected) {
-                                PlaylistBadgeChip(text = "محدد", color = colors.accentText)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun DeviceIdCompactCard(
     deviceCode: String?,
     deviceUid: String,
+    stackVertically: Boolean,
     onCopy: (String) -> Unit,
 ) {
     val colors = AppTheme.colors
@@ -987,62 +1254,91 @@ private fun DeviceIdCompactCard(
         borderColor = colors.border,
         borderAlpha = 0.55f,
     ) {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                .padding(horizontal = 10.dp, vertical = 8.dp),
         ) {
-            Icon(
-                imageVector = Icons.Filled.Devices,
-                contentDescription = "Device ID",
-                tint = colors.accentText,
-                modifier = Modifier.size(16.dp),
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text("Device ID", style = LiquidTypography.LabelSmall, color = colors.muted)
-                Text(
-                    text = validCode ?: "جارٍ تسجيل الجهاز...",
-                    style = LiquidTypography.LabelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = colors.text,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.testTag("device_id_value"),
-                )
-            }
-
-            val copyInteraction = remember { MutableInteractionSource() }
-            val copyFocused by copyInteraction.collectIsFocusedAsState()
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier
-                    .heightIn(min = 36.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(
-                        when {
-                            copiedFeedback -> colors.success.copy(alpha = 0.24f)
-                            copyFocused -> colors.selected
-                            else -> colors.panel.copy(alpha = 0.85f)
-                        },
+            if (stackVertically) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Devices,
+                                contentDescription = "Device ID",
+                                tint = colors.accentText,
+                                modifier = Modifier.size(15.dp),
+                            )
+                            Text(
+                                text = "Device ID",
+                                style = LiquidTypography.LabelSmall,
+                                color = colors.muted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        DeviceIdCopyButton(
+                            enabled = validCode != null,
+                            copiedFeedback = copiedFeedback,
+                            onClick = {
+                                if (validCode != null) {
+                                    onCopy(validCode)
+                                    copiedFeedback = true
+                                }
+                            },
+                        )
+                    }
+                    Text(
+                        text = validCode ?: "جارٍ تسجيل الجهاز...",
+                        style = LiquidTypography.LabelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = colors.text,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("device_id_value"),
                     )
-                    .border(
-                        width = if (copyFocused) 2.dp else 1.dp,
-                        color = when {
-                            copyFocused -> colors.focus
-                            copiedFeedback -> colors.success
-                            else -> colors.border.copy(alpha = 0.6f)
-                        },
-                        shape = RoundedCornerShape(50),
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Devices,
+                        contentDescription = "Device ID",
+                        tint = colors.accentText,
+                        modifier = Modifier.size(18.dp),
                     )
-                    .clickable(
-                        interactionSource = copyInteraction,
-                        indication = null,
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text("Device ID", style = LiquidTypography.LabelSmall, color = colors.muted)
+                        Text(
+                            text = validCode ?: "جارٍ تسجيل الجهاز...",
+                            style = LiquidTypography.LabelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = colors.text,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.testTag("device_id_value"),
+                        )
+                    }
+                    DeviceIdCopyButton(
                         enabled = validCode != null,
+                        copiedFeedback = copiedFeedback,
                         onClick = {
                             if (validCode != null) {
                                 onCopy(validCode)
@@ -1050,30 +1346,74 @@ private fun DeviceIdCompactCard(
                             }
                         },
                     )
-                    .focusable(interactionSource = copyInteraction)
-                    .padding(horizontal = 7.dp)
-                    .testTag("copy_device_id_button"),
-            ) {
-                Icon(
-                    imageVector = if (copiedFeedback) Icons.Filled.Check else Icons.Filled.ContentCopy,
-                    contentDescription = "نسخ Device ID",
-                    tint = if (copiedFeedback) colors.success else colors.accentText,
-                    modifier = Modifier.size(14.dp),
-                )
-                Text(
-                    text = if (copiedFeedback) "تم النسخ" else "نسخ",
-                    style = LiquidTypography.LabelSmall,
-                    color = if (copiedFeedback) colors.success else colors.text,
-                    maxLines = 1,
-                )
+                }
             }
         }
     }
 }
 
 @Composable
+private fun DeviceIdCopyButton(
+    enabled: Boolean,
+    copiedFeedback: Boolean,
+    onClick: () -> Unit,
+) {
+    val colors = AppTheme.colors
+    val copyInteraction = remember { MutableInteractionSource() }
+    val copyFocused by copyInteraction.collectIsFocusedAsState()
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier
+            .heightIn(min = 38.dp)
+            .clip(RoundedCornerShape(50))
+            .background(
+                when {
+                    copiedFeedback -> colors.success.copy(alpha = 0.24f)
+                    copyFocused -> colors.selected
+                    else -> colors.panel.copy(alpha = 0.85f)
+                },
+            )
+            .border(
+                width = if (copyFocused) 2.dp else 1.dp,
+                color = when {
+                    copyFocused -> colors.focus
+                    copiedFeedback -> colors.success
+                    else -> colors.border.copy(alpha = 0.6f)
+                },
+                shape = RoundedCornerShape(50),
+            )
+            .clickable(
+                interactionSource = copyInteraction,
+                indication = null,
+                enabled = enabled,
+                onClick = onClick,
+            )
+            .focusable(interactionSource = copyInteraction)
+            .padding(horizontal = 8.dp)
+            .testTag("copy_device_id_button"),
+    ) {
+        Icon(
+            imageVector = if (copiedFeedback) Icons.Filled.Check else Icons.Filled.ContentCopy,
+            contentDescription = "نسخ Device ID",
+            tint = if (copiedFeedback) colors.success else colors.accentText,
+            modifier = Modifier.size(14.dp),
+        )
+        Text(
+            text = if (copiedFeedback) "تم النسخ" else "نسخ",
+            style = LiquidTypography.LabelSmall,
+            color = if (copiedFeedback) colors.success else colors.text,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
 private fun PlaylistsSection(
     state: LoginUiState,
+    isCompactHeight: Boolean,
+    isCompactCards: Boolean,
+    stackDeviceIdVertically: Boolean,
     viewModel: LoginViewModel,
     onRequestDelete: (Subscription) -> Unit,
     modifier: Modifier = Modifier,
@@ -1081,176 +1421,140 @@ private fun PlaylistsSection(
     val colors = AppTheme.colors
     val clipboardManager = LocalClipboardManager.current
 
+    // Completely independent card aligned tightly to server_selection_main_card.
     LiquidGlassSurface(
         modifier = modifier
             .fillMaxWidth()
             .fillMaxHeight()
             .testTag("playlists_main_card"),
-        cornerRadius = 16.dp,
+        cornerRadius = 18.dp,
         glassColor = colors.panel,
-        glassAlpha = 0.48f,
+        glassAlpha = 0.50f,
         borderColor = colors.border,
         borderAlpha = 0.45f,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 8.dp, vertical = 10.dp)
+                .padding(
+                    horizontal = if (isCompactCards) 8.dp else 14.dp,
+                    vertical = if (isCompactHeight) 10.dp else 14.dp,
+                )
                 .testTag("login_playlists_section"),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(if (isCompactHeight) 8.dp else 10.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(if (isCompactCards) 6.dp else 8.dp),
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.PlaylistPlay,
                     contentDescription = null,
                     tint = colors.accentText,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(if (isCompactCards) 16.dp else 18.dp),
                 )
                 Text(
                     text = "قوائم التشغيل (${state.savedPlaylists.size})",
-                    style = LiquidTypography.TitleSmall.copy(fontWeight = FontWeight.Bold),
+                    style = (if (isCompactCards) LiquidTypography.LabelLarge else LiquidTypography.TitleSmall)
+                        .copy(fontWeight = FontWeight.Bold),
                     color = colors.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-        state.playlistMessage?.let { msg ->
-            LiquidGlassSurface(
-                modifier = Modifier.testTag("playlist_feedback_banner"),
-                cornerRadius = 12.dp,
-                glassAlpha = 0.22f,
-                borderAlpha = 0.45f,
-                glassColor = colors.success,
-                borderColor = colors.success,
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
+
+            state.playlistMessage?.let { msg ->
+                LiquidGlassSurface(
+                    modifier = Modifier.testTag("playlist_feedback_banner"),
+                    cornerRadius = 12.dp,
+                    glassAlpha = 0.22f,
+                    borderAlpha = 0.45f,
+                    glassColor = colors.success,
+                    borderColor = colors.success,
                 ) {
-                    Text(msg, style = LiquidTypography.BodySmall, color = colors.text, modifier = Modifier.weight(1f))
-                    TextButton(onClick = viewModel::clearError) {
-                        Text("إغلاق", color = colors.accentText)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = msg,
+                            style = LiquidTypography.LabelSmall,
+                            color = colors.text,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = viewModel::clearError) {
+                            Text("إغلاق", style = LiquidTypography.LabelSmall, color = colors.accentText)
+                        }
                     }
                 }
             }
-        }
 
-        if (state.savedPlaylists.isEmpty()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .testTag("playlists_empty_state"),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.PlaylistPlay,
-                    contentDescription = null,
-                    tint = colors.accentText,
-                    modifier = Modifier.size(28.dp),
-                )
-                Text(
-                    "لا توجد قوائم تشغيل محفوظة",
-                    style = LiquidTypography.TitleSmall,
-                    color = colors.text,
-                    maxLines = 2,
-                )
-                Text(
-                    "انتقل إلى اختيار السيرفر لإضافة قائمة عبر URL عادي أو سيرفرات لوحة التحكم.",
-                    style = LiquidTypography.BodySmall,
-                    color = colors.textSecondary,
-                )
-            }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("playlists_list_container"),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                state.savedPlaylists.forEach { sub ->
-                    PlaylistSubscriptionCard(
-                        subscription = sub,
-                        deviceCode = state.sonixState.deviceCode,
-                        isBusy = state.busyPlaylistId == sub.id,
-                        onConnectOrActivate = { viewModel.activatePlaylist(sub.id) },
-                        onSync = { viewModel.syncPlaylist(sub.id) },
-                        onEdit = { viewModel.startEditingPlaylist(sub) },
-                        onDelete = { onRequestDelete(sub) },
+            if (state.savedPlaylists.isEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 4.dp, vertical = 8.dp)
+                        .testTag("playlists_empty_state"),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.PlaylistPlay,
+                        contentDescription = null,
+                        tint = colors.accentText,
+                        modifier = Modifier.size(if (isCompactCards) 24.dp else 28.dp),
+                    )
+                    Text(
+                        text = "لا توجد قوائم تشغيل محفوظة",
+                        style = if (isCompactCards) LiquidTypography.LabelLarge else LiquidTypography.TitleSmall,
+                        color = colors.text,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                    )
+                    Text(
+                        text = "اضغط «اختيار سيرفر» لإضافة قائمة عبر افتراضي URL أو سيرفرات لوحة التحكم.",
+                        style = if (isCompactCards) LiquidTypography.LabelSmall else LiquidTypography.BodySmall,
+                        color = colors.textSecondary,
+                        textAlign = TextAlign.Center,
                     )
                 }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("playlists_list_container"),
+                    verticalArrangement = Arrangement.spacedBy(if (isCompactCards) 8.dp else 10.dp),
+                ) {
+                    state.savedPlaylists.forEach { sub ->
+                        PlaylistSubscriptionCard(
+                            subscription = sub,
+                            deviceCode = state.sonixState.deviceCode,
+                            isBusy = state.busyPlaylistId == sub.id,
+                            onConnectOrActivate = { viewModel.activatePlaylist(sub.id) },
+                            onSync = { viewModel.syncPlaylist(sub.id) },
+                            onEdit = { viewModel.startEditingPlaylist(sub) },
+                            onDelete = { onRequestDelete(sub) },
+                            compactMode = isCompactCards,
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.weight(1f))
             }
-        }
 
-            // Device ID remains inside the playlists card, aligned with the server-selection card.
+            // Device ID remains strictly inside the playlists card (Card 2).
             DeviceIdCompactCard(
                 deviceCode = state.sonixState.deviceCode,
                 deviceUid = state.sonixState.deviceUid,
+                stackVertically = stackDeviceIdVertically,
                 onCopy = { code ->
                     clipboardManager.setText(AnnotatedString(code))
                     viewModel.notifyDeviceIdCopied(code)
                 },
-            )
-        }
-    }
-}
-
-@Composable
-private fun LoginSectionTab(
-    title: String,
-    icon: ImageVector,
-    selected: Boolean,
-    enabled: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = AppTheme.colors
-    val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
-    Box(
-        modifier = modifier
-            .height(48.dp)
-            .clip(RoundedCornerShape(50))
-            .background(if (selected) colors.selected else Color.Transparent)
-            .border(
-                width = if (isFocused) 2.dp else if (selected) 1.dp else 0.dp,
-                color = if (isFocused) colors.focus else if (selected) colors.accent else Color.Transparent,
-                shape = RoundedCornerShape(50),
-            )
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                enabled = enabled,
-                onClick = onClick,
-            )
-            .focusable(interactionSource = interactionSource),
-        contentAlignment = Alignment.Center,
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.padding(horizontal = 8.dp),
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = title,
-                tint = if (!enabled) colors.muted else if (selected) colors.text else colors.textSecondary,
-                modifier = Modifier.size(16.dp),
-            )
-            Text(
-                text = title,
-                style = LiquidTypography.LabelMedium,
-                color = if (!enabled) colors.muted else if (selected) colors.text else colors.textSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -1269,6 +1573,7 @@ private fun CompactGlassTextField(
     imeAction: ImeAction = ImeAction.Next,
     onDone: (() -> Unit)? = null,
     inputHeight: Dp = 38.dp,
+    isCompactCards: Boolean = false,
     trailingContent: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
     fieldModifier: Modifier = Modifier,
@@ -1300,15 +1605,15 @@ private fun CompactGlassTextField(
                     color = if (isFocused) colors.focus else colors.border,
                     shape = RoundedCornerShape(10.dp),
                 )
-                .padding(horizontal = 10.dp),
+                .padding(horizontal = if (isCompactCards) 7.dp else 10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (isCompactCards) 5.dp else 7.dp),
         ) {
             Icon(
                 imageVector = leadingIcon,
                 contentDescription = null,
                 tint = colors.accentText,
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(if (isCompactCards) 14.dp else 16.dp),
             )
 
             Box(

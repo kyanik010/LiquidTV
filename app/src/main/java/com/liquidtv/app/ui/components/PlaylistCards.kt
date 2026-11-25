@@ -150,6 +150,7 @@ fun PlaylistSubscriptionCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
+    compactMode: Boolean = false,
 ) {
     val colors = AppTheme.colors
     val statusColor = when (subscription.connectionStatus) {
@@ -172,8 +173,8 @@ fun PlaylistSubscriptionCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(if (compactMode) 10.dp else 16.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compactMode) 6.dp else 10.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -182,12 +183,12 @@ fun PlaylistSubscriptionCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     FlowRow(
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(if (compactMode) 4.dp else 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(if (compactMode) 5.dp else 8.dp),
                     ) {
                         Text(
                             text = subscription.name,
-                            style = LiquidTypography.TitleMedium,
+                            style = if (compactMode) LiquidTypography.TitleSmall.copy(fontWeight = FontWeight.Bold) else LiquidTypography.TitleMedium,
                             color = colors.text,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -195,11 +196,20 @@ fun PlaylistSubscriptionCard(
                         PlaylistBadgeChip(
                             text = localizedSubscriptionOriginAr(subscription.origin),
                             color = colors.accentText,
+                            compactMode = compactMode,
                         )
                         if (subscription.isActive) {
                             PlaylistBadgeChip(
                                 text = "نشط",
                                 color = colors.success,
+                                compactMode = compactMode,
+                            )
+                        }
+                        if (compactMode) {
+                            PlaylistBadgeChip(
+                                text = localizedSubscriptionStatusAr(subscription.connectionStatus),
+                                color = statusColor,
+                                compactMode = true,
                             )
                         }
                     }
@@ -226,7 +236,7 @@ fun PlaylistSubscriptionCard(
                     }
 
                     FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(if (compactMode) 8.dp else 12.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         subscription.username?.let { user ->
@@ -234,6 +244,8 @@ fun PlaylistSubscriptionCard(
                                 text = "المستخدم: $user",
                                 style = LiquidTypography.LabelSmall,
                                 color = colors.muted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                         deviceCode?.takeIf { it.isNotBlank() }?.let { code ->
@@ -241,16 +253,20 @@ fun PlaylistSubscriptionCard(
                                 text = "Device ID: $code",
                                 style = LiquidTypography.LabelSmall,
                                 color = colors.muted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
                 }
 
-                Spacer(Modifier.width(8.dp))
-                PlaylistBadgeChip(
-                    text = localizedSubscriptionStatusAr(subscription.connectionStatus),
-                    color = statusColor,
-                )
+                if (!compactMode) {
+                    Spacer(Modifier.width(8.dp))
+                    PlaylistBadgeChip(
+                        text = localizedSubscriptionStatusAr(subscription.connectionStatus),
+                        color = statusColor,
+                    )
+                }
             }
 
             if (subscription.accountStatus != null ||
@@ -289,14 +305,15 @@ fun PlaylistSubscriptionCard(
 
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(if (compactMode) 5.dp else 8.dp),
+                verticalArrangement = Arrangement.spacedBy(if (compactMode) 5.dp else 8.dp),
             ) {
                 PlaylistActionPill(
                     text = if (subscription.isActive) "فتح القائمة" else "اتصال وتفعيل",
                     icon = Icons.Filled.CheckCircle,
                     isPrimary = true,
                     enabled = !isBusy,
+                    compactMode = compactMode,
                     onClick = onConnectOrActivate,
                     modifier = Modifier.testTag("playlist_connect_${subscription.id}"),
                 )
@@ -305,6 +322,7 @@ fun PlaylistSubscriptionCard(
                     icon = Icons.Filled.Refresh,
                     isPrimary = false,
                     enabled = !isBusy,
+                    compactMode = compactMode,
                     onClick = onSync,
                     modifier = Modifier.testTag("playlist_sync_${subscription.id}"),
                 )
@@ -313,6 +331,7 @@ fun PlaylistSubscriptionCard(
                     icon = Icons.Filled.Edit,
                     isPrimary = false,
                     enabled = !isBusy,
+                    compactMode = compactMode,
                     onClick = onEdit,
                     modifier = Modifier.testTag("playlist_edit_${subscription.id}"),
                 )
@@ -322,6 +341,7 @@ fun PlaylistSubscriptionCard(
                     isPrimary = false,
                     enabled = !isBusy,
                     tint = colors.danger,
+                    compactMode = compactMode,
                     onClick = onDelete,
                     modifier = Modifier.testTag("playlist_delete_${subscription.id}"),
                 )
@@ -331,18 +351,22 @@ fun PlaylistSubscriptionCard(
 }
 
 @Composable
-fun PlaylistBadgeChip(text: String, color: Color) {
+fun PlaylistBadgeChip(text: String, color: Color, compactMode: Boolean = false) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
             .background(color.copy(alpha = 0.18f))
             .border(1.dp, color.copy(alpha = 0.55f), RoundedCornerShape(50))
-            .padding(horizontal = 10.dp, vertical = 3.dp),
+            .padding(
+                horizontal = if (compactMode) 7.dp else 10.dp,
+                vertical = if (compactMode) 2.dp else 3.dp,
+            ),
     ) {
         Text(
             text = text,
             style = LiquidTypography.LabelSmall.copy(fontWeight = FontWeight.Bold),
             color = color,
+            maxLines = 1,
         )
     }
 }
@@ -354,6 +378,7 @@ fun PlaylistActionPill(
     isPrimary: Boolean,
     enabled: Boolean = true,
     tint: Color? = null,
+    compactMode: Boolean = false,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -364,7 +389,7 @@ fun PlaylistActionPill(
 
     Box(
         modifier = modifier
-            .height(48.dp)
+            .height(if (compactMode) 40.dp else 48.dp)
             .clip(RoundedCornerShape(50))
             .background(
                 when {
@@ -385,23 +410,29 @@ fun PlaylistActionPill(
                 onClick = onClick,
             )
             .focusable(interactionSource = interactionSource)
-            .padding(horizontal = 14.dp),
+            .padding(horizontal = if (compactMode) 10.dp else 14.dp),
         contentAlignment = Alignment.Center,
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (compactMode) 4.dp else 6.dp),
         ) {
             if (isPrimary && !enabled) {
                 CircularProgressIndicator(
                     color = resolvedTint,
                     strokeWidth = 2.dp,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(if (compactMode) 14.dp else 16.dp),
                 )
             } else {
-                Icon(icon, contentDescription = null, tint = resolvedTint, modifier = Modifier.size(18.dp))
+                Icon(icon, contentDescription = null, tint = resolvedTint, modifier = Modifier.size(if (compactMode) 15.dp else 18.dp))
             }
-            Text(text, style = LiquidTypography.LabelLarge, color = resolvedTint)
+            Text(
+                text = text,
+                style = if (compactMode) LiquidTypography.LabelSmall else LiquidTypography.LabelLarge,
+                color = resolvedTint,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }

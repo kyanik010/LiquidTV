@@ -6,8 +6,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
+import androidx.activity.OnBackPressedDispatcher
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -245,7 +254,7 @@ class RedesignUiAndLogicTest {
     }
 
     @Test
-    fun `LoginScreen renders two sections, validates blank input, hides URL for panel servers, and shows Playlists`() {
+    fun `LoginScreen starts collapsed with single اختيار سيرفر option, switches exclusively between افتراضي URL and panel servers, and keeps Playlists independent`() {
         val fakeSubRepo = FakeSubscriptionRepository()
         val fakeSonix = FakeSonixControlRepository(
             SonixSyncState(
@@ -256,11 +265,10 @@ class RedesignUiAndLogicTest {
                 deviceStatus = SonixDeviceStatus.ACTIVE,
                 accessStatus = SonixAccessStatus.ACTIVE,
                 accessAllowed = true,
-                assignedServers = listOf(
-                    SonixAssignedServer(id = "srv-panel-1", name = "XLINE", region = "DE"),
-                ),
+                hasLoadedCatalog = true,
                 availableServers = listOf(
-                    SonixAssignedServer(id = "srv-panel-1", name = "XLINE", region = "DE"),
+                    SonixAssignedServer(id = "srv-panel-1", name = "ALPHA STREAM", region = "DE", priority = 1),
+                    SonixAssignedServer(id = "srv-panel-2", name = "BETA CLOUD", region = "NL", priority = 2),
                 ),
             )
         )
@@ -276,33 +284,48 @@ class RedesignUiAndLogicTest {
                 }
             }
         }
+        composeRule.waitForIdle()
 
-        // Both login cards are visible side by side; URL fields remain collapsed initially.
+        // 1. Initial launch: two equal side-by-side cards; ONLY collapsed «اختيار سيرفر» visible inside Card 1.
         composeRule.onNodeWithTag("login_two_cards_row").assertIsDisplayed()
         composeRule.onNodeWithTag("server_selection_main_card").assertIsDisplayed()
         composeRule.onNodeWithTag("playlists_main_card").assertIsDisplayed()
-        composeRule.onNodeWithTag("tab_normal_url").assertIsDisplayed()
+        composeRule.onNodeWithTag("server_selector_toggle").assertIsDisplayed()
+        composeRule.onNodeWithText("اختيار سيرفر").assertIsDisplayed()
+        composeRule.onNodeWithTag("server_selector_list").assertDoesNotExist()
+        composeRule.onNodeWithTag("tab_normal_url").assertDoesNotExist()
+        composeRule.onNodeWithTag("panel_servers_container").assertDoesNotExist()
         composeRule.onNodeWithTag("input_xtream_url").assertDoesNotExist()
+        assertEquals(0, composeRule.onAllNodesWithText("M3U").fetchSemanticsNodes().size)
+
         val serverCardBounds = composeRule.onNodeWithTag("server_selection_main_card").fetchSemanticsNode().boundsInRoot
         val playlistsCardBounds = composeRule.onNodeWithTag("playlists_main_card").fetchSemanticsNode().boundsInRoot
         assertTrue(
-            "Expected server and playlists cards side by side",
-            serverCardBounds.right <= playlistsCardBounds.left + 4f ||
-                playlistsCardBounds.right <= serverCardBounds.left + 4f,
+            "Expected server and playlists cards strictly side by side",
+            serverCardBounds.right <= playlistsCardBounds.left + 2f ||
+                playlistsCardBounds.right <= serverCardBounds.left + 2f,
         )
-        assertEquals(0, composeRule.onAllNodesWithText("M3U").fetchSemanticsNodes().size)
+        assertTrue("Expected equal card widths", kotlin.math.abs(serverCardBounds.width - playlistsCardBounds.width) <= 2f)
+        assertTrue("Expected equal card heights", kotlin.math.abs(serverCardBounds.height - playlistsCardBounds.height) <= 2f)
+        assertTrue("Expected aligned top edges", kotlin.math.abs(serverCardBounds.top - playlistsCardBounds.top) <= 2f)
+        assertTrue("Expected aligned bottom edges", kotlin.math.abs(serverCardBounds.bottom - playlistsCardBounds.bottom) <= 2f)
 
-        // Option 2 (panel servers) sits below Option 1 (URL عادي)
-        val normalCardBounds = composeRule.onNodeWithTag("normal_url_option_card").fetchSemanticsNode().boundsInRoot
-        val panelCardBounds = composeRule.onNodeWithTag("panel_servers_option_card").fetchSemanticsNode().boundsInRoot
-        assertTrue(
-            "Expected SONIX-CONTROL servers below URL عادي (normalBottom=${normalCardBounds.bottom}, panelTop=${panelCardBounds.top})",
-            panelCardBounds.top >= normalCardBounds.bottom - 4f,
-        )
+        // 2. Expand «اختيار سيرفر» -> «افتراضي URL» and dynamic SONIX-CONTROL servers appear, all forms collapsed initially.
+        composeRule.onNodeWithTag("server_selector_toggle").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("server_selector_list").assertIsDisplayed()
+        composeRule.onNodeWithTag("tab_normal_url").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("افتراضي URL").assertIsDisplayed()
+        composeRule.onNodeWithTag("panel_server_item_srv-panel-1").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("panel_server_item_srv-panel-2").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("default_url_form").assertDoesNotExist()
+        composeRule.onNodeWithTag("panel_server_form_srv-panel-1").assertDoesNotExist()
+        composeRule.onNodeWithTag("panel_server_form_srv-panel-2").assertDoesNotExist()
 
-        // 2. Click URL عادي -> opens 4 fields in strict order 1->2->3->4
+        // 3. Click «افتراضي URL» -> opens 4 fields in order (Name < Username < Password < Host URL) and validates blank input.
         composeRule.onNodeWithTag("tab_normal_url").performScrollTo().performClick()
         composeRule.waitForIdle()
+        composeRule.onNodeWithTag("default_url_form").assertIsDisplayed()
         composeRule.onNodeWithTag("input_subscription_name").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_username").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_password").performScrollTo().assertIsDisplayed()
@@ -312,51 +335,122 @@ class RedesignUiAndLogicTest {
         val userTop = composeRule.onNodeWithTag("input_xtream_username").fetchSemanticsNode().boundsInRoot.top
         val passTop = composeRule.onNodeWithTag("input_xtream_password").fetchSemanticsNode().boundsInRoot.top
         val urlTop = composeRule.onNodeWithTag("input_xtream_url").fetchSemanticsNode().boundsInRoot.top
-        assertTrue("Expected field order: Name < Username < Password < Host URL ($nameTop, $userTop, $passTop, $urlTop)", nameTop < userTop && userTop < passTop && passTop < urlTop)
+        assertTrue("Expected field order: Name < Username < Password < Host URL", nameTop < userTop && userTop < passTop && passTop < urlTop)
 
-        // 3. Click URL عادي again -> closes cleanly
-        composeRule.onNodeWithTag("tab_normal_url").performScrollTo().performClick()
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag("input_subscription_name").assertDoesNotExist()
-        composeRule.onNodeWithTag("input_xtream_url").assertDoesNotExist()
-
-        // 4. Re-open URL عادي and validate blank error
-        composeRule.onNodeWithTag("tab_normal_url").performScrollTo().performClick()
-        composeRule.waitForIdle()
         composeRule.onNodeWithTag("connect_button").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("login_error_banner").performScrollTo().assertIsDisplayed()
 
-        // 5. Select active SONIX-CONTROL server (XLINE) -> 3 fields ONLY, NO Host URL
-        composeRule.onNodeWithTag("panel_server_item_srv-panel-1").performScrollTo().assertIsDisplayed().performClick()
+        // 4. Click Server 1 -> collapses «افتراضي URL» and opens ONLY Server 1 form (3 fields, NO Host URL).
+        composeRule.onNodeWithTag("panel_server_item_srv-panel-1").performScrollTo().performClick()
         composeRule.waitForIdle()
+        composeRule.onNodeWithTag("default_url_form").assertDoesNotExist()
+        composeRule.onNodeWithTag("input_xtream_url").assertDoesNotExist()
+        composeRule.onNodeWithTag("panel_server_form_srv-panel-1").assertIsDisplayed()
         composeRule.onNodeWithTag("input_subscription_name").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_username").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_password").performScrollTo().assertIsDisplayed()
+
+        // 5. Click Server 2 -> auto-collapses Server 1 and opens ONLY Server 2 form.
+        composeRule.onNodeWithTag("panel_server_item_srv-panel-2").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("panel_server_form_srv-panel-1").assertDoesNotExist()
+        composeRule.onNodeWithTag("panel_server_form_srv-panel-2").assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_url").assertDoesNotExist()
 
-        val pNameTop = composeRule.onNodeWithTag("input_subscription_name").fetchSemanticsNode().boundsInRoot.top
-        val pUserTop = composeRule.onNodeWithTag("input_xtream_username").fetchSemanticsNode().boundsInRoot.top
-        val pPassTop = composeRule.onNodeWithTag("input_xtream_password").fetchSemanticsNode().boundsInRoot.top
-        assertTrue("Expected 3 panel fields in order: Name < Username < Password", pNameTop < pUserTop && pUserTop < pPassTop)
-
-        // 6. Playlists card is permanently visible beside server selection; Device ID remains below its empty state.
+        // 6. Card 2 remains completely independent with Device ID & Copy button intact.
         composeRule.onNodeWithTag("login_playlists_section").assertIsDisplayed()
-        val emptyBounds = composeRule.onNodeWithTag("playlists_empty_state").fetchSemanticsNode().boundsInRoot
-        val deviceCardBounds = composeRule.onNodeWithTag("device_id_compact_card").performScrollTo().fetchSemanticsNode().boundsInRoot
-        assertTrue("Expected Device ID card below empty playlists state", deviceCardBounds.top >= emptyBounds.bottom - 4f)
-        composeRule.onNodeWithTag("device_id_compact_card").assertIsDisplayed()
+        composeRule.onNodeWithTag("playlists_empty_state").assertIsDisplayed()
+        composeRule.onNodeWithTag("device_id_compact_card").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("device_id_value").assertIsDisplayed()
         composeRule.onNodeWithText("SNX778899").assertIsDisplayed()
 
         composeRule.onNodeWithTag("copy_device_id_button").performScrollTo().performClick()
         composeRule.waitForIdle()
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val clipText = clipboard.primaryClip?.getItemAt(0)?.text?.toString()
-        assertEquals("SNX778899", clipText)
+        assertEquals("SNX778899", clipboard.primaryClip?.getItemAt(0)?.text?.toString())
         composeRule.onNodeWithTag("playlist_feedback_banner").performScrollTo().assertIsDisplayed()
     }
 
+    @Test
+    fun `LoginScreen reflects dynamic SONIX-CONTROL add, rename, delete, loading, empty, and error without disabling افتراضي URL`() {
+        val fakeSubRepo = FakeSubscriptionRepository()
+        val fakeSonix = FakeSonixControlRepository(
+            SonixSyncState(
+                isRegistered = true,
+                deviceId = "dev-dyn",
+                deviceUid = "uid-dyn",
+                deviceCode = "SNXDYN01",
+                deviceStatus = SonixDeviceStatus.ACTIVE,
+                accessStatus = SonixAccessStatus.ACTIVE,
+                accessAllowed = true,
+                isCatalogLoading = true,
+                hasLoadedCatalog = false,
+                availableServers = emptyList(),
+            )
+        )
+        val vm = LoginViewModel(fakeSubRepo, fakeSonix)
+
+        composeRule.setContent {
+            LiquidTVTheme {
+                Box(Modifier.width(420.dp).height(820.dp)) {
+                    LoginScreen(onLoginSuccess = {}, viewModel = vm)
+                }
+            }
+        }
+        composeRule.onNodeWithTag("server_selector_toggle").performClick()
+        composeRule.waitForIdle()
+
+        // Loading state: loading indicator shown, افتراضي URL stays enabled
+        composeRule.onNodeWithTag("panel_servers_loading").assertIsDisplayed()
+        composeRule.onNodeWithTag("tab_normal_url").assertIsDisplayed()
+
+        // Panel connection failure: error shown, افتراضي URL MUST still work seamlessly
+        fakeSonix.mutableState.value = fakeSonix.mutableState.value.copy(
+            isCatalogLoading = false,
+            catalogError = "تعذّر الاتصال بلوحة التحكم",
+        )
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("panel_servers_error").assertIsDisplayed()
+        composeRule.onNodeWithTag("tab_normal_url").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("default_url_form").assertIsDisplayed()
+
+        // Panel empty state: empty notice shown cleanly
+        fakeSonix.mutableState.value = fakeSonix.mutableState.value.copy(
+            catalogError = null,
+            hasLoadedCatalog = true,
+            availableServers = emptyList(),
+        )
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("panel_servers_empty").performScrollTo().assertIsDisplayed()
+
+        // Panel adds two dynamic servers -> appear live without rebuilding app
+        fakeSonix.mutableState.value = fakeSonix.mutableState.value.copy(
+            hasLoadedCatalog = true,
+            availableServers = listOf(
+                SonixAssignedServer(id = "dyn-1", name = "سيرفر أول", priority = 1),
+                SonixAssignedServer(id = "dyn-2", name = "سيرفر ثاني", priority = 2),
+            ),
+        )
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("panel_server_item_dyn-2").performScrollTo().assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("panel_server_form_dyn-2").assertIsDisplayed()
+
+        // Panel renames dyn-1 and deletes dyn-2 -> UI updates dynamically and clears deleted selection
+        fakeSonix.mutableState.value = fakeSonix.mutableState.value.copy(
+            hasLoadedCatalog = true,
+            availableServers = listOf(
+                SonixAssignedServer(id = "dyn-1", name = "سيرفر معدّل", priority = 1),
+            ),
+        )
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("سيرفر معدّل").assertIsDisplayed()
+        composeRule.onNodeWithTag("panel_server_item_dyn-2").assertDoesNotExist()
+        composeRule.onNodeWithTag("panel_server_form_dyn-2").assertDoesNotExist()
+        assertNull(vm.uiState.value.selectedPanelServerId)
+    }
     @Test
     fun `Playlists tab displays saved playlists above Device ID card with connect, sync, edit, delete actions and copy works`() {
         val saved = listOf(
@@ -726,62 +820,165 @@ class RedesignUiAndLogicTest {
         assertTrue("Expected portrait phone Series grid >= 75% of 800dp screen height, was $gridHeightDp", gridHeightDp >= phoneHeightDp * 0.75f)
     }
 
-    @Test
-    fun `LoginScreen card is compact horizontally and vertically on landscape phone without clipping CTA`() {
-        val fakeSubRepo = FakeSubscriptionRepository()
-        val vm = LoginViewModel(fakeSubRepo, FakeSonixControlRepository())
+    private fun assertEqualSideBySideCardsViewport(widthDp: Int, heightDp: Int) {
+        val saved = listOf(
+            Subscription(
+                id = "sub-vp-1",
+                name = "اشتراك اختباري طويل جداً",
+                type = SubscriptionType.XTREAM,
+                origin = SubscriptionOrigin.PANEL_SERVER,
+                panelServerId = "srv-vp-1",
+                panelServerName = "SONIX PRO",
+                serverUrl = "http://panel.example.com:8080",
+                username = "user_demo",
+                isActive = true,
+                connectionStatus = SubscriptionStatus.CONNECTED,
+            ),
+        )
+        val fakeSubRepo = FakeSubscriptionRepository(initialSubscriptions = saved)
+        val fakeSonix = FakeSonixControlRepository(
+            SonixSyncState(
+                isRegistered = true,
+                deviceId = "dev-vp",
+                deviceUid = "uid-vp",
+                deviceCode = "SNX-VP-9900",
+                deviceStatus = SonixDeviceStatus.ACTIVE,
+                accessStatus = SonixAccessStatus.ACTIVE,
+                accessAllowed = true,
+                hasLoadedCatalog = true,
+                availableServers = listOf(
+                    SonixAssignedServer(id = "srv-vp-1", name = "SONIX PRO", region = "EU"),
+                ),
+            ),
+        )
+        val vm = LoginViewModel(fakeSubRepo, fakeSonix)
 
         composeRule.setContent {
             LiquidTVTheme {
-                Box(Modifier.width(850.dp).height(400.dp)) {
+                Box(Modifier.width(widthDp.dp).height(heightDp.dp)) {
                     LoginScreen(onLoginSuccess = {}, viewModel = vm)
                 }
             }
         }
+        composeRule.waitForIdle()
 
         val density = composeRule.density.density
-        val cardBounds = composeRule.onNodeWithTag("login_card").fetchSemanticsNode().boundsInRoot
-        val cardWidthDp = cardBounds.width / density
-        val cardLeftDp = cardBounds.left / density
-        val cardRightDp = cardBounds.right / density
+        val maxW = widthDp * density
 
-        assertTrue("Expected compact Login card width <= 470dp on 850dp screen, was $cardWidthDp", cardWidthDp <= 470f)
-        assertTrue("Expected Login card centered with generous side margins (left=$cardLeftDp, right=$cardRightDp)", cardLeftDp >= 180f && cardRightDp <= 670f)
+        fun assertEqualAlignedCards(phase: String) {
+            val sBounds = composeRule.onNodeWithTag("server_selection_main_card").fetchSemanticsNode().boundsInRoot
+            val pBounds = composeRule.onNodeWithTag("playlists_main_card").fetchSemanticsNode().boundsInRoot
+            assertTrue(
+                "[$widthDp x $heightDp $phase] Cards must be side by side (s=$sBounds, p=$pBounds)",
+                sBounds.right <= pBounds.left + 2f || pBounds.right <= sBounds.left + 2f,
+            )
+            assertTrue(
+                "[$widthDp x $heightDp $phase] Card widths must match (${sBounds.width} vs ${pBounds.width})",
+                kotlin.math.abs(sBounds.width - pBounds.width) <= 2f,
+            )
+            assertTrue(
+                "[$widthDp x $heightDp $phase] Card heights must match (${sBounds.height} vs ${pBounds.height})",
+                kotlin.math.abs(sBounds.height - pBounds.height) <= 2f,
+            )
+            assertTrue(
+                "[$widthDp x $heightDp $phase] Card tops must align (${sBounds.top} vs ${pBounds.top})",
+                kotlin.math.abs(sBounds.top - pBounds.top) <= 2f,
+            )
+            assertTrue(
+                "[$widthDp x $heightDp $phase] Card bottoms must align (${sBounds.bottom} vs ${pBounds.bottom})",
+                kotlin.math.abs(sBounds.bottom - pBounds.bottom) <= 2f,
+            )
+            assertTrue("[$widthDp x $heightDp $phase] Horizontal overflow", sBounds.left >= -1f && pBounds.right <= maxW + 1f && pBounds.left >= -1f && sBounds.right <= maxW + 1f)
+            return
+        }
 
-        // The normal URL form is collapsed by default; expand it before asserting its fields.
-        composeRule.onNodeWithTag("tab_normal_url").performClick()
-        composeRule.onNodeWithTag("input_subscription_name").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag("input_xtream_url").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag("input_xtream_username").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag("input_xtream_password").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag("toggle_password_visibility").performScrollTo().assertIsDisplayed()
+        // Collapsed check + intra-card horizontal bounds check
+        assertEqualAlignedCards("collapsed")
+        val sCollapsed = composeRule.onNodeWithTag("server_selection_main_card").fetchSemanticsNode().boundsInRoot
+        val pCollapsed = composeRule.onNodeWithTag("playlists_main_card").fetchSemanticsNode().boundsInRoot
+        val toggleBounds = composeRule.onNodeWithTag("server_selector_toggle").fetchSemanticsNode().boundsInRoot
+        assertTrue("Toggle clipped horizontally", toggleBounds.left >= sCollapsed.left - 1f && toggleBounds.right <= sCollapsed.right + 1f && toggleBounds.height > 0f)
+        val deviceBounds = composeRule.onNodeWithTag("device_id_value").fetchSemanticsNode().boundsInRoot
+        val copyBounds = composeRule.onNodeWithTag("copy_device_id_button").fetchSemanticsNode().boundsInRoot
+        assertTrue("Device ID clipped horizontally", deviceBounds.left >= pCollapsed.left - 1f && deviceBounds.right <= pCollapsed.right + 1f && deviceBounds.width > 0f)
+        assertTrue("Copy button clipped horizontally", copyBounds.left >= pCollapsed.left - 1f && copyBounds.right <= pCollapsed.right + 1f && copyBounds.width > 0f)
+
+        // Expanded check with «افتراضي URL» open
+        composeRule.onNodeWithTag("server_selector_toggle").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("tab_normal_url").performScrollTo().performClick()
+        composeRule.waitForIdle()
         composeRule.onNodeWithTag("connect_button").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("toggle_password_visibility").performScrollTo().assertIsDisplayed()
+        assertEqualAlignedCards("expanded")
+        val sExpanded = composeRule.onNodeWithTag("server_selection_main_card").fetchSemanticsNode().boundsInRoot
+        val ctaBounds = composeRule.onNodeWithTag("connect_button").fetchSemanticsNode().boundsInRoot
+        assertTrue("CTA clipped horizontally", ctaBounds.left >= sExpanded.left - 1f && ctaBounds.right <= sExpanded.right + 1f && ctaBounds.width > 0f)
     }
 
     @Test
-    fun `LoginScreen card remains compact and centered on Android TV 1080p viewport`() {
+    fun `LoginScreen keeps two independent equal side-by-side cards without clipping on small portrait phone 360x640`() {
+        assertEqualSideBySideCardsViewport(360, 640)
+    }
+
+    @Test
+    fun `LoginScreen keeps two independent equal side-by-side cards without clipping on small landscape phone 640x360`() {
+        assertEqualSideBySideCardsViewport(640, 360)
+    }
+
+    @Test
+    fun `LoginScreen keeps two independent equal side-by-side cards without clipping on Android TV 1080p`() {
+        assertEqualSideBySideCardsViewport(1920, 1080)
+    }
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `LoginScreen supports Android TV D-pad focus and Back key collapse`() {
         val fakeSubRepo = FakeSubscriptionRepository()
-        val vm = LoginViewModel(fakeSubRepo, FakeSonixControlRepository())
+        val fakeSonix = FakeSonixControlRepository(
+            SonixSyncState(
+                isRegistered = true,
+                deviceId = "dev-tv",
+                deviceUid = "uid-tv",
+                deviceCode = "SNX-TV-555",
+                deviceStatus = SonixDeviceStatus.ACTIVE,
+                accessStatus = SonixAccessStatus.ACTIVE,
+                accessAllowed = true,
+                hasLoadedCatalog = true,
+                availableServers = listOf(SonixAssignedServer(id = "srv-tv-1", name = "TV NODE", region = "GLOBAL")),
+            ),
+        )
+        val vm = LoginViewModel(fakeSubRepo, fakeSonix)
+        var backDispatcher: OnBackPressedDispatcher? = null
 
         composeRule.setContent {
             LiquidTVTheme {
+                backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
                 Box(Modifier.width(1280.dp).height(720.dp)) {
                     LoginScreen(onLoginSuccess = {}, viewModel = vm)
                 }
             }
         }
-
-        val density = composeRule.density.density
-        val cardBounds = composeRule.onNodeWithTag("login_card").fetchSemanticsNode().boundsInRoot
-        val cardWidthDp = cardBounds.width / density
-        val cardHeightDp = cardBounds.height / density
-
-        assertTrue("Expected Login card width <= 500dp on TV, was $cardWidthDp", cardWidthDp <= 500f)
-        assertTrue("Expected Login card height <= 620dp on TV, was $cardHeightDp", cardHeightDp <= 620f)
-        composeRule.onNodeWithTag("tab_normal_url").performScrollTo().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("toggle_password_visibility").performScrollTo().performClick()
-        composeRule.onNodeWithTag("connect_button").performScrollTo().assertIsDisplayed()
+
+        // Focus «اختيار سيرفر» with D-pad and activate via Enter
+        composeRule.onNodeWithTag("server_selector_toggle").performSemanticsAction(SemanticsActions.RequestFocus)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("server_selector_toggle").assertIsFocused()
+        composeRule.onNodeWithTag("server_selector_toggle").performKeyInput { pressKey(Key.Enter) }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("server_selector_list").assertIsDisplayed()
+        composeRule.onNodeWithTag("tab_normal_url").performSemanticsAction(SemanticsActions.RequestFocus)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("tab_normal_url").assertIsFocused()
+        composeRule.onNodeWithTag("panel_server_item_srv-tv-1").performSemanticsAction(SemanticsActions.RequestFocus)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("panel_server_item_srv-tv-1").assertIsFocused()
+
+        // Back key collapses expanded server selector cleanly
+        composeRule.runOnUiThread { backDispatcher?.onBackPressed() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("server_selector_list").assertDoesNotExist()
     }
 
     @Test

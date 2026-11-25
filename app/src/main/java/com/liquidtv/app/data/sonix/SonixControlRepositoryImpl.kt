@@ -143,7 +143,7 @@ class SonixControlRepositoryImpl @Inject constructor(
 
     override suspend fun refreshAvailableServers(forceSync: Boolean): Result<List<SonixAssignedServer>> {
         val uid = identityStore.getOrCreateDeviceUid()
-        _state.update { it.copy(deviceUid = uid) }
+        _state.update { it.copy(deviceUid = uid, isCatalogLoading = true, catalogError = null) }
 
         // The catalog contains only active server names/IDs (never server URLs).
         // Load it independently from device authentication so a fresh installation
@@ -154,12 +154,31 @@ class SonixControlRepositoryImpl @Inject constructor(
                 val servers = catalogResult.data["servers"]?.let { element ->
                     runCatching { json.decodeFromJsonElement<List<SonixAssignedServer>>(element) }.getOrNull()
                 } ?: emptyList()
-                _state.update { it.copy(availableServers = servers) }
+                _state.update {
+                    it.copy(
+                        availableServers = servers,
+                        isCatalogLoading = false,
+                        hasLoadedCatalog = true,
+                        catalogError = null,
+                    )
+                }
                 identityStore.saveCachedSnapshot(_state.value.toSnapshot())
             }
-            is SonixApiResult.Forbidden -> return Result.failure(IllegalStateException(localizeApiError(catalogResult.errorCode)))
-            is SonixApiResult.Unauthorized -> return Result.failure(IllegalStateException(localizeApiError(catalogResult.errorCode)))
-            is SonixApiResult.Failure -> return Result.failure(IllegalStateException(localizeApiError(catalogResult.message)))
+            is SonixApiResult.Forbidden -> {
+                val msg = localizeApiError(catalogResult.errorCode)
+                _state.update { it.copy(isCatalogLoading = false, catalogError = msg) }
+                return Result.failure(IllegalStateException(msg))
+            }
+            is SonixApiResult.Unauthorized -> {
+                val msg = localizeApiError(catalogResult.errorCode)
+                _state.update { it.copy(isCatalogLoading = false, catalogError = msg) }
+                return Result.failure(IllegalStateException(msg))
+            }
+            is SonixApiResult.Failure -> {
+                val msg = localizeApiError(catalogResult.message)
+                _state.update { it.copy(isCatalogLoading = false, catalogError = msg) }
+                return Result.failure(IllegalStateException(msg))
+            }
         }
 
         // Registration/entitlement sync still runs, but it must not hide a catalog
@@ -296,6 +315,9 @@ class SonixControlRepositoryImpl @Inject constructor(
         val now = System.currentTimeMillis()
         val next = SonixSyncState(
             isSyncing = false,
+            isCatalogLoading = _state.value.isCatalogLoading,
+            hasLoadedCatalog = _state.value.hasLoadedCatalog,
+            catalogError = _state.value.catalogError,
             isRegistered = !deviceCode.isNullOrBlank() || !deviceId.isNullOrBlank(),
             deviceId = deviceId,
             deviceUid = uid,

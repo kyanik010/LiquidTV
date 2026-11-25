@@ -22,6 +22,8 @@ class FakeSonixControlRepository(
     override val state: StateFlow<SonixSyncState> = mutableState.asStateFlow()
 
     var foregroundSyncCalls = 0
+    var refreshCatalogCalls = 0
+    var refreshCatalogHandler: (suspend (Boolean) -> Result<List<SonixAssignedServer>>)? = null
     var resolveHandler: suspend (String) -> Result<SonixResolvedServer> = { id ->
         Result.failure(IllegalStateException("server_not_assigned: $id"))
     }
@@ -40,7 +42,13 @@ class FakeSonixControlRepository(
         Result.success(mutableState.value.assignedServers)
 
     override suspend fun refreshAvailableServers(): Result<List<SonixAssignedServer>> =
-        Result.success(mutableState.value.availableServers)
+        refreshAvailableServers(forceSync = false)
+
+    override suspend fun refreshAvailableServers(forceSync: Boolean): Result<List<SonixAssignedServer>> {
+        refreshCatalogCalls++
+        refreshCatalogHandler?.let { return it(forceSync) }
+        return Result.success(mutableState.value.availableServers)
+    }
 
     override suspend fun resolveAssignedServer(serverId: String): Result<SonixResolvedServer> =
         resolveHandler(serverId)

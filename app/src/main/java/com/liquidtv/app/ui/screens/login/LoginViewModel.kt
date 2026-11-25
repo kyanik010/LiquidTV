@@ -24,6 +24,7 @@ enum class LoginSection {
 
 data class LoginUiState(
     val activeSection: LoginSection = LoginSection.SERVER_SELECTION,
+    val isServerSelectorExpanded: Boolean = false,
     val editingSubscriptionId: String? = null,
     val editingOrigin: SubscriptionOrigin? = null,
     val serverMode: SubscriptionOrigin = SubscriptionOrigin.NORMAL_URL,
@@ -69,11 +70,19 @@ class LoginViewModel @Inject constructor(
                 Triple(playlists, sonix, sync)
             }.collect { (playlists, sonix, sync) ->
                 _uiState.update { current ->
-                    // Auto-respect admin policy when not editing an existing item
+                    val effectiveServers = if (sonix.hasLoadedCatalog) {
+                        sonix.availableServers
+                    } else {
+                        sonix.availableServers.ifEmpty { sonix.assignedServers }
+                    }
+                    val panelUnavailable = !sonix.catalogError.isNullOrBlank() || effectiveServers.isEmpty()
+
+                    // Auto-respect admin policy when panel is healthy, never blocking Normal URL if panel fails/empty.
                     val resolvedMode = when {
                         current.editingOrigin == SubscriptionOrigin.PANEL_SERVER -> SubscriptionOrigin.PANEL_SERVER
                         current.serverMode == SubscriptionOrigin.NORMAL_URL &&
                             !sonix.settings.allowNormalUrlLogin &&
+                            !panelUnavailable &&
                             sonix.settings.allowPanelServers -> SubscriptionOrigin.PANEL_SERVER
                         current.serverMode == SubscriptionOrigin.PANEL_SERVER &&
                             !sonix.settings.allowPanelServers &&
@@ -81,17 +90,20 @@ class LoginViewModel @Inject constructor(
                         else -> current.serverMode
                     }
 
-                    val effectiveServers = sonix.availableServers.ifEmpty { sonix.assignedServers }
                     val availableMatch = current.selectedPanelServerId?.let { selId ->
                         effectiveServers.firstOrNull { it.id == selId }
                     }
+                    val serverRemovedFromCatalog = sonix.hasLoadedCatalog &&
+                        current.selectedPanelServerId != null &&
+                        availableMatch == null &&
+                        current.editingOrigin != SubscriptionOrigin.PANEL_SERVER
 
                     current.copy(
                         savedPlaylists = playlists,
                         sonixState = sonix,
                         serverMode = resolvedMode,
-                        selectedPanelServerId = availableMatch?.id ?: current.selectedPanelServerId,
-                        selectedPanelServerName = availableMatch?.name ?: current.selectedPanelServerName,
+                        selectedPanelServerId = if (serverRemovedFromCatalog) null else (availableMatch?.id ?: current.selectedPanelServerId),
+                        selectedPanelServerName = if (serverRemovedFromCatalog) null else (availableMatch?.name ?: current.selectedPanelServerName),
                         progress = if (current.isConnecting) sync.loadingProgress else current.progress,
                         statusMessage = if (current.isConnecting) (sync.statusMessage ?: current.statusMessage) else current.statusMessage,
                     )
@@ -105,6 +117,33 @@ class LoginViewModel @Inject constructor(
         _uiState.update { it.copy(activeSection = section, errorMessage = null, playlistMessage = null) }
     }
 
+    fun toggleServerSelector() {
+        val current = _uiState.value
+        if (current.isConnecting) return
+        val nextExpanded = !current.isServerSelectorExpanded
+        _uiState.update { state ->
+            state.copy(
+                isServerSelectorExpanded = nextExpanded,
+                errorMessage = null,
+            )
+        }
+        if (nextExpanded && !_uiState.value.sonixState.isCatalogLoading) {
+            viewModelScope.launch {
+                sonixControlRepository.refreshAvailableServers(forceSync = false)
+            }
+        }
+    }
+
+    fun collapseServerSelector() {
+        if (_uiState.value.isConnecting) return
+        _uiState.update { state ->
+            state.copy(
+                isServerSelectorExpanded = false,
+                errorMessage = null,
+            )
+        }
+    }
+
     fun toggleNormalUrlSection() {
         val current = _uiState.value
         if (current.isConnecting) return
@@ -115,6 +154,7 @@ class LoginViewModel @Inject constructor(
         _uiState.update { state ->
             val nextOpen = !state.isNormalUrlSelected
             state.copy(
+                isServerSelectorExpanded = true,
                 serverMode = if (nextOpen) SubscriptionOrigin.NORMAL_URL else state.serverMode,
                 isNormalUrlSelected = nextOpen,
                 selectedPanelServerId = if (nextOpen) null else state.selectedPanelServerId,
@@ -133,6 +173,7 @@ class LoginViewModel @Inject constructor(
         }
         _uiState.update { state ->
             state.copy(
+                isServerSelectorExpanded = true,
                 serverMode = mode,
                 isNormalUrlSelected = mode == SubscriptionOrigin.NORMAL_URL,
                 selectedPanelServerId = if (mode == SubscriptionOrigin.NORMAL_URL) null else state.selectedPanelServerId,
@@ -143,9 +184,23 @@ class LoginViewModel @Inject constructor(
     }
 
     fun selectPanelServer(serverId: String, serverName: String) {
-        if (_uiState.value.isConnecting) return
+        val current = _uiState.value
+        if (current.isConnecting) return
+        val isSameServerSelected = !current.isNormalUrlSelected && current.selectedPanelServerId == serverId
+        if (isSameServerSelected && current.editingOrigin != SubscriptionOrigin.PANEL_SERVER) {
+            _uiState.update {
+                it.copy(
+                    isServerSelectorExpanded = true,
+                    selectedPanelServerId = null,
+                    selectedPanelServerName = null,
+                    errorMessage = null,
+                )
+            }
+            return
+        }
         _uiState.update {
             it.copy(
+                isServerSelectorExpanded = true,
                 serverMode = SubscriptionOrigin.PANEL_SERVER,
                 isNormalUrlSelected = false,
                 selectedPanelServerId = serverId,
@@ -156,7 +211,8 @@ class LoginViewModel @Inject constructor(
     }
 
     fun refreshPanelServers() {
-        if (_uiState.value.sonixState.isSyncing) return
+        val sonix = _uiState.value.sonixState
+        if (sonix.isSyncing || sonix.isCatalogLoading) return
         viewModelScope.launch {
             _uiState.update { it.copy(errorMessage = null) }
             val result = sonixControlRepository.refreshAvailableServers(forceSync = true)
@@ -195,6 +251,7 @@ class LoginViewModel @Inject constructor(
     fun clearEditMode() {
         _uiState.update {
             it.copy(
+                isServerSelectorExpanded = false,
                 editingSubscriptionId = null,
                 editingOrigin = null,
                 isNormalUrlSelected = false,
@@ -214,6 +271,7 @@ class LoginViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 activeSection = LoginSection.SERVER_SELECTION,
+                isServerSelectorExpanded = true,
                 editingSubscriptionId = sub.id,
                 editingOrigin = sub.origin,
                 serverMode = sub.origin,
@@ -273,6 +331,7 @@ class LoginViewModel @Inject constructor(
                         activate = true,
                     )
                 }
+
                 SubscriptionOrigin.PANEL_SERVER -> {
                     val serverId = current.selectedPanelServerId.orEmpty()
                     val resolvedRes = sonixControlRepository.resolveAssignedServer(serverId)
@@ -395,9 +454,17 @@ class LoginViewModel @Inject constructor(
     }
 
     private fun validateInputs(state: LoginUiState): String? {
+        val effectiveServers = if (state.sonixState.hasLoadedCatalog) {
+            state.sonixState.availableServers
+        } else {
+            state.sonixState.availableServers.ifEmpty { state.sonixState.assignedServers }
+        }
+        val panelUnavailable = !state.sonixState.catalogError.isNullOrBlank() || effectiveServers.isEmpty()
+
         return when (state.serverMode) {
             SubscriptionOrigin.NORMAL_URL -> {
                 if (!state.sonixState.settings.allowNormalUrlLogin &&
+                    !panelUnavailable &&
                     state.editingOrigin != SubscriptionOrigin.NORMAL_URL
                 ) {
                     return "تم تعطيل إضافة روابط URL عادية مؤقتاً من لوحة التحكم."
@@ -413,6 +480,7 @@ class LoginViewModel @Inject constructor(
                     else -> null
                 }
             }
+
             SubscriptionOrigin.PANEL_SERVER -> {
                 if (!state.sonixState.settings.allowPanelServers &&
                     state.editingOrigin != SubscriptionOrigin.PANEL_SERVER

@@ -120,6 +120,9 @@ data class SonixSyncSnapshot(
 
 data class SonixSyncState(
     val isSyncing: Boolean = false,
+    val isCatalogLoading: Boolean = false,
+    val hasLoadedCatalog: Boolean = false,
+    val catalogError: String? = null,
     val isRegistered: Boolean = false,
     val deviceId: String? = null,
     val deviceUid: String = "",

@@ -10,6 +10,7 @@ import com.liquidtv.app.data.remote.XtreamApiService
 import com.liquidtv.app.data.repository.SubscriptionRepositoryImpl
 import com.liquidtv.app.data.security.CredentialCrypto
 import com.liquidtv.app.data.sonix.SonixAccessStatus
+import com.liquidtv.app.data.sonix.SonixAppSettings
 import com.liquidtv.app.data.sonix.SonixAssignedServer
 import com.liquidtv.app.data.sonix.SonixDeviceStatus
 import com.liquidtv.app.data.sonix.SonixResolvedServer
@@ -39,6 +40,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -357,5 +359,111 @@ class LoginAndXtreamAuthTest {
         val remaining = database.subscriptionDao().getAllSubscriptionsOnce()
         assertEquals(1, remaining.size)
         assertEquals("قائمة معدلة", remaining.first().name)
+    }
+
+    @Test
+    fun `LoginViewModel manages collapsed server selector, mutual exclusion, dynamic catalog updates, and افتراضي URL fallback on panel error`() = runTest {
+        configureXtreamDispatcher()
+        val httpUrl = "http://${server.hostName}:${server.port}"
+        fakeSonixRepo.mutableState.value = SonixSyncState(
+            isRegistered = true,
+            deviceId = "dev-vm",
+            deviceUid = "uid-vm",
+            deviceCode = "SNXVM01",
+            deviceStatus = SonixDeviceStatus.ACTIVE,
+            accessStatus = SonixAccessStatus.ACTIVE,
+            accessAllowed = true,
+            hasLoadedCatalog = true,
+            availableServers = listOf(
+                SonixAssignedServer(id = "srv-1", name = "Node Alpha", region = "EU"),
+                SonixAssignedServer(id = "srv-2", name = "Node Beta", region = "US"),
+            ),
+        )
+        val vm = LoginViewModel(repository, fakeSonixRepo)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Initially collapsed
+        assertFalse(vm.uiState.value.isServerSelectorExpanded)
+        assertFalse(vm.uiState.value.isNormalUrlSelected)
+        assertNull(vm.uiState.value.selectedPanelServerId)
+
+        val callsBefore = fakeSonixRepo.refreshCatalogCalls
+        vm.toggleServerSelector()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(vm.uiState.value.isServerSelectorExpanded)
+        assertTrue(fakeSonixRepo.refreshCatalogCalls > callsBefore)
+
+        // Exclusive toggle between Server 1 -> Server 2 -> Normal URL
+        vm.selectPanelServer("srv-1", "Node Alpha")
+        assertEquals("srv-1", vm.uiState.value.selectedPanelServerId)
+        assertFalse(vm.uiState.value.isNormalUrlSelected)
+
+        vm.selectPanelServer("srv-2", "Node Beta")
+        assertEquals("srv-2", vm.uiState.value.selectedPanelServerId)
+        assertEquals("Node Beta", vm.uiState.value.selectedPanelServerName)
+
+        // Wait for combine collector to subscribe with Room before verifying reactive updates
+        kotlinx.coroutines.runBlocking {
+            withTimeout(5_000) {
+                vm.uiState.first { it.sonixState.deviceCode == "SNXVM01" }
+            }
+        }
+
+        // Dynamic rename on panel updates selectedPanelServerName
+        fakeSonixRepo.mutableState.value = fakeSonixRepo.mutableState.value.copy(
+            availableServers = listOf(
+                SonixAssignedServer(id = "srv-1", name = "Node Alpha", region = "EU"),
+                SonixAssignedServer(id = "srv-2", name = "Node Beta Pro", region = "US"),
+            ),
+        )
+        val renamedState = kotlinx.coroutines.runBlocking {
+            withTimeout(5_000) {
+                vm.uiState.first { it.selectedPanelServerName == "Node Beta Pro" }
+            }
+        }
+        assertEquals("Node Beta Pro", renamedState.selectedPanelServerName)
+
+        // Dynamic delete on panel clears deleted server selection
+        fakeSonixRepo.mutableState.value = fakeSonixRepo.mutableState.value.copy(
+            availableServers = listOf(
+                SonixAssignedServer(id = "srv-1", name = "Node Alpha", region = "EU"),
+            ),
+        )
+        val deletedState = kotlinx.coroutines.runBlocking {
+            withTimeout(5_000) {
+                vm.uiState.first { it.selectedPanelServerId == null }
+            }
+        }
+        assertNull(deletedState.selectedPanelServerId)
+        assertNull(deletedState.selectedPanelServerName)
+
+        // Clicking an open panel server again collapses it cleanly
+        vm.selectPanelServer("srv-1", "Node Alpha")
+        assertEquals("srv-1", vm.uiState.value.selectedPanelServerId)
+        vm.selectPanelServer("srv-1", "Node Alpha")
+        assertNull(vm.uiState.value.selectedPanelServerId)
+
+        // Panel failure never disables افتراضي URL login
+        fakeSonixRepo.mutableState.value = fakeSonixRepo.mutableState.value.copy(
+            catalogError = "فشل الاتصال بلوحة التحكم",
+            availableServers = emptyList(),
+            settings = SonixAppSettings(allowNormalUrlLogin = false),
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+        vm.toggleNormalUrlSection()
+        vm.setDisplayName("احتياطي")
+        vm.setUsername("demo")
+        vm.setPassword("secret")
+        vm.setServerUrl(httpUrl)
+        vm.connect()
+        val res = kotlinx.coroutines.runBlocking {
+            withTimeout(5_000) {
+                vm.uiState.first { !it.isConnecting && (it.isSuccess || it.errorMessage != null) }
+            }
+        }
+        assertTrue("Expected Normal URL login fallback to succeed: ${res.errorMessage}", res.isSuccess)
+
+        vm.collapseServerSelector()
+        assertFalse(vm.uiState.value.isServerSelectorExpanded)
     }
 }
