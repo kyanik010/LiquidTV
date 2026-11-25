@@ -277,12 +277,19 @@ class RedesignUiAndLogicTest {
             }
         }
 
-        // 1. Two tabs only: اختار السيرفر & قوائم التشغيل (no M3U)
-        composeRule.onNodeWithTag("tab_section_server").assertIsDisplayed()
-        composeRule.onNodeWithTag("tab_section_playlists").assertIsDisplayed()
+        // Both login cards are visible side by side; URL fields remain collapsed initially.
+        composeRule.onNodeWithTag("login_two_cards_row").assertIsDisplayed()
         composeRule.onNodeWithTag("server_selection_main_card").assertIsDisplayed()
+        composeRule.onNodeWithTag("playlists_main_card").assertIsDisplayed()
         composeRule.onNodeWithTag("tab_normal_url").assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_url").assertDoesNotExist()
+        val serverCardBounds = composeRule.onNodeWithTag("server_selection_main_card").fetchSemanticsNode().boundsInRoot
+        val playlistsCardBounds = composeRule.onNodeWithTag("playlists_main_card").fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Expected server and playlists cards side by side",
+            serverCardBounds.right <= playlistsCardBounds.left + 4f ||
+                playlistsCardBounds.right <= serverCardBounds.left + 4f,
+        )
         assertEquals(0, composeRule.onAllNodesWithText("M3U").fetchSemanticsNodes().size)
 
         // Option 2 (panel servers) sits below Option 1 (URL عادي)
@@ -333,9 +340,7 @@ class RedesignUiAndLogicTest {
         val pPassTop = composeRule.onNodeWithTag("input_xtream_password").fetchSemanticsNode().boundsInRoot.top
         assertTrue("Expected 3 panel fields in order: Name < Username < Password", pNameTop < pUserTop && pUserTop < pPassTop)
 
-        // 6. Playlists tab: Device ID card sits BELOW empty state / playlists & Copy works
-        composeRule.onNodeWithTag("tab_section_playlists").performScrollTo().performClick()
-        composeRule.waitForIdle()
+        // 6. Playlists card is permanently visible beside server selection; Device ID remains below its empty state.
         composeRule.onNodeWithTag("login_playlists_section").assertIsDisplayed()
         val emptyBounds = composeRule.onNodeWithTag("playlists_empty_state").fetchSemanticsNode().boundsInRoot
         val deviceCardBounds = composeRule.onNodeWithTag("device_id_compact_card").performScrollTo().fetchSemanticsNode().boundsInRoot
