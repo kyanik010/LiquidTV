@@ -24,7 +24,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.SavedStateHandle
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import com.liquidtv.app.data.datastore.UserPreferencesDataStore
+import com.liquidtv.app.domain.model.UserPreferences
+import com.liquidtv.app.domain.repository.UserPreferencesRepository
+import com.liquidtv.app.ui.theme.AppThemeCatalog
 import com.liquidtv.app.data.epg.XmltvParser
 import com.liquidtv.app.data.local.LiquidTVDatabase
 import com.liquidtv.app.data.local.entity.CategoryEntity
@@ -178,7 +180,7 @@ class RedesignUiAndLogicTest {
             override fun encrypt(plaintext: String) = plaintext
             override fun decrypt(ciphertext: String) = ciphertext
         }
-        val prefs = UserPreferencesDataStore(context)
+        val prefs = RedesignFakeUserPreferencesRepository()
         val subRepo = SubscriptionRepositoryImpl(
             context = context,
             database = db,
@@ -412,7 +414,7 @@ class RedesignUiAndLogicTest {
 
     @Test
     fun `SettingsScreen renders Arabic sections and scrolls vertically on compact phone screen`() {
-        val prefs = UserPreferencesDataStore(context)
+        val prefs = RedesignFakeUserPreferencesRepository()
         val fakeChannels = FakeChannelRepository()
         val fakeSubRepo = FakeSubscriptionRepository()
         val vm = SettingsViewModel(context, prefs, fakeChannels, fakeSubRepo)
@@ -536,7 +538,7 @@ class RedesignUiAndLogicTest {
     @Test
     fun `LiveTVScreen renders 3-pane Arabic RTL layout with EPG and categories`() {
         val fakeChannels = FakeChannelRepository()
-        val prefs = UserPreferencesDataStore(context)
+        val prefs = RedesignFakeUserPreferencesRepository()
         val liveVm = LiveTVViewModel(fakeChannels, prefs, SavedStateHandle())
 
         composeRule.setContent {
@@ -557,7 +559,7 @@ class RedesignUiAndLogicTest {
     @Test
     fun `MoviesScreen renders 2-to-3 cinema posters and category sidebar in Arabic RTL`() {
         val fakeChannels = FakeChannelRepository()
-        val prefs = UserPreferencesDataStore(context)
+        val prefs = RedesignFakeUserPreferencesRepository()
         val moviesVm = MoviesViewModel(fakeChannels, prefs)
 
         composeRule.setContent {
@@ -577,7 +579,7 @@ class RedesignUiAndLogicTest {
     @Test
     fun `SeriesScreen renders 2-to-3 cinema posters and category sidebar in Arabic RTL`() {
         val fakeChannels = FakeChannelRepository()
-        val prefs = UserPreferencesDataStore(context)
+        val prefs = RedesignFakeUserPreferencesRepository()
         val seriesVm = SeriesViewModel(fakeChannels, prefs)
 
         composeRule.setContent {
@@ -598,7 +600,7 @@ class RedesignUiAndLogicTest {
     @Test
     fun `LiveTVScreen landscape phone keeps all header controls clickable, shows channel names, toggles grid, and expands content`() {
         val fakeChannels = FakeChannelRepository()
-        val prefs = UserPreferencesDataStore(context)
+        val prefs = RedesignFakeUserPreferencesRepository()
         val liveVm = LiveTVViewModel(fakeChannels, prefs, SavedStateHandle())
         val totalHeightDp = 400f
 
@@ -647,7 +649,7 @@ class RedesignUiAndLogicTest {
     @Test
     fun `LiveTVScreen maximizes content pane height on 720p TV and portrait phone`() {
         val fakeChannels = FakeChannelRepository()
-        val prefs = UserPreferencesDataStore(context)
+        val prefs = RedesignFakeUserPreferencesRepository()
         val liveVm = LiveTVViewModel(fakeChannels, prefs, SavedStateHandle())
         val tvHeightDp = 540f
 
@@ -667,7 +669,7 @@ class RedesignUiAndLogicTest {
     @Test
     fun `MoviesScreen and SeriesScreen maximize 2-to-3 poster grid and sidebar vertical ratio across TV viewports`() {
         val fakeChannels = FakeChannelRepository()
-        val prefs = UserPreferencesDataStore(context)
+        val prefs = RedesignFakeUserPreferencesRepository()
         val moviesVm = MoviesViewModel(fakeChannels, prefs)
         val heightDp = 1080f
 
@@ -696,7 +698,7 @@ class RedesignUiAndLogicTest {
     @Test
     fun `SeriesScreen allocates majority vertical space on 720p landscape and portrait phone`() {
         val fakeChannels = FakeChannelRepository()
-        val prefs = UserPreferencesDataStore(context)
+        val prefs = RedesignFakeUserPreferencesRepository()
         val seriesVm = SeriesViewModel(fakeChannels, prefs)
         val phoneHeightDp = 800f
 
@@ -780,7 +782,7 @@ class RedesignUiAndLogicTest {
     @Test
     fun `LiveTVScreen distributes 3-pane widths with shared sidebar and 60-40 split in RTL across wide TV viewports`() {
         val fakeChannels = FakeChannelRepository()
-        val prefs = UserPreferencesDataStore(context)
+        val prefs = RedesignFakeUserPreferencesRepository()
         val liveVm = LiveTVViewModel(fakeChannels, prefs, SavedStateHandle())
 
         composeRule.setContent {
@@ -832,7 +834,7 @@ class RedesignUiAndLogicTest {
             )
         }
         val fakeChannels = FakeChannelRepository(movies = sixMovies, seriesList = sixSeries)
-        val prefs = UserPreferencesDataStore(context)
+        val prefs = RedesignFakeUserPreferencesRepository()
         val moviesVm = MoviesViewModel(fakeChannels, prefs)
 
         val wideWidths = listOf(800, 960, 1200, 1280, 1600, 1920)
@@ -879,7 +881,7 @@ class RedesignUiAndLogicTest {
             )
         }
         val fakeChannels = FakeChannelRepository(seriesList = sixSeries)
-        val prefs = UserPreferencesDataStore(context)
+        val prefs = RedesignFakeUserPreferencesRepository()
         val seriesVm = SeriesViewModel(fakeChannels, prefs)
 
         composeRule.setContent {
@@ -913,7 +915,7 @@ class RedesignUiAndLogicTest {
     @Test
     fun `LiveTVScreen maintains RTL 3-pane distribution without overlap on 800dp landscape tablet or large phone`() {
         val fakeChannels = FakeChannelRepository()
-        val prefs = UserPreferencesDataStore(context)
+        val prefs = RedesignFakeUserPreferencesRepository()
         val liveVm = LiveTVViewModel(fakeChannels, prefs, SavedStateHandle())
 
         composeRule.setContent {
@@ -945,7 +947,7 @@ class RedesignUiAndLogicTest {
     @Test
     fun `Small landscape phone 640dp uses non-wide adaptive layout without forcing sidebar or 5 columns`() {
         val fakeChannels = FakeChannelRepository()
-        val prefs = UserPreferencesDataStore(context)
+        val prefs = RedesignFakeUserPreferencesRepository()
         val moviesVm = MoviesViewModel(fakeChannels, prefs)
 
         composeRule.setContent {
@@ -965,7 +967,7 @@ class RedesignUiAndLogicTest {
 
     @Test
     fun `SettingsScreen supports touch vertical swipe scrolling up and down on landscape and portrait phones`() {
-        val prefs = UserPreferencesDataStore(context)
+        val prefs = RedesignFakeUserPreferencesRepository()
         val fakeChannels = FakeChannelRepository()
         val fakeSubRepo = FakeSubscriptionRepository()
         val vm = SettingsViewModel(context, prefs, fakeChannels, fakeSubRepo)
@@ -1149,4 +1151,72 @@ private class FakeChannelRepository(
     override suspend fun refreshPlaylists(): Result<Unit> = Result.success(Unit)
     override suspend fun clearWatchHistory() = Unit
     override fun getPlaylistInfo(): Flow<PlaylistInfo> = flowOf(PlaylistInfo())
+}
+
+private class RedesignFakeUserPreferencesRepository : UserPreferencesRepository {
+    private val prefsFlow = MutableStateFlow(UserPreferences())
+    private val historyFlow = MutableStateFlow<List<String>>(emptyList())
+    private val lastQueryFlow = MutableStateFlow("")
+    private var pinValue: String? = null
+
+    override val userPreferences: Flow<UserPreferences> = prefsFlow
+    override val searchHistory: Flow<List<String>> = historyFlow
+    override fun getGlassIntensity(): Flow<Float> = prefsFlow.map { it.glassIntensity }
+    override fun getBlurIntensity(): Flow<Float> = prefsFlow.map { it.blurIntensity }
+    override fun getAnimationIntensity(): Flow<Float> = prefsFlow.map { it.animationIntensity }
+    override fun getAppTheme(): Flow<String> = prefsFlow.map { it.appTheme }
+    override fun getAmbientTheme(): Flow<String> = prefsFlow.map { it.theme }
+    override fun getAmbientEnabled(): Flow<Boolean> = prefsFlow.map { it.ambientEnabled }
+    override fun getAmbientIdleDuration(): Flow<Long> = prefsFlow.map { it.ambientIdleDuration }
+    override fun getAmbientClockVisible(): Flow<Boolean> = prefsFlow.map { it.clockVisible }
+    override fun getAutoPlayNext(): Flow<Boolean> = prefsFlow.map { it.autoPlay }
+    override fun getStreamTimeout(): Flow<Int> = prefsFlow.map { it.connectionTimeout }
+    override fun getRetryAttempts(): Flow<Int> = prefsFlow.map { it.maxRetries }
+    override fun getLastSearchQuery(): Flow<String> = lastQueryFlow
+
+    override suspend fun setGlassIntensity(value: Float) { prefsFlow.update { it.copy(glassIntensity = value) } }
+    override suspend fun setBlurIntensity(value: Float) { prefsFlow.update { it.copy(blurIntensity = value) } }
+    override suspend fun setAnimationIntensity(value: Float) { prefsFlow.update { it.copy(animationIntensity = value) } }
+    override suspend fun setAppTheme(themeId: String) {
+        val resolved = AppThemeCatalog.resolve(themeId).id
+        prefsFlow.update { it.copy(appTheme = resolved) }
+    }
+    override suspend fun setAmbientTheme(theme: String) { prefsFlow.update { it.copy(theme = theme) } }
+    override suspend fun setAmbientEnabled(enabled: Boolean) { prefsFlow.update { it.copy(ambientEnabled = enabled) } }
+    override suspend fun setAmbientIdleDuration(ms: Long) { prefsFlow.update { it.copy(ambientIdleDuration = ms) } }
+    override suspend fun setAmbientClockVisible(visible: Boolean) { prefsFlow.update { it.copy(clockVisible = visible) } }
+    override suspend fun setAutoPlayNext(enabled: Boolean) { prefsFlow.update { it.copy(autoPlay = enabled) } }
+    override suspend fun setStreamTimeout(seconds: Int) { prefsFlow.update { it.copy(connectionTimeout = seconds) } }
+    override suspend fun setRetryAttempts(count: Int) { prefsFlow.update { it.copy(maxRetries = count) } }
+    override suspend fun setDefaultQuality(quality: String) { prefsFlow.update { it.copy(defaultQuality = quality) } }
+    override suspend fun setAutoPlay(enabled: Boolean) { prefsFlow.update { it.copy(autoPlay = enabled) } }
+    override suspend fun setSubtitlesEnabled(enabled: Boolean) { prefsFlow.update { it.copy(subtitlesEnabled = enabled) } }
+    override suspend fun setPreferredSubtitleLanguage(language: String) { prefsFlow.update { it.copy(preferredSubtitleLanguage = language) } }
+    override suspend fun setTheme(theme: String) { prefsFlow.update { it.copy(theme = theme) } }
+    override suspend fun setClockVisible(visible: Boolean) { prefsFlow.update { it.copy(clockVisible = visible) } }
+    override suspend fun setScreenSaverTimeout(minutes: Int) { prefsFlow.update { it.copy(screenSaverTimeout = minutes) } }
+    override suspend fun setAutoRefreshEnabled(enabled: Boolean) { prefsFlow.update { it.copy(autoRefreshEnabled = enabled) } }
+    override suspend fun setAutoRefreshInterval(hours: Int) { prefsFlow.update { it.copy(autoRefreshInterval = hours) } }
+    override suspend fun setConnectionTimeout(seconds: Int) { prefsFlow.update { it.copy(connectionTimeout = seconds) } }
+    override suspend fun setMaxRetries(retries: Int) { prefsFlow.update { it.copy(maxRetries = retries) } }
+    override suspend fun setParentalControlEnabled(enabled: Boolean) {
+        prefsFlow.update { it.copy(parentalControlEnabled = enabled && !pinValue.isNullOrBlank()) }
+    }
+    override suspend fun setParentalPin(pin: String) {
+        pinValue = pin
+        prefsFlow.update { it.copy(hasParentalPin = pin.isNotBlank()) }
+    }
+    override suspend fun verifyParentalPin(pin: String): Boolean = pinValue != null && pinValue == pin
+    override suspend fun clearParentalPin() {
+        pinValue = null
+        prefsFlow.update { it.copy(parentalControlEnabled = false, hasParentalPin = false) }
+    }
+    override suspend fun setGithubRepo(repo: String) { prefsFlow.update { it.copy(githubRepo = repo) } }
+    override suspend fun setAutoCheckUpdates(enabled: Boolean) { prefsFlow.update { it.copy(autoCheckUpdates = enabled) } }
+    override suspend fun addSearchHistory(query: String) {
+        historyFlow.update { (listOf(query) + it).distinct().take(20) }
+        lastQueryFlow.value = query
+    }
+    override suspend fun removeSearchHistory(query: String) { historyFlow.update { it - query } }
+    override suspend fun clearSearchHistory() { historyFlow.value = emptyList() }
 }
