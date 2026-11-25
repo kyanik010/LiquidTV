@@ -52,7 +52,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.liquidtv.app.data.sonix.SonixAccessStatus
 import com.liquidtv.app.data.sonix.SonixAssignedServer
 import com.liquidtv.app.domain.model.Subscription
 import com.liquidtv.app.domain.model.SubscriptionOrigin
@@ -60,10 +59,8 @@ import com.liquidtv.app.ui.components.AppBackground
 import com.liquidtv.app.ui.components.LiquidGlassSurface
 import com.liquidtv.app.ui.components.PlaylistBadgeChip
 import com.liquidtv.app.ui.components.PlaylistSubscriptionCard
-import com.liquidtv.app.ui.components.SonixDeviceStatusBanner
 import com.liquidtv.app.ui.theme.AppTheme
 import com.liquidtv.app.ui.theme.LiquidTypography
-import com.liquidtv.app.ui.utils.localizedSonixAccessStatusAr
 
 /**
  * Two-section Liquid Glass login & playlists screen:
@@ -225,10 +222,6 @@ fun LoginScreen(
                                     .weight(1f)
                                     .testTag("tab_section_playlists"),
                             )
-                        }
-
-                        if (state.activeSection == LoginSection.PLAYLISTS) {
-                            DeviceIdCompactCard(deviceCode = state.sonixState.deviceCode)
                         }
 
                         if (state.activeSection == LoginSection.SERVER_SELECTION) {
