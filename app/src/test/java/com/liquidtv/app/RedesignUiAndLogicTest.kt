@@ -284,6 +284,8 @@ class RedesignUiAndLogicTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("tab_normal_url").performScrollTo().performClick()
         composeRule.waitForIdle()
+        // URL fields are intentionally collapsed until the user expands "URL عادي".
+        composeRule.onNodeWithTag("tab_normal_url").performClick()
         composeRule.onNodeWithTag("input_subscription_name").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_url").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_username").performScrollTo().assertIsDisplayed()
