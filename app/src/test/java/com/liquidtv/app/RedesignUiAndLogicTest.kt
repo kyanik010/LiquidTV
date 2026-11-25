@@ -643,6 +643,8 @@ class RedesignUiAndLogicTest {
         assertTrue("Expected compact Login card width <= 470dp on 850dp screen, was $cardWidthDp", cardWidthDp <= 470f)
         assertTrue("Expected Login card centered with generous side margins (left=$cardLeftDp, right=$cardRightDp)", cardLeftDp >= 180f && cardRightDp <= 670f)
 
+        // The normal URL form is collapsed by default; expand it before asserting its fields.
+        composeRule.onNodeWithTag("tab_normal_url").performClick()
         composeRule.onNodeWithTag("input_subscription_name").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_url").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_username").performScrollTo().assertIsDisplayed()
