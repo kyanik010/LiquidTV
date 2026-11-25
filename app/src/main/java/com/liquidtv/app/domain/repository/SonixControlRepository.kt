@@ -20,6 +20,9 @@ interface SonixControlRepository {
 
     suspend fun refreshAvailableServers(): Result<List<SonixAssignedServer>>
 
+    suspend fun refreshAvailableServers(forceSync: Boolean): Result<List<SonixAssignedServer>> =
+        refreshAvailableServers()
+
     suspend fun resolveAssignedServer(serverId: String): Result<SonixResolvedServer>
 
     suspend fun acknowledgeMessage(messageId: String): Result<Unit>

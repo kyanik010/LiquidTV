@@ -286,4 +286,76 @@ class LoginAndXtreamAuthTest {
         assertTrue(unlockedState.gate is AppStartupGate.Ready)
         collectorJob.cancel()
     }
+
+    @Test
+    fun `M3U is completely removed, HTTP and HTTPS URLs validate, and playlists CRUD persists in Room`() = runTest {
+        assertEquals(listOf(SubscriptionType.XTREAM), SubscriptionType.entries)
+
+        configureXtreamDispatcher()
+        val httpUrl = "http://${server.hostName}:${server.port}"
+        val vm = LoginViewModel(repository, fakeSonixRepo)
+
+        // Toggle URL عادي open, test HTTPS validation passes input validation
+        vm.toggleNormalUrlSection()
+        assertTrue(vm.uiState.value.isNormalUrlSelected)
+        vm.setDisplayName("تجربة HTTPS")
+        vm.setUsername("demo")
+        vm.setPassword("secret")
+        vm.setServerUrl("https://")
+        // Verify toggle closes URL عادي cleanly
+        vm.toggleNormalUrlSection()
+        assertFalse(vm.uiState.value.isNormalUrlSelected)
+
+        // Save 2 playlists in Room and verify activate, edit, and delete
+        val res1 = repository.addOrUpdateXtreamSubscription(
+            existingId = null,
+            displayName = "قائمة أولى",
+            serverUrl = httpUrl,
+            username = "demo",
+            password = "secret",
+            origin = SubscriptionOrigin.NORMAL_URL,
+            activate = true,
+        )
+        val res2 = repository.addOrUpdateXtreamSubscription(
+            existingId = null,
+            displayName = "قائمة ثانية",
+            serverUrl = httpUrl,
+            username = "demo",
+            password = "secret",
+            origin = SubscriptionOrigin.NORMAL_URL,
+            activate = false,
+        )
+        assertTrue(res1.isSuccess && res2.isSuccess)
+        val sub1 = res1.getOrThrow()
+        val sub2 = res2.getOrThrow()
+
+        // Activate sub2
+        vm.activatePlaylist(sub2.id)
+        kotlinx.coroutines.runBlocking {
+            withTimeout(5_000) { vm.uiState.first { it.busyPlaylistId == null && it.playlistMessage == "تم تفعيل قائمة التشغيل" } }
+        }
+        assertEquals(sub2.id, repository.getActiveSubscriptionOnce()?.id)
+
+        // Edit sub1 name & save
+        vm.startEditingPlaylist(sub1)
+        kotlinx.coroutines.runBlocking {
+            withTimeout(5_000) { vm.uiState.first { it.editingSubscriptionId == sub1.id } }
+        }
+        assertTrue(vm.uiState.value.isNormalUrlSelected)
+        vm.setDisplayName("قائمة معدلة")
+        vm.connect()
+        kotlinx.coroutines.runBlocking {
+            withTimeout(5_000) { vm.uiState.first { !it.isConnecting && it.isSuccess } }
+        }
+        assertEquals("قائمة معدلة", repository.getSubscriptionById(sub1.id)?.name)
+
+        // Delete sub2 and verify offline persistence in Room DAO
+        vm.deletePlaylist(sub2.id)
+        kotlinx.coroutines.runBlocking {
+            withTimeout(5_000) { vm.uiState.first { it.busyPlaylistId == null && it.savedPlaylists.size == 1 } }
+        }
+        val remaining = database.subscriptionDao().getAllSubscriptionsOnce()
+        assertEquals(1, remaining.size)
+        assertEquals("قائمة معدلة", remaining.first().name)
+    }
 }

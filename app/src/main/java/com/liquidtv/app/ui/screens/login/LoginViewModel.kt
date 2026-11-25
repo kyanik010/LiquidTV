@@ -58,7 +58,7 @@ class LoginViewModel @Inject constructor(
     private var connectJob: Job? = null
 
     init {
-        viewModelScope.launch { sonixControlRepository.refreshAvailableServers() }
+        viewModelScope.launch { sonixControlRepository.refreshAvailableServers(forceSync = false) }
         viewModelScope.launch {
             combine(
                 subscriptionRepository.allSubscriptions,
@@ -80,8 +80,9 @@ class LoginViewModel @Inject constructor(
                         else -> current.serverMode
                     }
 
+                    val effectiveServers = sonix.availableServers.ifEmpty { sonix.assignedServers }
                     val availableMatch = current.selectedPanelServerId?.let { selId ->
-                        sonix.availableServers.firstOrNull { it.id == selId }
+                        effectiveServers.firstOrNull { it.id == selId }
                     }
 
                     current.copy(
@@ -103,6 +104,25 @@ class LoginViewModel @Inject constructor(
         _uiState.update { it.copy(activeSection = section, errorMessage = null, playlistMessage = null) }
     }
 
+    fun toggleNormalUrlSection() {
+        val current = _uiState.value
+        if (current.isConnecting) return
+        if (current.editingOrigin == SubscriptionOrigin.PANEL_SERVER) {
+            // Never expose/convert a panel-managed playlist to normal Host URL edit
+            return
+        }
+        _uiState.update { state ->
+            val nextOpen = !state.isNormalUrlSelected
+            state.copy(
+                serverMode = if (nextOpen) SubscriptionOrigin.NORMAL_URL else state.serverMode,
+                isNormalUrlSelected = nextOpen,
+                selectedPanelServerId = if (nextOpen) null else state.selectedPanelServerId,
+                selectedPanelServerName = if (nextOpen) null else state.selectedPanelServerName,
+                errorMessage = null,
+            )
+        }
+    }
+
     fun selectServerMode(mode: SubscriptionOrigin) {
         val current = _uiState.value
         if (current.isConnecting) return
@@ -111,13 +131,6 @@ class LoginViewModel @Inject constructor(
             return
         }
         _uiState.update { state ->
-            val singlePanel = if (
-                mode == SubscriptionOrigin.PANEL_SERVER &&
-                state.selectedPanelServerId.isNullOrBlank() &&
-                state.sonixState.assignedServers.size == 1
-            ) {
-                state.sonixState.assignedServers.first()
-            } else null
             state.copy(
                 serverMode = mode,
                 isNormalUrlSelected = mode == SubscriptionOrigin.NORMAL_URL,
@@ -142,14 +155,24 @@ class LoginViewModel @Inject constructor(
     }
 
     fun refreshPanelServers() {
+        if (_uiState.value.sonixState.isSyncing) return
         viewModelScope.launch {
             _uiState.update { it.copy(errorMessage = null) }
-            val result = sonixControlRepository.refreshAvailableServers()
+            val result = sonixControlRepository.refreshAvailableServers(forceSync = true)
             if (result.isFailure) {
                 _uiState.update {
                     it.copy(errorMessage = result.exceptionOrNull()?.message ?: "تعذّر تحديث بيانات لوحة التحكم")
                 }
             }
+        }
+    }
+
+    fun notifyDeviceIdCopied(deviceCode: String) {
+        _uiState.update {
+            it.copy(
+                playlistMessage = "تم نسخ معرّف الجهاز: $deviceCode",
+                errorMessage = null,
+            )
         }
     }
 

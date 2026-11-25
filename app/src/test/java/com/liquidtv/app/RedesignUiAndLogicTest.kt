@@ -1,5 +1,6 @@
 package com.liquidtv.app
 
+import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
@@ -254,10 +255,10 @@ class RedesignUiAndLogicTest {
                 accessStatus = SonixAccessStatus.ACTIVE,
                 accessAllowed = true,
                 assignedServers = listOf(
-                    SonixAssignedServer(id = "srv-panel-1", name = "VIP Europe", region = "DE"),
+                    SonixAssignedServer(id = "srv-panel-1", name = "XLINE", region = "DE"),
                 ),
                 availableServers = listOf(
-                    SonixAssignedServer(id = "srv-panel-1", name = "VIP Europe", region = "DE"),
+                    SonixAssignedServer(id = "srv-panel-1", name = "XLINE", region = "DE"),
                 ),
             )
         )
@@ -274,42 +275,139 @@ class RedesignUiAndLogicTest {
             }
         }
 
+        // 1. Two tabs only: اختار السيرفر & قوائم التشغيل (no M3U)
         composeRule.onNodeWithTag("tab_section_server").assertIsDisplayed()
         composeRule.onNodeWithTag("tab_section_playlists").assertIsDisplayed()
+        composeRule.onNodeWithTag("server_selection_main_card").assertIsDisplayed()
         composeRule.onNodeWithTag("tab_normal_url").assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_url").assertDoesNotExist()
+        assertEquals(0, composeRule.onAllNodesWithText("M3U").fetchSemanticsNodes().size)
 
-        // Expand the ordinary URL option; its four fields appear only after selection.
+        // Option 2 (panel servers) sits below Option 1 (URL عادي)
+        val normalCardBounds = composeRule.onNodeWithTag("normal_url_option_card").fetchSemanticsNode().boundsInRoot
+        val panelCardBounds = composeRule.onNodeWithTag("panel_servers_option_card").fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Expected SONIX-CONTROL servers below URL عادي (normalBottom=${normalCardBounds.bottom}, panelTop=${panelCardBounds.top})",
+            panelCardBounds.top >= normalCardBounds.bottom - 4f,
+        )
+
+        // 2. Click URL عادي -> opens 4 fields in strict order 1->2->3->4
         composeRule.onNodeWithTag("tab_normal_url").performScrollTo().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("tab_normal_url").performScrollTo().performClick()
-        composeRule.waitForIdle()
-        // URL fields are intentionally collapsed until the user expands "URL عادي".
-        composeRule.onNodeWithTag("tab_normal_url").performClick()
         composeRule.onNodeWithTag("input_subscription_name").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag("input_xtream_url").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_username").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_password").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("input_xtream_url").performScrollTo().assertIsDisplayed()
 
+        val nameTop = composeRule.onNodeWithTag("input_subscription_name").fetchSemanticsNode().boundsInRoot.top
+        val userTop = composeRule.onNodeWithTag("input_xtream_username").fetchSemanticsNode().boundsInRoot.top
+        val passTop = composeRule.onNodeWithTag("input_xtream_password").fetchSemanticsNode().boundsInRoot.top
+        val urlTop = composeRule.onNodeWithTag("input_xtream_url").fetchSemanticsNode().boundsInRoot.top
+        assertTrue("Expected field order: Name < Username < Password < Host URL ($nameTop, $userTop, $passTop, $urlTop)", nameTop < userTop && userTop < passTop && passTop < urlTop)
+
+        // 3. Click URL عادي again -> closes cleanly
+        composeRule.onNodeWithTag("tab_normal_url").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("input_subscription_name").assertDoesNotExist()
+        composeRule.onNodeWithTag("input_xtream_url").assertDoesNotExist()
+
+        // 4. Re-open URL عادي and validate blank error
+        composeRule.onNodeWithTag("tab_normal_url").performScrollTo().performClick()
+        composeRule.waitForIdle()
         composeRule.onNodeWithTag("connect_button").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("login_error_banner").performScrollTo().assertIsDisplayed()
 
-        // The public server catalog is listed below the normal URL option.
+        // 5. Select active SONIX-CONTROL server (XLINE) -> 3 fields ONLY, NO Host URL
         composeRule.onNodeWithTag("panel_server_item_srv-panel-1").performScrollTo().assertIsDisplayed().performClick()
-        composeRule.waitForIdle()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("input_subscription_name").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_username").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_password").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_url").assertDoesNotExist()
 
-        // Playlists contains the compact device ID card.
+        val pNameTop = composeRule.onNodeWithTag("input_subscription_name").fetchSemanticsNode().boundsInRoot.top
+        val pUserTop = composeRule.onNodeWithTag("input_xtream_username").fetchSemanticsNode().boundsInRoot.top
+        val pPassTop = composeRule.onNodeWithTag("input_xtream_password").fetchSemanticsNode().boundsInRoot.top
+        assertTrue("Expected 3 panel fields in order: Name < Username < Password", pNameTop < pUserTop && pUserTop < pPassTop)
+
+        // 6. Playlists tab: Device ID card sits BELOW empty state / playlists & Copy works
         composeRule.onNodeWithTag("tab_section_playlists").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("login_playlists_section").assertIsDisplayed()
-        composeRule.onNodeWithTag("device_id_compact_card").performScrollTo().assertIsDisplayed()
+        val emptyBounds = composeRule.onNodeWithTag("playlists_empty_state").fetchSemanticsNode().boundsInRoot
+        val deviceCardBounds = composeRule.onNodeWithTag("device_id_compact_card").performScrollTo().fetchSemanticsNode().boundsInRoot
+        assertTrue("Expected Device ID card below empty playlists state", deviceCardBounds.top >= emptyBounds.bottom - 4f)
+        composeRule.onNodeWithTag("device_id_compact_card").assertIsDisplayed()
+        composeRule.onNodeWithTag("device_id_value").assertIsDisplayed()
         composeRule.onNodeWithText("SNX778899").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("copy_device_id_button").performScrollTo().performClick()
+        composeRule.waitForIdle()
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clipText = clipboard.primaryClip?.getItemAt(0)?.text?.toString()
+        assertEquals("SNX778899", clipText)
+        composeRule.onNodeWithTag("playlist_feedback_banner").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun `Playlists tab displays saved playlists above Device ID card with connect, sync, edit, delete actions and copy works`() {
+        val saved = listOf(
+            Subscription(
+                id = "sub-saved-1",
+                name = "باقة إكس لاين",
+                type = SubscriptionType.XTREAM,
+                origin = SubscriptionOrigin.PANEL_SERVER,
+                panelServerId = "srv-panel-1",
+                panelServerName = "XLINE",
+                serverUrl = "http://panel.example.com:8080",
+                username = "ali_user",
+                isActive = true,
+                connectionStatus = SubscriptionStatus.CONNECTED,
+            )
+        )
+        val fakeSubRepo = FakeSubscriptionRepository(initialSubscriptions = saved)
+        val fakeSonix = FakeSonixControlRepository(
+            SonixSyncState(
+                isRegistered = true,
+                deviceId = "dev-1",
+                deviceUid = "uid-1",
+                deviceCode = "SNX8899001",
+                deviceStatus = SonixDeviceStatus.ACTIVE,
+                accessStatus = SonixAccessStatus.ACTIVE,
+                accessAllowed = true,
+                availableServers = listOf(SonixAssignedServer(id = "srv-panel-1", name = "XLINE", region = "EU")),
+            )
+        )
+        val vm = LoginViewModel(fakeSubRepo, fakeSonix)
+        vm.selectSection(com.liquidtv.app.ui.screens.login.LoginSection.PLAYLISTS)
+
+        composeRule.setContent {
+            LiquidTVTheme {
+                Box(Modifier.width(500.dp).height(860.dp)) {
+                    LoginScreen(onLoginSuccess = {}, viewModel = vm)
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("playlists_list_container").assertIsDisplayed()
+        composeRule.onNodeWithTag("playlist_connect_sub-saved-1").assertIsDisplayed()
+        composeRule.onNodeWithTag("playlist_sync_sub-saved-1").assertIsDisplayed()
+        composeRule.onNodeWithTag("playlist_edit_sub-saved-1").assertIsDisplayed()
+        composeRule.onNodeWithTag("playlist_delete_sub-saved-1").assertIsDisplayed()
+
+        val listBounds = composeRule.onNodeWithTag("playlists_list_container").fetchSemanticsNode().boundsInRoot
+        val deviceBounds = composeRule.onNodeWithTag("device_id_compact_card").performScrollTo().fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Expected Device ID card BELOW saved playlists list (listBottom=${listBounds.bottom}, deviceTop=${deviceBounds.top})",
+            deviceBounds.top >= listBounds.bottom - 4f,
+        )
+
+        composeRule.onNodeWithTag("copy_device_id_button").performClick()
+        composeRule.waitForIdle()
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        assertEquals("SNX8899001", clipboard.primaryClip?.getItemAt(0)?.text?.toString())
     }
 
     @Test
@@ -910,8 +1008,11 @@ class RedesignUiAndLogicTest {
     }
 }
 
-private class FakeSubscriptionRepository : SubscriptionRepository {
-    override val allSubscriptions: Flow<List<Subscription>> = flowOf(emptyList())
+private class FakeSubscriptionRepository(
+    initialSubscriptions: List<Subscription> = emptyList(),
+) : SubscriptionRepository {
+    private val subsFlow = MutableStateFlow(initialSubscriptions)
+    override val allSubscriptions: Flow<List<Subscription>> = subsFlow
     override val activeSubscription: Flow<Subscription?> = flowOf(null)
     override val syncInfo: Flow<PlaylistInfo> = flowOf(PlaylistInfo())
     override suspend fun getActiveSubscriptionOnce(): Subscription? = null

@@ -113,6 +113,7 @@ data class SonixSyncSnapshot(
     val subscription: SonixSubscriptionSummary? = null,
     val settings: SonixAppSettings = SonixAppSettings(),
     val assignedServers: List<SonixAssignedServer> = emptyList(),
+    val availableServers: List<SonixAssignedServer> = emptyList(),
     val pendingMessages: List<SonixMessage> = emptyList(),
     val lastSyncedAt: Long? = null,
 )

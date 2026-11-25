@@ -350,4 +350,64 @@ class SonixControlIntegrationTest {
         composeRule.onNodeWithTag("panel_message_ack_button").performClick()
         assertEquals("m-99", ackedId)
     }
+
+    @Test
+    fun `SonixControlRepositoryImpl fetches active servers via servers catalog and debounces startup sync`() = runTest {
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setBody(
+                    """
+                    {
+                      "ok": true,
+                      "status": "active",
+                      "device_id": "dev-cat-1",
+                      "device_uid": "ltv_cat_1",
+                      "device_code": "XLINE12345",
+                      "device_status": "active",
+                      "access_status": "active",
+                      "access_allowed": true,
+                      "device_token": "tok_cat_1",
+                      "settings": {"allow_normal_url_login":true,"allow_panel_servers":true},
+                      "servers": []
+                    }
+                    """.trimIndent(),
+                ),
+        )
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setBody(
+                    """
+                    {
+                      "ok": true,
+                      "servers": [
+                        {"id": "srv-xline", "name": "XLINE", "region": "GLOBAL", "priority": 1}
+                      ]
+                    }
+                    """.trimIndent(),
+                ),
+        )
+
+        val api = HttpSonixControlApi(
+            okHttpClient = OkHttpClient(),
+            baseUrl = server.url("/").toString(),
+            anonKey = "sb_publishable_test_key",
+        )
+        val identityStore = SonixDeviceIdentityStore(context, plainCrypto)
+        val repo = SonixControlRepositoryImpl(context, api, identityStore)
+
+        // First sync + catalog fetch
+        repo.syncNow(force = true)
+        val catalogRes = repo.refreshAvailableServers(forceSync = false)
+        assertTrue("Expected catalog fetch success: ${catalogRes.exceptionOrNull()}", catalogRes.isSuccess)
+        val servers = catalogRes.getOrThrow()
+        assertEquals(1, servers.size)
+        assertEquals("XLINE", servers.first().name)
+        assertEquals("XLINE", repo.state.value.availableServers.first().name)
+        assertEquals("XLINE12345", repo.state.value.deviceCode)
+
+        // Debounced syncNow(force = false) did NOT fire a second "sync" request -> total requests = 2 (sync + servers.catalog)
+        assertEquals(2, server.requestCount)
+    }
 }

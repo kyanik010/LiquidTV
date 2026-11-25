@@ -64,6 +64,7 @@ class SonixControlRepositoryImpl @Inject constructor(
                         subscription = cached.subscription,
                         settings = cached.settings,
                         assignedServers = cached.assignedServers,
+                        availableServers = cached.availableServers,
                         pendingMessages = cached.pendingMessages,
                         lastSyncedAt = cached.lastSyncedAt,
                     )
@@ -82,6 +83,15 @@ class SonixControlRepositoryImpl @Inject constructor(
     }
 
     override suspend fun syncNow(force: Boolean): Result<SonixSyncState> = syncMutex.withLock {
+        val currentBeforeSync = _state.value
+        val lastSynced = currentBeforeSync.lastSyncedAt
+        if (!force &&
+            currentBeforeSync.isRegistered &&
+            lastSynced != null &&
+            (System.currentTimeMillis() - lastSynced) < FOREGROUND_DEBOUNCE_MS
+        ) {
+            return@withLock Result.success(currentBeforeSync)
+        }
         _state.update { it.copy(isSyncing = true, lastError = null) }
 
         val uid = identityStore.getOrCreateDeviceUid()
@@ -123,8 +133,11 @@ class SonixControlRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun refreshAvailableServers(): Result<List<SonixAssignedServer>> {
-        val syncResult = syncNow(force = true)
+    override suspend fun refreshAvailableServers(): Result<List<SonixAssignedServer>> =
+        refreshAvailableServers(forceSync = false)
+
+    override suspend fun refreshAvailableServers(forceSync: Boolean): Result<List<SonixAssignedServer>> {
+        val syncResult = syncNow(force = forceSync)
         if (syncResult.isFailure) return Result.failure(syncResult.exceptionOrNull() ?: IllegalStateException("تعذّر التحقق من الجهاز"))
         val current = _state.value
         if (current.isBlockedOrRevoked) return Result.failure(IllegalStateException("تم إيقاف هذا الجهاز من لوحة التحكم"))
@@ -136,6 +149,7 @@ class SonixControlRepositoryImpl @Inject constructor(
                     runCatching { json.decodeFromJsonElement<List<SonixAssignedServer>>(element) }.getOrNull()
                 } ?: emptyList()
                 _state.update { it.copy(availableServers = servers) }
+                identityStore.saveCachedSnapshot(_state.value.toSnapshot())
                 Result.success(servers)
             }
             is SonixApiResult.Forbidden -> Result.failure(IllegalStateException(localizeApiError(result.errorCode)))
@@ -326,6 +340,7 @@ class SonixControlRepositoryImpl @Inject constructor(
         subscription = subscription,
         settings = settings,
         assignedServers = assignedServers,
+        availableServers = availableServers,
         pendingMessages = pendingMessages,
         lastSyncedAt = lastSyncedAt,
     )
