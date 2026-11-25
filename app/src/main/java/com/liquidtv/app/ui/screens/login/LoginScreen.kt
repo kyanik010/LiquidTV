@@ -109,12 +109,11 @@ fun LoginScreen(
                 .windowInsetsPadding(WindowInsets.safeDrawing),
         ) {
             val isCompactHeight = maxHeight < 480.dp
+            val isCompactWidth = maxWidth < 480.dp
             val maxCardWidth = when {
-                state.activeSection == LoginSection.PLAYLISTS -> if (maxWidth < 720.dp) maxWidth * 0.95f else 620.dp
-                maxWidth < 480.dp -> (maxWidth * 0.94f).coerceIn(280.dp, 390.dp)
-                maxWidth < 720.dp -> 420.dp
-                maxWidth < 1100.dp -> 460.dp
-                else -> 490.dp
+                maxWidth < 720.dp -> maxWidth * 0.98f
+                maxWidth < 1100.dp -> 900.dp
+                else -> 1040.dp
             }
             val fieldInputHeight = if (isCompactHeight) 36.dp else 42.dp
             val verticalGap = if (isCompactHeight) 6.dp else 10.dp
@@ -123,7 +122,7 @@ fun LoginScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(scrollState)
-                    .padding(horizontal = 14.dp, vertical = if (isCompactHeight) 8.dp else 16.dp),
+                    .padding(horizontal = if (isCompactWidth) 6.dp else 14.dp, vertical = if (isCompactHeight) 8.dp else 16.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 val colors = AppTheme.colors
@@ -140,8 +139,12 @@ fun LoginScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(
-                                horizontal = if (isCompactHeight) 14.dp else 18.dp,
-                                vertical = if (isCompactHeight) 10.dp else 16.dp,
+                                horizontal = when {
+                                    isCompactWidth -> 8.dp
+                                    isCompactHeight -> 14.dp
+                                    else -> 18.dp
+                                },
+                                vertical = if (isCompactHeight) 8.dp else 12.dp,
                             ),
                         verticalArrangement = Arrangement.spacedBy(verticalGap),
                     ) {
@@ -199,52 +202,41 @@ fun LoginScreen(
                             }
                         }
 
-                        // Primary Two-Section Switcher: 1. اختار السيرفر | 2. قوائم التشغيل
+                        // Two persistent, equally sized cards. They remain side by side on narrow phones.
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(50))
-                                .background(colors.panel.copy(alpha = 0.84f))
-                                .border(1.dp, colors.border.copy(alpha = 0.55f), RoundedCornerShape(50))
-                                .padding(3.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                .height(IntrinsicSize.Min)
+                                .testTag("login_two_cards_row"),
+                            horizontalArrangement = Arrangement.spacedBy(if (isCompactWidth) 6.dp else 10.dp),
+                            verticalAlignment = Alignment.Top,
                         ) {
-                            LoginSectionTab(
-                                title = "اختار السيرفر",
-                                icon = Icons.Filled.Dns,
-                                selected = state.activeSection == LoginSection.SERVER_SELECTION,
-                                enabled = !state.isConnecting,
-                                onClick = { viewModel.selectSection(LoginSection.SERVER_SELECTION) },
+                            Column(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .testTag("tab_section_server"),
-                            )
-                            LoginSectionTab(
-                                title = "قوائم التشغيل (${state.savedPlaylists.size})",
-                                icon = Icons.AutoMirrored.Filled.PlaylistPlay,
-                                selected = state.activeSection == LoginSection.PLAYLISTS,
-                                enabled = !state.isConnecting,
-                                onClick = { viewModel.selectSection(LoginSection.PLAYLISTS) },
+                                    .fillMaxHeight(),
+                            ) {
+                                ServerSelectionSection(
+                                    state = state,
+                                    fieldInputHeight = fieldInputHeight,
+                                    isCompactHeight = isCompactHeight,
+                                    primaryInputRequester = primaryInputRequester,
+                                    viewModel = viewModel,
+                                    modifier = Modifier.fillMaxHeight(),
+                                )
+                            }
+                            Column(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .testTag("tab_section_playlists"),
-                            )
-                        }
-
-                        if (state.activeSection == LoginSection.SERVER_SELECTION) {
-                            ServerSelectionSection(
-                                state = state,
-                                fieldInputHeight = fieldInputHeight,
-                                isCompactHeight = isCompactHeight,
-                                primaryInputRequester = primaryInputRequester,
-                                viewModel = viewModel,
-                            )
-                        } else {
-                            PlaylistsSection(
-                                state = state,
-                                viewModel = viewModel,
-                                onRequestDelete = { pendingDelete = it },
-                            )
+                                    .fillMaxHeight(),
+                            ) {
+                                PlaylistsSection(
+                                    state = state,
+                                    viewModel = viewModel,
+                                    onRequestDelete = { pendingDelete = it },
+                                    modifier = Modifier.fillMaxHeight(),
+                                )
+                            }
                         }
                     }
                 }
@@ -289,6 +281,7 @@ private fun ServerSelectionSection(
     isCompactHeight: Boolean,
     primaryInputRequester: FocusRequester,
     viewModel: LoginViewModel,
+    modifier: Modifier = Modifier,
 ) {
     val colors = AppTheme.colors
     val isPanelLockedEdit = state.editingOrigin == SubscriptionOrigin.PANEL_SERVER
@@ -300,8 +293,9 @@ private fun ServerSelectionSection(
         (!state.selectedPanelServerId.isNullOrBlank() || isPanelLockedEdit)
 
     LiquidGlassSurface(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
+            .fillMaxHeight()
             .animateContentSize()
             .testTag("server_selection_main_card"),
         cornerRadius = 16.dp,
@@ -996,39 +990,38 @@ private fun DeviceIdCompactCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .padding(horizontal = 8.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            Icon(
+                imageVector = Icons.Filled.Devices,
+                contentDescription = "Device ID",
+                tint = colors.accentText,
+                modifier = Modifier.size(16.dp),
+            )
+            Column(
                 modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Devices,
-                    contentDescription = "Device ID",
-                    tint = colors.accentText,
-                    modifier = Modifier.size(20.dp),
+                Text("Device ID", style = LiquidTypography.LabelSmall, color = colors.muted)
+                Text(
+                    text = validCode ?: "جارٍ تسجيل الجهاز...",
+                    style = LiquidTypography.LabelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = colors.text,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.testTag("device_id_value"),
                 )
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("Device ID", style = LiquidTypography.LabelSmall, color = colors.muted)
-                    Text(
-                        text = validCode ?: "جارٍ تسجيل الجهاز...",
-                        style = LiquidTypography.TitleSmall.copy(fontWeight = FontWeight.Bold),
-                        color = colors.text,
-                        modifier = Modifier.testTag("device_id_value"),
-                    )
-                }
             }
 
             val copyInteraction = remember { MutableInteractionSource() }
             val copyFocused by copyInteraction.collectIsFocusedAsState()
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier
-                    .heightIn(min = 48.dp)
+                    .heightIn(min = 36.dp)
                     .clip(RoundedCornerShape(50))
                     .background(
                         when {
@@ -1058,19 +1051,20 @@ private fun DeviceIdCompactCard(
                         },
                     )
                     .focusable(interactionSource = copyInteraction)
-                    .padding(horizontal = 14.dp)
+                    .padding(horizontal = 7.dp)
                     .testTag("copy_device_id_button"),
             ) {
                 Icon(
                     imageVector = if (copiedFeedback) Icons.Filled.Check else Icons.Filled.ContentCopy,
                     contentDescription = "نسخ Device ID",
                     tint = if (copiedFeedback) colors.success else colors.accentText,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(14.dp),
                 )
                 Text(
                     text = if (copiedFeedback) "تم النسخ" else "نسخ",
-                    style = LiquidTypography.LabelMedium,
+                    style = LiquidTypography.LabelSmall,
                     color = if (copiedFeedback) colors.success else colors.text,
+                    maxLines = 1,
                 )
             }
         }
@@ -1082,16 +1076,48 @@ private fun PlaylistsSection(
     state: LoginUiState,
     viewModel: LoginViewModel,
     onRequestDelete: (Subscription) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = AppTheme.colors
     val clipboardManager = LocalClipboardManager.current
 
-    Column(
-        modifier = Modifier
+    LiquidGlassSurface(
+        modifier = modifier
             .fillMaxWidth()
-            .testTag("login_playlists_section"),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+            .fillMaxHeight()
+            .testTag("playlists_main_card"),
+        cornerRadius = 16.dp,
+        glassColor = colors.panel,
+        glassAlpha = 0.48f,
+        borderColor = colors.border,
+        borderAlpha = 0.45f,
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 8.dp, vertical = 10.dp)
+                .testTag("login_playlists_section"),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.PlaylistPlay,
+                    contentDescription = null,
+                    tint = colors.accentText,
+                    modifier = Modifier.size(16.dp),
+                )
+                Text(
+                    text = "قوائم التشغيل (${state.savedPlaylists.size})",
+                    style = LiquidTypography.TitleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = colors.text,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         state.playlistMessage?.let { msg ->
             LiquidGlassSurface(
                 modifier = Modifier.testTag("playlist_feedback_banner"),
@@ -1116,38 +1142,32 @@ private fun PlaylistsSection(
             }
         }
 
-        state.errorMessage?.let { err ->
-            LoginErrorBanner(message = err)
-        }
-
         if (state.savedPlaylists.isEmpty()) {
-            LiquidGlassSurface(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .weight(1f)
                     .testTag("playlists_empty_state"),
-                cornerRadius = 16.dp,
-                glassAlpha = 0.18f,
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.PlaylistPlay,
-                        contentDescription = null,
-                        tint = colors.accentText,
-                        modifier = Modifier.size(36.dp),
-                    )
-                    Text("لا توجد قوائم تشغيل محفوظة", style = LiquidTypography.TitleSmall, color = colors.text)
-                    Text(
-                        "انتقل إلى قسم \"اختار السيرفر\" لإضافة قائمة عبر URL عادي أو سيرفرات لوحة التحكم.",
-                        style = LiquidTypography.BodySmall,
-                        color = colors.textSecondary,
-                    )
-                }
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.PlaylistPlay,
+                    contentDescription = null,
+                    tint = colors.accentText,
+                    modifier = Modifier.size(28.dp),
+                )
+                Text(
+                    "لا توجد قوائم تشغيل محفوظة",
+                    style = LiquidTypography.TitleSmall,
+                    color = colors.text,
+                    maxLines = 2,
+                )
+                Text(
+                    "انتقل إلى اختيار السيرفر لإضافة قائمة عبر URL عادي أو سيرفرات لوحة التحكم.",
+                    style = LiquidTypography.BodySmall,
+                    color = colors.textSecondary,
+                )
             }
         } else {
             Column(
@@ -1170,15 +1190,16 @@ private fun PlaylistsSection(
             }
         }
 
-        // Device ID card placed BELOW the saved playlists list (or empty state)
-        DeviceIdCompactCard(
-            deviceCode = state.sonixState.deviceCode,
-            deviceUid = state.sonixState.deviceUid,
-            onCopy = { code ->
-                clipboardManager.setText(AnnotatedString(code))
-                viewModel.notifyDeviceIdCopied(code)
-            },
-        )
+            // Device ID remains inside the playlists card, aligned with the server-selection card.
+            DeviceIdCompactCard(
+                deviceCode = state.sonixState.deviceCode,
+                deviceUid = state.sonixState.deviceUid,
+                onCopy = { code ->
+                    clipboardManager.setText(AnnotatedString(code))
+                    viewModel.notifyDeviceIdCopied(code)
+                },
+            )
+        }
     }
 }
 
