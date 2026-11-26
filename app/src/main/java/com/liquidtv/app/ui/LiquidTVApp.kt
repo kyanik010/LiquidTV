@@ -1,5 +1,6 @@
 package com.liquidtv.app.ui
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.CircularProgressIndicator
@@ -10,8 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.liquidtv.app.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -56,8 +57,8 @@ fun LiquidTVApp(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 CircularProgressIndicator(color = AppTheme.colors.accent)
-                AsyncImage(
-                    model = R.drawable.liquid_logo_horizontal,
+                Image(
+                    painter = painterResource(id = R.drawable.liquid_logo_horizontal),
                     contentDescription = "SONIX IPTV",
                     modifier = Modifier.width(240.dp).height(138.dp),
                     contentScale = ContentScale.Fit,

@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -39,6 +40,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -56,7 +58,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
 import com.liquidtv.app.R
 import com.liquidtv.app.data.sonix.SonixAssignedServer
 import com.liquidtv.app.domain.model.Subscription
@@ -175,8 +176,8 @@ fun LoginScreen(
                                 )
                             }
                         }
-                        AsyncImage(
-                            model = R.drawable.liquid_logo_icon,
+                        Image(
+                            painter = painterResource(id = R.drawable.liquid_logo_icon),
                             contentDescription = "SONIX IPTV",
                             modifier = Modifier.size(if (isCompactWidth) 36.dp else 42.dp),
                             contentScale = ContentScale.Fit,

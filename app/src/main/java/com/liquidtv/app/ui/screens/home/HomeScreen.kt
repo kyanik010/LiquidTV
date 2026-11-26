@@ -1,6 +1,7 @@
 package com.liquidtv.app.ui.screens.home
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -31,6 +32,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -307,8 +309,8 @@ private fun HomeHeader(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            AsyncImage(
-                model = R.drawable.liquid_logo_horizontal,
+            Image(
+                painter = painterResource(id = R.drawable.liquid_logo_horizontal),
                 contentDescription = "SONIX IPTV",
                 modifier = Modifier.width(if (isCompact) 156.dp else 190.dp).height(if (isCompact) 90.dp else 110.dp),
                 contentScale = ContentScale.Fit,

@@ -3,6 +3,7 @@ package com.liquidtv.app.ui.screens.settings
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,6 +34,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -40,7 +42,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
 import com.liquidtv.app.R
 import com.liquidtv.app.BuildConfig
 import com.liquidtv.app.ui.components.AppBackground
@@ -1047,8 +1048,8 @@ private fun SettingsDetailPane(
                                     SettingHeader("حول SONIX IPTV", "مصمم لأجهزة Android TV وGoogle TV والهواتف والأجهزة اللوحية")
                                 }
                                 item {
-                                    AsyncImage(
-                                        model = R.drawable.liquid_logo_horizontal,
+                                    Image(
+                                        painter = painterResource(id = R.drawable.liquid_logo_horizontal),
                                         contentDescription = "SONIX IPTV",
                                         modifier = Modifier.width(220.dp).height(126.dp),
                                         contentScale = ContentScale.Fit,
