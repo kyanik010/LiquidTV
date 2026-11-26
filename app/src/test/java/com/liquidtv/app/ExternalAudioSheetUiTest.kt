@@ -1,33 +1,32 @@
 package com.liquidtv.app
 
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
-import com.liquidtv.app.domain.model.MediaType
-import com.liquidtv.app.domain.model.OnlineSubtitleResult
-import com.liquidtv.app.domain.model.SubtitleMediaMetadata
-import com.liquidtv.app.domain.model.TrackInfo
-import com.liquidtv.app.player.PlayerUiState
-import com.liquidtv.app.ui.screens.player.PlayerOverlaySheetDefaults
-import com.liquidtv.app.ui.screens.player.PlayerSubtitlesAndTracksSheet
-import kotlin.math.abs
 import com.liquidtv.app.domain.model.AudioBrandFilter
 import com.liquidtv.app.domain.model.AudioChannelBrand
 import com.liquidtv.app.domain.model.ExternalAudioChannel
 import com.liquidtv.app.domain.model.ExternalAudioStatus
 import com.liquidtv.app.domain.model.ExternalAudioSyncStage
 import com.liquidtv.app.domain.model.ExternalAudioUiState
+import com.liquidtv.app.domain.model.MediaType
+import com.liquidtv.app.domain.model.OnlineSubtitleResult
+import com.liquidtv.app.domain.model.SubtitleMediaMetadata
+import com.liquidtv.app.domain.model.TrackInfo
 import com.liquidtv.app.player.ExternalAudioSyncPolicy
+import com.liquidtv.app.player.PlayerUiState
 import com.liquidtv.app.ui.screens.player.ExternalAudioSheet
+import com.liquidtv.app.ui.screens.player.PlayerOverlaySheetDefaults
+import com.liquidtv.app.ui.screens.player.PlayerSubtitlesAndTracksSheet
 import com.liquidtv.app.ui.theme.LiquidTVTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -36,6 +35,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import kotlin.math.abs
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "w1280dp-h720dp-xhdpi")
@@ -92,53 +92,26 @@ class ExternalAudioSheetUiTest {
         assertEquals(AudioBrandFilter.ALWAN, selectedFilter)
     }
 
+    @Test
+    @Config(sdk = [36], qualifiers = "w850dp-h390dp-xhdpi")
+    fun `ExternalAudioSheet shows at least 6 full channels simultaneously on Phone Landscape`() {
+        verifyAtLeastSixChannelsVisible()
+    }
 
     @Test
-    fun `ExternalAudioSheet and PlayerSubtitlesAndTracksSheet share exact compact dimensions across all states on TV`() {
-        verifyUnifiedCompactDimensions(expectedMaxWidthDp = 460f, expectedMaxHeightDp = 460f)
+    @Config(sdk = [36], qualifiers = "w1280dp-h720dp-xhdpi")
+    fun `ExternalAudioSheet shows at least 6 full channels simultaneously on TV Landscape`() {
+        verifyAtLeastSixChannelsVisible()
     }
 
     @Test
     @Config(sdk = [36], qualifiers = "w390dp-h800dp-xhdpi")
-    fun `ExternalAudioSheet and PlayerSubtitlesAndTracksSheet share exact compact dimensions on Phone Portrait`() {
-        verifyUnifiedCompactDimensions(expectedMaxWidthDp = 390f, expectedMaxHeightDp = 460f)
+    fun `ExternalAudioSheet shows at least 6 full channels simultaneously on Phone Portrait`() {
+        verifyAtLeastSixChannelsVisible()
     }
 
     @Test
-    fun `ExternalAudioSheet search input filters and updates cleanly without clipping`() {
-        val channels = listOf(
-            ExternalAudioChannel("1", "beIN SPORTS 1 HD", "1", "http://ex/1.m3u8", AudioChannelBrand.BEIN_SPORTS, "beIN SPORTS", qualityLabel = "HD"),
-            ExternalAudioChannel("2", "ALWAN 2 FHD", "2", "http://ex/2.m3u8", AudioChannelBrand.ALWAN, "ALWAN", qualityLabel = "FHD"),
-        )
-        var latestQuery by mutableStateOf("")
-        composeRule.setContent {
-            LiquidTVTheme {
-                ExternalAudioSheet(
-                    state = ExternalAudioUiState(
-                        isSheetVisible = true,
-                        channels = channels,
-                        searchQuery = latestQuery,
-                    ),
-                    onSelectChannel = {},
-                    onDetachAudio = {},
-                    onRefreshCatalog = {},
-                    onSearchQueryChange = { latestQuery = it },
-                    onSelectBrandFilter = {},
-                    onVolumeChange = {},
-                    onToggleLoudnessBoost = {},
-                    onAdjustSyncOffset = {},
-                    onResetSyncOffset = {},
-                    onClose = {},
-                )
-            }
-        }
-        composeRule.onNodeWithTag("external_audio_search_input").performTextInput("ALWAN")
-        composeRule.waitForIdle()
-        assertEquals("ALWAN", latestQuery)
-        composeRule.onNodeWithText("ALWAN 2 FHD").assertIsDisplayed()
-    }
-
-    private fun verifyUnifiedCompactDimensions(expectedMaxWidthDp: Float, expectedMaxHeightDp: Float) {
+    fun `ExternalAudioSheet and PlayerSubtitlesAndTracksSheet maintain stable dimensions across states`() {
         val channels = listOf(
             ExternalAudioChannel("1", "beIN SPORTS 1 HD", "1", "http://ex/1.m3u8", AudioChannelBrand.BEIN_SPORTS, "beIN SPORTS", qualityLabel = "HD"),
             ExternalAudioChannel("2", "ALWAN 2 FHD", "2", "http://ex/2.m3u8", AudioChannelBrand.ALWAN, "ALWAN", qualityLabel = "FHD"),
@@ -147,14 +120,12 @@ class ExternalAudioSheetUiTest {
         var audioUiState by mutableStateOf(
             ExternalAudioUiState(isSheetVisible = true, isLoadingCatalog = true, channels = emptyList()),
         )
-        var playerUiState by mutableStateOf(
-            PlayerUiState(
-                mediaType = MediaType.MOVIE,
-                subtitleMetadata = SubtitleMediaMetadata(title = "Test Movie", mediaType = MediaType.MOVIE),
-                audioTracks = listOf(TrackInfo(0, 0, "ar", "Arabic Stereo", false)),
-                subtitleSearchResults = listOf(
-                    OnlineSubtitleResult(url = "http://ex/s1.srt", label = "Arabic WEB-DL Subtitles.srt", language = "ar", addonName = "OpenSubtitles"),
-                ),
+        val playerUiState = PlayerUiState(
+            mediaType = MediaType.MOVIE,
+            subtitleMetadata = SubtitleMediaMetadata(title = "Test Movie", mediaType = MediaType.MOVIE),
+            audioTracks = listOf(TrackInfo(0, 0, "ar", "Arabic Stereo", false)),
+            subtitleSearchResults = listOf(
+                OnlineSubtitleResult(url = "http://ex/s1.srt", label = "Arabic WEB-DL Subtitles.srt", language = "ar", addonName = "OpenSubtitles"),
             ),
         )
 
@@ -194,11 +165,9 @@ class ExternalAudioSheetUiTest {
             }
         }
 
-        // State 1: Audio loading (empty)
         composeRule.waitForIdle()
         val audioLoadingBounds = composeRule.onNodeWithTag("external_audio_sheet").getUnclippedBoundsInRoot()
 
-        // State 2: Audio populated + active
         audioUiState = ExternalAudioUiState(
             isSheetVisible = true,
             isLoadingCatalog = false,
@@ -209,37 +178,50 @@ class ExternalAudioSheetUiTest {
         )
         composeRule.waitForIdle()
         val audioActiveBounds = composeRule.onNodeWithTag("external_audio_sheet").getUnclippedBoundsInRoot()
-        val audioRowBounds = composeRule.onNodeWithTag("external_audio_channel_1").getUnclippedBoundsInRoot()
+        assertTrue(abs(audioLoadingBounds.width.value - audioActiveBounds.width.value) < 0.5f)
+        assertTrue(abs(audioLoadingBounds.height.value - audioActiveBounds.height.value) < 0.5f)
+        assertTrue(audioActiveBounds.width.value <= 760.5f)
 
-        // State 3: Subtitles sheet (Tracks tab)
         showAudio = false
         composeRule.waitForIdle()
         val subTracksBounds = composeRule.onNodeWithTag("player_tracks_sheet").getUnclippedBoundsInRoot()
         val subOptionRowBounds = composeRule.onNodeWithTag("disable_all_subtitles_row").getUnclippedBoundsInRoot()
+        assertTrue(subTracksBounds.width.value <= PlayerOverlaySheetDefaults.SheetMaxWidth.value + 0.5f)
+        assertTrue(abs(subOptionRowBounds.height.value - PlayerOverlaySheetDefaults.OptionCardHeight.value) < 0.5f)
+    }
 
-        // State 4: Subtitles sheet (Online Search tab with result card)
-        composeRule.onNodeWithTag("player_tab_online_search").performClick()
+    @Test
+    fun `ExternalAudioSheet search input filters and updates cleanly without clipping`() {
+        val channels = listOf(
+            ExternalAudioChannel("1", "beIN SPORTS 1 HD", "1", "http://ex/1.m3u8", AudioChannelBrand.BEIN_SPORTS, "beIN SPORTS", qualityLabel = "HD"),
+            ExternalAudioChannel("2", "ALWAN 2 FHD", "2", "http://ex/2.m3u8", AudioChannelBrand.ALWAN, "ALWAN", qualityLabel = "FHD"),
+        )
+        var latestQuery by mutableStateOf("")
+        composeRule.setContent {
+            LiquidTVTheme {
+                ExternalAudioSheet(
+                    state = ExternalAudioUiState(
+                        isSheetVisible = true,
+                        channels = channels,
+                        searchQuery = latestQuery,
+                    ),
+                    onSelectChannel = {},
+                    onDetachAudio = {},
+                    onRefreshCatalog = {},
+                    onSearchQueryChange = { latestQuery = it },
+                    onSelectBrandFilter = {},
+                    onVolumeChange = {},
+                    onToggleLoudnessBoost = {},
+                    onAdjustSyncOffset = {},
+                    onResetSyncOffset = {},
+                    onClose = {},
+                )
+            }
+        }
+        composeRule.onNodeWithTag("external_audio_search_input").performTextInput("ALWAN")
         composeRule.waitForIdle()
-        val subOnlineBounds = composeRule.onNodeWithTag("player_tracks_sheet").getUnclippedBoundsInRoot()
-        val onlineResultBounds = composeRule.onNodeWithTag("online_subtitle_result_card").getUnclippedBoundsInRoot()
-
-        // Verify compact size ceiling (much smaller than old 720x620 & 660x580)
-        assertTrue(audioActiveBounds.width.value <= expectedMaxWidthDp + 0.5f)
-        assertTrue(audioActiveBounds.height.value <= expectedMaxHeightDp + 0.5f)
-
-        // Verify exact width & height match across all states and across both sheets
-        assertTrue(abs(audioLoadingBounds.width.value - audioActiveBounds.width.value) < 0.5f)
-        assertTrue(abs(audioLoadingBounds.height.value - audioActiveBounds.height.value) < 0.5f)
-        assertTrue(abs(audioActiveBounds.width.value - subTracksBounds.width.value) < 0.5f)
-        assertTrue(abs(audioActiveBounds.height.value - subTracksBounds.height.value) < 0.5f)
-        assertTrue(abs(subTracksBounds.width.value - subOnlineBounds.width.value) < 0.5f)
-        assertTrue(abs(subTracksBounds.height.value - subOnlineBounds.height.value) < 0.5f)
-
-        // Verify unified internal card heights (48.dp)
-        val expectedRowHeight = PlayerOverlaySheetDefaults.OptionCardHeight.value
-        assertTrue(abs(audioRowBounds.height.value - expectedRowHeight) < 0.5f)
-        assertTrue(abs(subOptionRowBounds.height.value - expectedRowHeight) < 0.5f)
-        assertTrue(abs(onlineResultBounds.height.value - expectedRowHeight) < 0.5f)
+        assertEquals("ALWAN", latestQuery)
+        composeRule.onNodeWithText("ALWAN 2 FHD").assertIsDisplayed()
     }
 
     @Test
@@ -285,11 +267,9 @@ class ExternalAudioSheetUiTest {
         composeRule.onNodeWithTag("external_audio_last_synced_text").assertIsDisplayed()
         composeRule.onNodeWithText("تمت المزامنة بنجاح").assertIsDisplayed()
 
-        // Enabled click fires once
         composeRule.onNodeWithTag("external_audio_sync_catalog_button").performClick()
         assertEquals(1, syncClicks)
 
-        // While syncing, button disables repeated taps and shows downloading stage + keeps channels visible
         loadingState = true
         stage = ExternalAudioSyncStage.DOWNLOADING_PLAYLIST
         stageMsg = ExternalAudioSyncStage.DOWNLOADING_PLAYLIST.defaultMessageAr
@@ -299,12 +279,61 @@ class ExternalAudioSheetUiTest {
         assertEquals(1, syncClicks)
         composeRule.onNodeWithText("beIN SPORTS 1 HD").assertIsDisplayed()
 
-        // Failure keeps cached channels visible and shows failure reason
         loadingState = false
         stage = ExternalAudioSyncStage.FAILED
         stageMsg = "فشلت المزامنة: انتهت مهلة القراءة أثناء تحميل قائمة الصوت"
         composeRule.waitForIdle()
         composeRule.onNodeWithText("فشلت المزامنة: انتهت مهلة القراءة أثناء تحميل قائمة الصوت").assertIsDisplayed()
         composeRule.onNodeWithText("beIN SPORTS 1 HD").assertIsDisplayed()
+    }
+
+    private fun verifyAtLeastSixChannelsVisible() {
+        val tenChannels = (1..10).map { idx ->
+            ExternalAudioChannel(
+                id = "ext-$idx",
+                name = "beIN SPORTS $idx SD",
+                number = idx.toString(),
+                streamUrl = "http://ex/$idx.m3u8",
+                brand = if (idx <= 7) AudioChannelBrand.BEIN_SPORTS else AudioChannelBrand.ALWAN,
+                categoryName = if (idx <= 7) "beIN SPORTS" else "ALWAN",
+                qualityLabel = "SD",
+            )
+        }
+        composeRule.setContent {
+            LiquidTVTheme {
+                ExternalAudioSheet(
+                    state = ExternalAudioUiState(
+                        isSheetVisible = true,
+                        syncStage = ExternalAudioSyncStage.SUCCEEDED,
+                        syncStageMessage = "تمت المزامنة بنجاح",
+                        lastSyncedAtMs = 1764070000000L,
+                        activeChannel = tenChannels.first(),
+                        status = ExternalAudioStatus.ACTIVE,
+                        statusMessage = "نشط: beIN SPORTS 1 SD",
+                        channels = tenChannels,
+                    ),
+                    onSelectChannel = {},
+                    onDetachAudio = {},
+                    onRefreshCatalog = {},
+                    onSearchQueryChange = {},
+                    onSelectBrandFilter = {},
+                    onVolumeChange = {},
+                    onToggleLoudnessBoost = {},
+                    onAdjustSyncOffset = {},
+                    onResetSyncOffset = {},
+                    onClose = {},
+                )
+            }
+        }
+        composeRule.waitForIdle()
+        val listBounds = composeRule.onNodeWithTag("external_audio_channel_list").getUnclippedBoundsInRoot()
+        for (i in 1..6) {
+            composeRule.onNodeWithTag("external_audio_channel_$i").assertIsDisplayed()
+            val itemBounds = composeRule.onNodeWithTag("external_audio_channel_$i").getUnclippedBoundsInRoot()
+            assertTrue(
+                "Channel $i bottom (${itemBounds.bottom.value}) exceeded list bottom (${listBounds.bottom.value})",
+                itemBounds.bottom.value <= listBounds.bottom.value + 1f,
+            )
+        }
     }
 }

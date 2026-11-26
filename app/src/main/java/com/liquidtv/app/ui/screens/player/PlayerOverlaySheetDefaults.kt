@@ -51,6 +51,8 @@ fun PlayerOverlaySheetCard(
     testTag: String,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    maxCardWidth: androidx.compose.ui.unit.Dp = PlayerOverlaySheetDefaults.SheetMaxWidth,
+    maxCardHeight: androidx.compose.ui.unit.Dp = PlayerOverlaySheetDefaults.SheetMaxHeight,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = AppTheme.colors
@@ -58,15 +60,15 @@ fun PlayerOverlaySheetCard(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
-        val horizontalMargin = if (maxWidth < 480.dp) 12.dp else 24.dp
-        val verticalMargin = if (maxHeight < 480.dp) 12.dp else 20.dp
+        val horizontalMargin = if (maxWidth < 480.dp) 10.dp else 20.dp
+        val verticalMargin = if (maxHeight < 480.dp) 8.dp else 18.dp
         val cardWidth = (maxWidth - horizontalMargin * 2).coerceIn(
             PlayerOverlaySheetDefaults.SheetMinWidth,
-            PlayerOverlaySheetDefaults.SheetMaxWidth,
+            maxCardWidth,
         )
         val cardHeight = (maxHeight - verticalMargin * 2).coerceIn(
             PlayerOverlaySheetDefaults.SheetMinHeight,
-            PlayerOverlaySheetDefaults.SheetMaxHeight,
+            maxCardHeight,
         )
 
         Box(
