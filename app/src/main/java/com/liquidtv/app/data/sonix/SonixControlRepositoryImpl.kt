@@ -40,7 +40,7 @@ class SonixControlRepositoryImpl @Inject constructor(
 
     private val json = Json { ignoreUnknownKeys = true }
     private val syncMutex = Mutex()
-    // Serialize every token read / request / recovery / token write across all actions.
+    // Serialize token recovery and persistence only; ordinary API requests stay concurrent.
     private val deviceAuthMutex = Mutex()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
