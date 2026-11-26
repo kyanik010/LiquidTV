@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.liquidtv.app.R
 import com.liquidtv.app.BuildConfig
 import com.liquidtv.app.domain.model.Category
 import com.liquidtv.app.domain.model.Channel
@@ -306,50 +307,17 @@ private fun HomeHeader(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(contentAlignment = Alignment.Center) {
-                Box(
-                    modifier = Modifier
-                        .size(if (isCompact) 44.dp else 52.dp)
-                        .background(
-                            Brush.radialGradient(
-                                listOf(colors.accent.copy(alpha = 0.38f), Color.Transparent)
-                            ),
-                            CircleShape,
-                        ),
-                )
-                Box(
-                    modifier = Modifier
-                        .size(if (isCompact) 38.dp else 42.dp)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(colors.accent, colors.waveOne)
-                            ),
-                            CircleShape,
-                        )
-                        .border(1.dp, colors.border.copy(alpha = 0.7f), CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Filled.LiveTv, contentDescription = null, tint = colors.onAccent, modifier = Modifier.size(20.dp))
-                }
-            }
-            Column {
-                Text(
-                    text = "LIQUID TV",
-                    style = (if (isCompact) LiquidTypography.HeadlineMedium else LiquidTypography.HeadlineLarge).copy(
-                        brush = Brush.linearGradient(
-                            listOf(
-                                colors.text,
-                                colors.accentText,
-                            )
-                        )
-                    ),
-                )
-                Text(
-                    text = "الإصدار ${BuildConfig.VERSION_NAME} • تجربة IPTV زجاجية",
-                    style = LiquidTypography.LabelSmall,
-                    color = colors.accentText.copy(alpha = 0.88f),
-                )
-            }
+            AsyncImage(
+                model = R.drawable.liquid_logo_horizontal,
+                contentDescription = "SONIX IPTV",
+                modifier = Modifier.width(if (isCompact) 156.dp else 190.dp).height(if (isCompact) 90.dp else 110.dp),
+                contentScale = ContentScale.Fit,
+            )
+            Text(
+                text = "الإصدار ${BuildConfig.VERSION_NAME}",
+                style = LiquidTypography.LabelSmall,
+                color = colors.accentText.copy(alpha = 0.88f),
+            )
         }
 
         Row(

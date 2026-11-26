@@ -38,6 +38,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -55,6 +56,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
+import com.liquidtv.app.R
 import com.liquidtv.app.data.sonix.SonixAssignedServer
 import com.liquidtv.app.domain.model.Subscription
 import com.liquidtv.app.domain.model.SubscriptionOrigin
@@ -172,24 +175,12 @@ fun LoginScreen(
                                 )
                             }
                         }
-                        Box(
-                            modifier = Modifier
-                                .size(if (isCompactWidth) 32.dp else 36.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(colors.accent, colors.waveOne),
-                                    ),
-                                ),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.LiveTv,
-                                contentDescription = "LIQUID TV",
-                                tint = colors.onAccent,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
+                        AsyncImage(
+                            model = R.drawable.liquid_logo_icon,
+                            contentDescription = "SONIX IPTV",
+                            modifier = Modifier.size(if (isCompactWidth) 36.dp else 42.dp),
+                            contentScale = ContentScale.Fit,
+                        )
                         Text(
                             text = if (state.editingSubscriptionId != null) "تعديل قائمة التشغيل" else "LIQUID TV",
                             style = LiquidTypography.TitleMedium.copy(
