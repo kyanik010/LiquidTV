@@ -215,8 +215,9 @@ class SettingsViewModel @Inject constructor(
             result.onSuccess {
                 _uiState.update { it.copy(isRefreshing = false, successMessage = "تم تحديث دليل البرامج بنجاح") }
             }.onFailure { throwable ->
+                runCatching { android.util.Log.w("SettingsViewModel", "refreshEpg failed", throwable) }
                 _uiState.update {
-                    it.copy(isRefreshing = false, error = throwable.message ?: "فشل تحديث دليل البرامج")
+                    it.copy(isRefreshing = false, error = "تعذر تحديث دليل البرامج حالياً، يرجى المحاولة لاحقاً.")
                 }
             }
         }
@@ -293,12 +294,17 @@ class SettingsViewModel @Inject constructor(
             repo.syncNow(force = true)
                 .onSuccess {
                     _uiState.update {
-                        it.copy(isRefreshing = false, successMessage = "تمت مزامنة حالة الجهاز والإعدادات من لوحة التحكم")
+                        it.copy(isRefreshing = false, successMessage = "تم تحديث حالة الجهاز والإعدادات بنجاح")
                     }
                 }
                 .onFailure { throwable ->
+                    runCatching { android.util.Log.w("SettingsViewModel", "syncWithControlPanel failed", throwable) }
                     _uiState.update {
-                        it.copy(isRefreshing = false, error = throwable.message ?: "فشلت المزامنة مع لوحة التحكم")
+                        it.copy(
+                            isRefreshing = false,
+                            error = throwable.message?.takeIf { msg -> !msg.contains("HTTP", ignoreCase = true) }
+                                ?: "تعذرت مزامنة الإعدادات حالياً، يرجى المحاولة لاحقاً.",
+                        )
                     }
                 }
         }

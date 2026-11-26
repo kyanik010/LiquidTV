@@ -94,7 +94,7 @@ fun SubscriptionsScreen(
                                 ),
                             )
                             Text(
-                                text = "إدارة قوائم URL عادي وسيرفرات لوحة التحكم",
+                                text = "إدارة قوائم URL عادي والسيرفرات المخصصة",
                                 style = LiquidTypography.BodySmall,
                                 color = colors.textSecondary,
                             )
@@ -182,7 +182,7 @@ fun SubscriptionsScreen(
                             )
                             Text("لا توجد قوائم تشغيل محفوظة", style = LiquidTypography.TitleMedium, color = colors.text)
                             Text(
-                                "أضف قائمة تشغيل عبر URL عادي أو اختر من سيرفرات لوحة التحكم لتحميل القنوات والمحتوى.",
+                                "أضف قائمة تشغيل عبر URL عادي أو اختر من السيرفرات المخصصة لتحميل القنوات والمحتوى.",
                                 style = LiquidTypography.BodySmall,
                                 color = colors.textSecondary,
                             )

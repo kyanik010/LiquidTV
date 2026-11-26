@@ -133,8 +133,8 @@ class SonixControlRepositoryImpl @Inject constructor(
         val syncRes = syncNow(force = true)
         val current = _state.value
         return when {
-            current.isBlockedOrRevoked -> Result.failure(IllegalStateException("تم إيقاف هذا الجهاز من لوحة التحكم"))
-            current.isPanelExpired -> Result.failure(IllegalStateException("انتهت صلاحية اشتراك الجهاز في لوحة التحكم"))
+            current.isBlockedOrRevoked -> Result.failure(IllegalStateException("تم إيقاف هذا الجهاز من قبل مزود الخدمة"))
+            current.isPanelExpired -> Result.failure(IllegalStateException("انتهت صلاحية اشتراك هذا الجهاز"))
             syncRes.isSuccess -> Result.success(current.assignedServers)
             else -> Result.failure(syncRes.exceptionOrNull() ?: IllegalStateException("تعذّر جلب السيرفرات المخصصة"))
         }
@@ -487,13 +487,24 @@ class SonixControlRepositoryImpl @Inject constructor(
     }
 
     private fun localizeApiError(code: String): String = when (code.trim().lowercase()) {
-        "invalid_device_credentials" -> "تعذّر التحقق من رمز أمان الجهاز. يُرجى إعادة المحاولة أو إعادة ربط الجهاز من لوحة التحكم."
-        "device_blocked" -> "تم حظر هذا الجهاز من لوحة التحكم."
-        "device_revoked" -> "تم إلغاء صلاحية هذا الجهاز من لوحة التحكم."
-        "subscription_expired" -> "انتهت صلاحية اشتراك هذا الجهاز في لوحة التحكم."
+        "invalid_device_credentials" -> "تعذّر التحقق من رمز أمان الجهاز. يُرجى إعادة المحاولة."
+        "device_blocked" -> "تم إيقاف هذا الجهاز حالياً."
+        "device_revoked" -> "تم إلغاء صلاحية هذا الجهاز."
+        "subscription_expired" -> "انتهت صلاحية اشتراك هذا الجهاز."
         "server_not_assigned" -> "السيرفر المحدد غير متاح أو تم إيقافه."
         "invalid_device_uid" -> "معرّف الجهاز غير صالح."
-        else -> if (code.startsWith("HTTP ")) "تعذّر الاتصال بلوحة التحكم ($code)" else code.ifBlank { "تعذّر الاتصال بلوحة التحكم" }
+        else -> {
+            val trimmed = code.trim()
+            if (trimmed.isBlank() ||
+                trimmed.startsWith("HTTP ", ignoreCase = true) ||
+                trimmed.startsWith("server_error_") ||
+                trimmed == "network_error"
+            ) {
+                "تعذّر الاتصال بخادم الخدمة حالياً، يرجى المحاولة لاحقاً."
+            } else {
+                trimmed
+            }
+        }
     }
 
     companion object {

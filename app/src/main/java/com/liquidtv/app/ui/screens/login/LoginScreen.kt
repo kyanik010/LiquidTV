@@ -288,7 +288,7 @@ private fun ServerSelectionSection(
         if (isPanelLockedEdit && !selId.isNullOrBlank() && catalogServers.none { it.id == selId }) {
             SonixAssignedServer(
                 id = selId,
-                name = state.selectedPanelServerName?.takeIf { it.isNotBlank() } ?: "سيرفر لوحة التحكم",
+                name = state.selectedPanelServerName?.takeIf { it.isNotBlank() } ?: "سيرفر مخصص",
             )
         } else {
             null
@@ -359,7 +359,7 @@ private fun ServerSelectionSection(
                 ) {
                     Text(
                         text = if (isPanelLockedEdit) {
-                            "وضع التعديل: سيرفر لوحة التحكم"
+                            "وضع التعديل: سيرفر مخصص"
                         } else {
                             "وضع تعديل قائمة التشغيل"
                         },
@@ -694,7 +694,7 @@ private fun PanelServersAccordionSection(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = if (isCompactCards) "السيرفرات المتاحة" else "سيرفرات لوحة التحكم",
+                text = if (isCompactCards) "السيرفرات المتاحة" else "السيرفرات المخصصة",
                 style = if (isCompactCards) LiquidTypography.LabelMedium else LiquidTypography.LabelLarge,
                 color = colors.textSecondary,
                 maxLines = 1,
@@ -759,7 +759,7 @@ private fun PanelServersAccordionSection(
                     modifier = Modifier.testTag("panel_servers_blocked"),
                 ) {
                     Text(
-                        text = "تم حظر هذا الجهاز من لوحة التحكم. لا يمكن استخدام سيرفرات اللوحة.",
+                        text = "تم إيقاف هذا الجهاز حالياً. لا يمكن استخدام السيرفرات المخصصة.",
                         style = LiquidTypography.BodySmall,
                         color = colors.text,
                         modifier = Modifier.padding(10.dp),
@@ -805,7 +805,7 @@ private fun PanelServersAccordionSection(
                             modifier = Modifier.size(16.dp),
                         )
                         Text(
-                            text = "جارٍ تحميل السيرفرات من لوحة التحكم...",
+                            text = "جارٍ تحميل السيرفرات المتاحة...",
                             style = LiquidTypography.BodySmall,
                             color = colors.textSecondary,
                         )
@@ -850,7 +850,7 @@ private fun PanelServersAccordionSection(
                     modifier = Modifier.testTag("panel_servers_empty"),
                 ) {
                     Text(
-                        text = "لا توجد سيرفرات متاحة حالياً في لوحة التحكم (${sonix.deviceCode ?: "—"}).",
+                        text = "لا توجد سيرفرات متاحة لهذا الجهاز حالياً (${sonix.deviceCode ?: "—"}).",
                         style = LiquidTypography.BodySmall,
                         color = colors.textSecondary,
                         modifier = Modifier.padding(10.dp),
@@ -1509,7 +1509,7 @@ private fun PlaylistsSection(
                         maxLines = 2,
                     )
                     Text(
-                        text = "اضغط «اختيار سيرفر» لإضافة قائمة عبر افتراضي URL أو سيرفرات لوحة التحكم.",
+                        text = "اضغط «اختيار سيرفر» لإضافة قائمة عبر افتراضي URL أو السيرفرات المخصصة.",
                         style = if (isCompactCards) LiquidTypography.LabelSmall else LiquidTypography.BodySmall,
                         color = colors.textSecondary,
                         textAlign = TextAlign.Center,

@@ -99,24 +99,24 @@ class StremioAddonClient @Inject constructor(
     ): StremioAddon = withContext(Dispatchers.IO) {
         val normalizedUrl = normalizeManifestUrl(manifestUrl)
         require(normalizedUrl.startsWith("http://", true) || normalizedUrl.startsWith("https://", true)) {
-            "أدخل رابط Manifest صالحاً يبدأ بـ https:// أو http://"
+            "أدخل رابط إضافة صالحاً يبدأ بـ https:// أو http://"
         }
         val body = fetchText(normalizedUrl)
         val json = JSONObject(body)
         val id = json.optString("id").trim().ifBlank { fallbackAddon?.id.orEmpty() }
         val name = json.optString("name").trim().ifBlank { fallbackAddon?.name.orEmpty() }
         require(id.isNotBlank() && name.isNotBlank()) {
-            "ملف Manifest غير مكتمل أو لا يحتوي على معرّف واسم صالحين."
+            "ملف تعريف الإضافة غير مكتمل أو لا يحتوي على معرّف واسم صالحين."
         }
         require(!DefaultAddonsRegistry.isExcludedLegacyAddon(id, name)) {
-            "هذه الإضافة غير مدعومة في LIQUID TV."
+            "هذه الإضافة غير مدعومة في SONIX IPTV."
         }
         normalizeAddonObject(
             raw = json,
             source = source,
             explicitUrl = normalizedUrl,
             fallback = fallbackAddon,
-        ) ?: throw IllegalArgumentException("تعذر قراءة بيانات الإضافة من ملف Manifest.")
+        ) ?: throw IllegalArgumentException("تعذر قراءة بيانات الإضافة من الرابط.")
     }
 
     suspend fun resolveImdb(
@@ -189,7 +189,7 @@ class StremioAddonClient @Inject constructor(
             )
 
         val match = validCandidates.firstOrNull()
-            ?: throw IllegalStateException("لم يتم العثور على معرّف IMDb مطابق في Cinemeta أو كتالوجات الإضافات المثبتة.")
+            ?: throw IllegalStateException("لم يتم العثور على معرّف مطابق في الإضافات المثبتة.")
 
         val resourceId = formatResourceId(
             imdbId = match.imdbId,
@@ -293,7 +293,7 @@ class StremioAddonClient @Inject constructor(
 
         okHttpClient.newCall(req).execute().use { response ->
             if (!response.isSuccessful) {
-                throw IllegalStateException("تعذر تنزيل الترجمة (رمز HTTP ${response.code})")
+                throw IllegalStateException("تعذر تنزيل الترجمة من الخادم حالياً")
             }
             val body = response.body ?: throw IllegalStateException("استجابة فارغة من خادم الترجمة")
             val contentLength = body.contentLength()
@@ -397,9 +397,9 @@ class StremioAddonClient @Inject constructor(
             .build()
         okHttpClient.newCall(req).execute().use { response ->
             if (!response.isSuccessful) {
-                throw IllegalStateException("HTTP ${response.code} أثناء الاتصال بـ $url")
+                throw IllegalStateException("تعذر الاتصال بخادم الإضافة حالياً")
             }
-            val body = response.body ?: throw IllegalStateException("استجابة فارغة من $url")
+            val body = response.body ?: throw IllegalStateException("استجابة فارغة من خادم الإضافة")
             val bytes = readStreamBounded(body.byteStream(), MAX_JSON_BYTES)
             return bytes.toString(Charsets.UTF_8)
         }

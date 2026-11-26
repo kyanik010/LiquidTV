@@ -218,7 +218,7 @@ class LoginViewModel @Inject constructor(
             val result = sonixControlRepository.refreshAvailableServers(forceSync = true)
             if (result.isFailure) {
                 _uiState.update {
-                    it.copy(errorMessage = result.exceptionOrNull()?.message ?: "تعذّر تحديث بيانات لوحة التحكم")
+                    it.copy(errorMessage = result.exceptionOrNull()?.message ?: "تعذّر تحديث قائمة السيرفرات، يرجى المحاولة لاحقاً")
                 }
             }
         }
@@ -337,7 +337,7 @@ class LoginViewModel @Inject constructor(
                     val resolvedRes = sonixControlRepository.resolveAssignedServer(serverId)
                     if (resolvedRes.isFailure) {
                         val err = resolvedRes.exceptionOrNull()
-                            ?: IllegalStateException("تعذّر التحقق من السيرفر المحدد في لوحة التحكم")
+                            ?: IllegalStateException("تعذّر التحقق من السيرفر المحدد")
                         Result.failure(err)
                     } else {
                         val resolved = resolvedRes.getOrThrow()
@@ -467,7 +467,7 @@ class LoginViewModel @Inject constructor(
                     !panelUnavailable &&
                     state.editingOrigin != SubscriptionOrigin.NORMAL_URL
                 ) {
-                    return "تم تعطيل إضافة روابط URL عادية مؤقتاً من لوحة التحكم."
+                    return "تم تعطيل إضافة روابط URL عادية مؤقتاً."
                 }
                 val url = state.serverUrl.trim()
                 when {
@@ -485,12 +485,12 @@ class LoginViewModel @Inject constructor(
                 if (!state.sonixState.settings.allowPanelServers &&
                     state.editingOrigin != SubscriptionOrigin.PANEL_SERVER
                 ) {
-                    return "تم تعطيل سيرفرات لوحة التحكم مؤقتاً من الإعدادات."
+                    return "تم تعطيل السيرفرات المخصصة مؤقتاً."
                 }
                 when {
-                    state.sonixState.isBlockedOrRevoked -> "تم إيقاف هذا الجهاز من لوحة التحكم."
-                    state.sonixState.isPanelExpired -> "انتهت صلاحية اشتراك الجهاز في لوحة التحكم."
-                    state.selectedPanelServerId.isNullOrBlank() -> "يرجى اختيار سيرفر من قائمة سيرفرات لوحة التحكم."
+                    state.sonixState.isBlockedOrRevoked -> "تم إيقاف هذا الجهاز حالياً. لا يمكن متابعة الاتصال."
+                    state.sonixState.isPanelExpired -> "انتهت صلاحية اشتراك هذا الجهاز."
+                    state.selectedPanelServerId.isNullOrBlank() -> "يرجى اختيار سيرفر من القائمة أولاً."
                     state.displayName.isBlank() -> "يرجى إدخال اسم قائمة التشغيل."
                     state.username.isBlank() -> "يرجى إدخال اسم المستخدم."
                     state.password.isBlank() -> "يرجى إدخال كلمة المرور."

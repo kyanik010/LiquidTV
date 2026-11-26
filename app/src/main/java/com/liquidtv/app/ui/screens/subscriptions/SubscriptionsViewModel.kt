@@ -62,8 +62,8 @@ class SubscriptionsViewModel @Inject constructor(
         viewModelScope.launch {
             _error.value = null
             repo.syncNow(force = true)
-                .onSuccess { _message.value = "تم تحديث حالة الجهاز والسيرفرات من لوحة التحكم" }
-                .onFailure { _error.value = it.message ?: "تعذّرت المزامنة مع لوحة التحكم" }
+                .onSuccess { _message.value = "تم تحديث حالة الجهاز والسيرفرات بنجاح" }
+                .onFailure { _error.value = it.message ?: "تعذّرت مزامنة السيرفرات، يرجى المحاولة لاحقاً" }
         }
     }
 

@@ -174,9 +174,9 @@ object PlayerMediaHelper {
         return when {
             cause is HttpDataSource.InvalidResponseCodeException -> {
                 when (cause.responseCode) {
-                    401, 403 -> "تم رفض الوصول للبث (HTTP ${cause.responseCode}). تحقق من اشتراكك أو عدد الأجهزة المتصلة."
-                    404, 410 -> "البث غير متوفر على الخادم (HTTP ${cause.responseCode})."
-                    else -> "أرجع الخادم خطأ HTTP ${cause.responseCode} (${error.errorCodeName})."
+                    401, 403 -> "تم رفض الوصول للبث. تحقق من اشتراكك أو عدد الأجهزة المتصلة."
+                    404, 410 -> "البث غير متوفر على الخادم حالياً."
+                    else -> "تعذّر تشغيل البث من الخادم حالياً، يرجى المحاولة لاحقاً."
                 }
             }
             error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ->
@@ -188,7 +188,7 @@ object PlayerMediaHelper {
             error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED ||
                 error.errorCode == PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED ->
                 "صيغة البث غير مدعومة أو استجابة غير صالحة."
-            else -> error.localizedMessage ?: "البث غير متاح مؤقتاً (${error.errorCodeName})."
+            else -> "البث غير متاح مؤقتاً، يرجى المحاولة لاحقاً."
         }
     }
 

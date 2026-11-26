@@ -54,7 +54,7 @@ class HttpSonixControlApi(
     ): SonixApiResult<JsonObject> = withContext(Dispatchers.IO) {
         val cleanBase = baseUrl.trim().trimEnd('/')
         if (cleanBase.isEmpty() || anonKey.isBlank()) {
-            return@withContext SonixApiResult.Failure("إعدادات الاتصال بلوحة SONIX-CONTROL غير مكتملة")
+            return@withContext SonixApiResult.Failure("إعدادات الخدمة غير مكتملة")
         }
 
         val bodyJson = buildJsonObject {
@@ -88,13 +88,14 @@ class HttpSonixControlApi(
                     response.code == 401 -> SonixApiResult.Unauthorized(errorCode.ifBlank { "invalid_device_credentials" })
                     response.code == 403 -> SonixApiResult.Forbidden(errorCode.ifBlank { "access_denied" })
                     else -> {
-                        val msg = errorCode.ifBlank { "HTTP ${response.code}" }
+                        val msg = errorCode.ifBlank { "server_error_${response.code}" }
                         SonixApiResult.Failure(msg, response.code)
                     }
                 }
             }
         } catch (e: Exception) {
-            SonixApiResult.Failure(e.message ?: "تعذّر الاتصال بلوحة التحكم")
+            runCatching { android.util.Log.w("SonixControlApi", "API call failed", e) }
+            SonixApiResult.Failure("network_error")
         }
     }
 

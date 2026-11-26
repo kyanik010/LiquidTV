@@ -69,7 +69,7 @@ class AppUpdateManager @Inject constructor(
             val repo = sanitizeRepo(rawRepo)
 
             if (!isValidRepoFormat(repo)) {
-                return@withContext Result.failure(IllegalArgumentException("يرجى تحديد مستودع GitHub صحيح بصيغة 'owner/repo'"))
+                return@withContext Result.failure(IllegalArgumentException("تعذّر التحقق من إعدادات التحديثات"))
             }
 
             val releaseResult = checkGithubReleaseApi(repo)
@@ -114,10 +114,11 @@ class AppUpdateManager @Inject constructor(
         return try {
             okHttpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    return Result.failure(Exception("GitHub API returned HTTP ${response.code} for $repo"))
+                    runCatching { android.util.Log.w("AppUpdateManager", "Release check returned ${response.code}") }
+                    return Result.failure(Exception("تعذّر التحقق من توفر تحديثات جديدة حالياً"))
                 }
 
-                val body = response.body?.string() ?: return Result.failure(Exception("Empty response body from GitHub"))
+                val body = response.body?.string() ?: return Result.failure(Exception("استجابة التحديثات غير مكتملة"))
                 val json = JSONObject(body)
 
                 val rawTag = json.optString("tag_name", "").trim()
@@ -144,7 +145,7 @@ class AppUpdateManager @Inject constructor(
                 }
 
                 if (apkUrl.isNullOrBlank()) {
-                    return Result.failure(Exception("Release $versionName found on GitHub, but no trusted .apk asset was attached"))
+                    return Result.failure(Exception("لا تتوفر حزمة تثبيت صالحة لهذا الإصدار حالياً"))
                 }
 
                 Result.success(
@@ -198,7 +199,7 @@ class AppUpdateManager @Inject constructor(
             } catch (_: Exception) {
             }
         }
-        return Result.failure(Exception("No valid version.json found in repository $repo"))
+        return Result.failure(Exception("لا توجد تحديثات جديدة متاحة حالياً"))
     }
 
     suspend fun downloadUpdate(
@@ -225,7 +226,7 @@ class AppUpdateManager @Inject constructor(
 
             okHttpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    return@withContext Result.failure(Exception("Failed to download APK: HTTP ${response.code}"))
+                    return@withContext Result.failure(Exception("تعذّر تنزيل ملف التحديث من الخادم"))
                 }
 
                 // Verify final redirect host stayed on trusted GitHub infrastructure
@@ -368,7 +369,7 @@ class AppUpdateManager @Inject constructor(
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }
                 context.startActivity(settingsIntent)
-                return Result.failure(IllegalStateException("يرجى السماح بصلاحية تثبيت التطبيقات من مصادر غير معروفة لتطبيق LIQUID TV ثم اضغط تثبيت مجدداً."))
+                return Result.failure(IllegalStateException("يرجى السماح بصلاحية تثبيت التطبيقات من مصادر غير معروفة لتطبيق SONIX IPTV ثم اضغط تثبيت مجدداً."))
             }
 
             val apkUri: Uri = FileProvider.getUriForFile(

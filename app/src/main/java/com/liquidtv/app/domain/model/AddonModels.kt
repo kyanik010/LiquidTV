@@ -305,7 +305,7 @@ object DefaultAddonsRegistry {
             id = CINEMETA_ID,
             name = "Cinemeta",
             version = "3.0.14",
-            description = "كتالوج الأفلام والمسلسلات ومعرّفات IMDb من Stremio",
+            description = "كتالوج بيانات الأفلام والمسلسلات",
             url = "https://v3-cinemeta.strem.io/manifest.json",
             types = listOf("movie", "series"),
             resources = listOf("catalog", "meta", "addon_catalog"),

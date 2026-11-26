@@ -66,7 +66,7 @@ private val LocalSettingsCompactHeight = staticCompositionLocalOf { false }
 
 private enum class SettingsSection(val title: String, val icon: ImageVector) {
     Subscriptions("الاشتراكات والمزامنة", Icons.Filled.Subscriptions),
-    Addons("Addons – الإضافات", Icons.Filled.Extension),
+    Addons("الإضافات", Icons.Filled.Extension),
     Themes("الثيمات", Icons.Filled.ColorLens),
     Playback("التشغيل والبث", Icons.Filled.PlayCircle),
     Parental("الرقابة الأبوية", Icons.Filled.Lock),
@@ -108,8 +108,6 @@ fun SettingsScreen(
     val colors = AppTheme.colors
 
     var selectedSection by remember { mutableStateOf(SettingsSection.Subscriptions) }
-    var showRepoDialog by remember { mutableStateOf(false) }
-    var repoInput by remember { mutableStateOf("") }
 
     var pinAction by remember { mutableStateOf(PinDialogAction.NONE) }
     var pinError by remember { mutableStateOf<String?>(null) }
@@ -222,10 +220,6 @@ fun SettingsScreen(
                             updateViewModel = updateViewModel,
                             onManageSubscriptions = onManageSubscriptions,
                             onOpenAddons = onOpenAddons,
-                            onEditRepo = {
-                                repoInput = uiState.githubRepo
-                                showRepoDialog = true
-                            },
                             onRequestPinAction = { action ->
                                 pinError = null
                                 pinAction = action
@@ -271,10 +265,6 @@ fun SettingsScreen(
                             updateViewModel = updateViewModel,
                             onManageSubscriptions = onManageSubscriptions,
                             onOpenAddons = onOpenAddons,
-                            onEditRepo = {
-                                repoInput = uiState.githubRepo
-                                showRepoDialog = true
-                            },
                             onRequestPinAction = { action ->
                                 pinError = null
                                 pinAction = action
@@ -290,57 +280,6 @@ fun SettingsScreen(
                     }
                 }
             }
-        }
-
-        if (showRepoDialog) {
-            AlertDialog(
-                onDismissRequest = { showRepoDialog = false },
-                title = { Text("مستودع GitHub", color = colors.text) },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            "أدخل اسم مستودع GitHub بصيغة 'owner/repo' (مثال: kyanik010/LiquidTV):",
-                            style = LiquidTypography.BodySmall,
-                            color = colors.textSecondary,
-                        )
-                        OutlinedTextField(
-                            value = repoInput,
-                            onValueChange = { repoInput = it },
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = colors.text,
-                                unfocusedTextColor = colors.text,
-                                focusedContainerColor = colors.surface,
-                                unfocusedContainerColor = colors.surface,
-                                focusedBorderColor = colors.accent,
-                                unfocusedBorderColor = colors.border,
-                                cursorColor = colors.accent,
-                            ),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        val sanitized = repoInput.trim()
-                            .removePrefix("https://github.com/")
-                            .removePrefix("http://github.com/")
-                            .removePrefix("github.com/")
-                            .removeSuffix(".git")
-                            .trim('/')
-                        viewModel.setGithubRepo(sanitized)
-                        showRepoDialog = false
-                    }) {
-                        Text("حفظ", color = colors.accentText)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showRepoDialog = false }) {
-                        Text("إلغاء", color = colors.muted)
-                    }
-                },
-                containerColor = colors.panel,
-            )
         }
 
         if (showLockedCategoriesDialog) {
@@ -548,7 +487,6 @@ private fun SettingsDetailPane(
     updateViewModel: AppUpdateViewModel,
     onManageSubscriptions: () -> Unit,
     onOpenAddons: () -> Unit,
-    onEditRepo: () -> Unit,
     onRequestPinAction: (PinDialogAction) -> Unit,
     onOpenLockedCategories: () -> Unit,
     compactHeight: Boolean,
@@ -581,7 +519,7 @@ private fun SettingsDetailPane(
                         when (selectedSection) {
                             SettingsSection.Subscriptions -> {
                                 item {
-                                    SettingHeader("قوائم التشغيل والمزامنة", "إدارة قوائم Xtream وحالة الجهاز في لوحة التحكم ودليل البرامج")
+                                    SettingHeader("قوائم التشغيل والمزامنة", "إدارة قوائم التشغيل وحالة الجهاز ودليل البرامج")
                                 }
                                 item {
                                     val sub = uiState.activeSubscription
@@ -607,7 +545,7 @@ private fun SettingsDetailPane(
                                         if (end != null) " • ينتهي: $end" else ""
                                     }.orEmpty()
                                     SettingItemTile(
-                                        title = "لوحة التحكم SONIX (معرّف الجهاز: $deviceIdLabel)",
+                                        title = "حالة الجهاز (معرّف الجهاز: $deviceIdLabel)",
                                         subtitle = "حالة الجهاز: ${localizedSonixAccessStatusAr(sonix.accessStatus)}$subLine • اضغط للمزامنة الآن",
                                         action = {
                                             Icon(Icons.Filled.Devices, null, tint = colors.accentText)
@@ -633,7 +571,7 @@ private fun SettingsDetailPane(
                                 item {
                                     SettingItemTile(
                                         title = "مزامنة دليل البرامج (EPG)",
-                                        subtitle = "تنزيل أحدث جدول برامج XMLTV للاشتراك المفعّل",
+                                        subtitle = "تنزيل أحدث جدول برامج للاشتراك المفعّل",
                                         action = {
                                             Icon(Icons.Filled.Schedule, null, tint = colors.accentText)
                                         },
@@ -688,14 +626,14 @@ private fun SettingsDetailPane(
                             SettingsSection.Addons -> {
                                 item {
                                     SettingHeader(
-                                        title = "Addons – الإضافات",
-                                        subtitle = "إدارة إضافات Stremio للترجمات والكتالوجات (Cinemeta وOpenSubtitles وسوق الإضافات)",
+                                        title = "الإضافات",
+                                        subtitle = "إدارة إضافات الترجمات والمحتوى والمصادر الإضافية",
                                     )
                                 }
                                 item {
                                     SettingItemTile(
-                                        title = "إدارة إضافات Stremio والترجمات",
-                                        subtitle = "تصفح السوق الرسمي والمجتمعي، التثبيت برابط Manifest، وتفعيل أو تعطيل المصادر",
+                                        title = "إدارة الإضافات والترجمات",
+                                        subtitle = "تصفح المتجر، التثبيت بالرابط المباشر، وتفعيل أو تعطيل المصادر",
                                         action = {
                                             Icon(Icons.Filled.Extension, null, tint = colors.accentText)
                                         },
@@ -706,7 +644,7 @@ private fun SettingsDetailPane(
                                 item {
                                     SettingItemTile(
                                         title = "الإضافات الافتراضية المدمجة",
-                                        subtitle = "Cinemeta (3.0.14) للبيانات وIMDb • OpenSubtitles V3 (1.0.0) • OpenSubtitles PRO (0.1.0)",
+                                        subtitle = "مصدر بيانات الأفلام والمسلسلات • مصادر الترجمات متعددة اللغات",
                                         action = {
                                             Icon(Icons.Filled.Subtitles, null, tint = colors.accentText)
                                         },
@@ -981,16 +919,16 @@ private fun SettingsDetailPane(
                             }
                             SettingsSection.Updates -> {
                                 item {
-                                    SettingHeader("تحديثات التطبيق", "فحص تحديثات لوحة SONIX-CONTROL وإصدارات GitHub الموقّعة")
+                                    SettingHeader("تحديثات التطبيق", "فحص التحديثات وتنزيل أحدث الإصدارات الرسمية الموقّعة")
                                 }
                                 item {
                                     SettingItemTile(
                                         title = "التحقق من التحديثات",
                                         subtitle = when (updateState) {
-                                            is UpdateState.Checking -> "جارٍ البحث في GitHub عن إصدارات جديدة..."
+                                            is UpdateState.Checking -> "جارٍ البحث عن تحديثات جديدة..."
                                             is UpdateState.UpToDate -> "أنت تستخدم أحدث إصدار! (v${BuildConfig.VERSION_NAME})"
                                             is UpdateState.Available -> "يتوفر تحديث جديد: v${updateState.info.versionName} • اضغط للعرض"
-                                            is UpdateState.Error -> "تعذّر الفحص: ${updateState.message}"
+                                            is UpdateState.Error -> "تعذّر التحقق من التحديثات حالياً، يرجى المحاولة لاحقاً."
                                             else -> "الإصدار المثبّت: v${BuildConfig.VERSION_NAME} (بناء ${BuildConfig.VERSION_CODE})"
                                         },
                                         action = {
@@ -1020,18 +958,8 @@ private fun SettingsDetailPane(
                                 }
                                 item {
                                     SettingItemTile(
-                                        title = "مستودع GitHub",
-                                        subtitle = uiState.githubRepo.ifBlank { "اضغط لتحديد المستودع (owner/repo)" },
-                                        action = {
-                                            Icon(Icons.Filled.Edit, null, tint = colors.accentText)
-                                        },
-                                        onClick = onEditRepo,
-                                    )
-                                }
-                                item {
-                                    SettingItemTile(
                                         title = "فحص تلقائي عند التشغيل",
-                                        subtitle = if (uiState.autoCheckUpdates) "يفحص GitHub في الخلفية عند فتح التطبيق" else "فحص يدوي للتحديثات فقط",
+                                        subtitle = if (uiState.autoCheckUpdates) "يفحص التحديثات تلقائياً في الخلفية عند فتح التطبيق" else "فحص يدوي للتحديثات فقط",
                                         action = {
                                             Switch(
                                                 checked = uiState.autoCheckUpdates,
@@ -1066,7 +994,7 @@ private fun SettingsDetailPane(
                                 item {
                                     SettingItemTile(
                                         title = "محرك التشغيل والبث",
-                                        subtitle = "خدمة تشغيل موحّدة عبر AndroidX Media3 تدعم Xtream Codes ولوحة SONIX-CONTROL ودليل البرامج XMLTV.",
+                                        subtitle = "خدمة تشغيل وبث عالية الأداء تدعم القوائم المباشرة والأفلام والمسلسلات ودليل البرامج.",
                                         action = {
                                             Icon(Icons.Filled.LiveTv, null, tint = colors.accentText)
                                         },

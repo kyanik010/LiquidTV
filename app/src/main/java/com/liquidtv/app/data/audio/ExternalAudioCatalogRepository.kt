@@ -69,7 +69,7 @@ sealed class AudioCatalogSyncException(
         AudioCatalogSyncException(userMessageAr, cause)
 
     class HttpStatusFailure(code: Int) :
-        AudioCatalogSyncException("فشل جلب قائمة M3U من الخادم (HTTP $code)")
+        AudioCatalogSyncException("فشل جلب قائمة الصوتيات من الخادم (رمز $code)")
 
     class ParseFailure(userMessageAr: String, cause: Throwable? = null) :
         AudioCatalogSyncException(userMessageAr, cause)
@@ -236,7 +236,7 @@ class DefaultExternalAudioCatalogRepository internal constructor(
         } catch (e: Exception) {
             runCatching { Log.w(TAG, "Panel audio.sources failed (${e::class.java.simpleName})") }
             emitStage(ExternalAudioSyncStage.FAILED)
-            val errMsg = e.message ?: "تعذّر جلب مصادر الصوت من لوحة التحكم"
+            val errMsg = e.message ?: "تعذّر جلب مصادر الصوت من الخادم"
             return fallbackOrError(
                 cached = cached,
                 errorMsg = errMsg,
@@ -246,7 +246,7 @@ class DefaultExternalAudioCatalogRepository internal constructor(
 
         if (panelResult.isFailure) {
             emitStage(ExternalAudioSyncStage.FAILED)
-            val panelErr = panelResult.exceptionOrNull()?.message ?: "تعذّر جلب مصادر الصوت من لوحة التحكم"
+            val panelErr = panelResult.exceptionOrNull()?.message ?: "تعذّر جلب مصادر الصوت من الخادم"
             return fallbackOrError(
                 cached = cached,
                 errorMsg = panelErr,
@@ -258,7 +258,7 @@ class DefaultExternalAudioCatalogRepository internal constructor(
         val m3uUrl = config.m3uUrl?.trim().orEmpty()
         if (!config.configured || m3uUrl.isBlank()) {
             emitStage(ExternalAudioSyncStage.FAILED)
-            val errMsg = "لم يتم ضبط رابط قائمة الصوت الخارجي لهذا الجهاز في لوحة SONIX"
+            val errMsg = "لم يتم ضبط قائمة الصوت الخارجي لهذا الجهاز بعد"
             return if (cached != null && cached.channels.isNotEmpty() && !forceRefresh) {
                 cached.copy(
                     fromCache = true,
@@ -424,13 +424,13 @@ class DefaultExternalAudioCatalogRepository internal constructor(
             } catch (e: SocketTimeoutException) {
                 throw AudioCatalogSyncException.ReadTimeoutFailure(e)
             } catch (e: EOFException) {
-                throw AudioCatalogSyncException.ParseFailure("انقطع تدفق قائمة M3U قبل اكتمالها", e)
+                throw AudioCatalogSyncException.ParseFailure("انقطع تدفق قائمة الصوتيات قبل اكتمالها", e)
             } catch (e: ZipException) {
-                throw AudioCatalogSyncException.ParseFailure("ملف M3U المضغوط غير مكتمل أو تالف", e)
+                throw AudioCatalogSyncException.ParseFailure("ملف قائمة الصوتيات المضغوط غير مكتمل أو تالف", e)
             } catch (e: IOException) {
-                throw AudioCatalogSyncException.ParseFailure("انقطعت قراءة قائمة M3U من الخادم", e)
+                throw AudioCatalogSyncException.ParseFailure("انقطعت قراءة قائمة الصوتيات من الخادم", e)
             } catch (e: IllegalStateException) {
-                throw AudioCatalogSyncException.ParseFailure(e.message ?: "تنسيق قائمة M3U غير صالح", e)
+                throw AudioCatalogSyncException.ParseFailure(e.message ?: "تنسيق قائمة الصوتيات غير صالح", e)
             }
         } finally {
             runCatching { connection.disconnect() }
@@ -442,7 +442,7 @@ class DefaultExternalAudioCatalogRepository internal constructor(
         var current = try {
             URL(currentUrl)
         } catch (e: MalformedURLException) {
-            throw AudioCatalogSyncException.RedirectFailure("عنوان قائمة M3U غير صالح", e)
+            throw AudioCatalogSyncException.RedirectFailure("عنوان قائمة الصوتيات غير صالح", e)
         }
 
         repeat(MAX_REDIRECTS + 1) { redirectIndex ->
@@ -461,7 +461,7 @@ class DefaultExternalAudioCatalogRepository internal constructor(
                     setRequestProperty("Connection", "close")
                 }
             } catch (e: Exception) {
-                throw AudioCatalogSyncException.ConnectFailure("تعذّر إنشاء اتصال HTTP بخادم الصوت", e)
+                throw AudioCatalogSyncException.ConnectFailure("تعذّر إنشاء اتصال بخادم الصوت", e)
             }
 
             val status = try {
@@ -493,15 +493,15 @@ class DefaultExternalAudioCatalogRepository internal constructor(
                 val location = connection.getHeaderField("Location")
                 runCatching { connection.disconnect() }
                 if (location.isNullOrBlank()) {
-                    throw AudioCatalogSyncException.RedirectFailure("أعاد خادم قائمة M3U تحويلاً دون وجهة")
+                    throw AudioCatalogSyncException.RedirectFailure("أعاد خادم الصوتيات تحويلاً دون وجهة")
                 }
                 if (redirectIndex >= MAX_REDIRECTS) {
-                    throw AudioCatalogSyncException.RedirectFailure("تجاوزت قائمة M3U عدد التحويلات المسموح")
+                    throw AudioCatalogSyncException.RedirectFailure("تجاوزت قائمة الصوتيات عدد التحويلات المسموح")
                 }
                 current = try {
                     URL(current, location)
                 } catch (e: MalformedURLException) {
-                    throw AudioCatalogSyncException.RedirectFailure("رابط التحويل من خادم M3U غير صالح", e)
+                    throw AudioCatalogSyncException.RedirectFailure("رابط التحويل من خادم الصوتيات غير صالح", e)
                 }
                 currentUrl = current.toString()
             } else if (status !in 200..299) {
@@ -511,7 +511,7 @@ class DefaultExternalAudioCatalogRepository internal constructor(
                 return connection to currentUrl
             }
         }
-        throw AudioCatalogSyncException.RedirectFailure("تعذّر فتح قائمة M3U بعد التحويلات")
+        throw AudioCatalogSyncException.RedirectFailure("تعذّر فتح قائمة الصوتيات بعد التحويلات")
     }
 
     private fun validateDestinationSecurity(urlString: String, parsed: URL) {

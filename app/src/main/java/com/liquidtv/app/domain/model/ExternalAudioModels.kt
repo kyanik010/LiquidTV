@@ -48,7 +48,7 @@ enum class ExternalAudioStatus {
 
 enum class ExternalAudioSyncStage(val defaultMessageAr: String) {
     IDLE(""),
-    CONNECTING_PANEL("جارٍ الاتصال بلوحة التحكم..."),
+    CONNECTING_PANEL("جارٍ الاتصال بمزود الصوتيات..."),
     DOWNLOADING_PLAYLIST("جارٍ تنزيل قوائم الصوتيات..."),
     PARSING_CHANNELS("جارٍ تحليل وتصنيف القنوات..."),
     SAVING_LOCAL("جارٍ حفظ الصوتيات على الجهاز..."),

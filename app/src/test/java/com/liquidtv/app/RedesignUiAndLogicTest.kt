@@ -1208,14 +1208,28 @@ class RedesignUiAndLogicTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("setting_manage_subscriptions").assertIsDisplayed()
 
-        // Scroll left sections list via touch swipe and tap a lower section
+        // Scroll left sections list via touch swipe and tap lower sections
         composeRule.onNodeWithTag("settings_sections_list").performTouchInput {
             swipeUp()
         }
         composeRule.waitForIdle()
+        composeRule.onNodeWithTag("settings_section_updates").assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+        composeRule.onAllNodesWithText("GitHub", substring = true, ignoreCase = true)
+            .let { assertEquals(0, it.fetchSemanticsNodes().size) }
+        composeRule.onAllNodesWithText("SONIX-CONTROL", substring = true, ignoreCase = true)
+            .let { assertEquals(0, it.fetchSemanticsNodes().size) }
+        assertEquals("kyanik010/LiquidTV", vm.uiState.value.githubRepo)
+
         composeRule.onNodeWithTag("settings_section_about").assertIsDisplayed().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("حول SONIX IPTV").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Media3", substring = true, ignoreCase = true)
+            .let { assertEquals(0, it.fetchSemanticsNodes().size) }
+        composeRule.onAllNodesWithText("XMLTV", substring = true, ignoreCase = true)
+            .let { assertEquals(0, it.fetchSemanticsNodes().size) }
+        composeRule.onAllNodesWithText("Xtream", substring = true, ignoreCase = true)
+            .let { assertEquals(0, it.fetchSemanticsNodes().size) }
     }
 }
 

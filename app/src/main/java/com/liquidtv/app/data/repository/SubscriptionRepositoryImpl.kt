@@ -92,8 +92,8 @@ class SubscriptionRepositoryImpl @Inject constructor(
                 val existing = existingId?.let { subscriptionDao.getSubscriptionById(it) }
                 val finalName = displayName.trim().ifBlank {
                     when (origin) {
-                        SubscriptionOrigin.PANEL_SERVER -> panelServerName?.takeIf { it.isNotBlank() } ?: "سيرفر لوحة التحكم"
-                        SubscriptionOrigin.NORMAL_URL -> normalizedUrl.toHttpUrlOrNull()?.host ?: "قائمة Xtream"
+                        SubscriptionOrigin.PANEL_SERVER -> panelServerName?.takeIf { it.isNotBlank() } ?: "سيرفر مخصص"
+                        SubscriptionOrigin.NORMAL_URL -> normalizedUrl.toHttpUrlOrNull()?.host ?: "قائمة البث"
                     }
                 }
 
@@ -102,7 +102,7 @@ class SubscriptionRepositoryImpl @Inject constructor(
                     name = finalName,
                     isLoading = true,
                     loadingProgress = 0.08f,
-                    statusMessage = "جارٍ الاتصال بخادم Xtream...",
+                    statusMessage = "جارٍ الاتصال بالسيرفر...",
                 )
 
                 val authResponse = xtreamApi.authenticate(
@@ -172,9 +172,9 @@ class SubscriptionRepositoryImpl @Inject constructor(
                 val panelState = sonixControlRepository?.state?.value
                 if (panelState != null && (panelState.isBlockedOrRevoked || panelState.isPanelExpired)) {
                     val reason = if (panelState.isBlockedOrRevoked) {
-                        "تم إيقاف هذا الجهاز من لوحة التحكم"
+                        "تم إيقاف هذا الجهاز حالياً"
                     } else {
-                        "انتهت صلاحية اشتراك الجهاز في لوحة التحكم"
+                        "انتهت صلاحية اشتراك هذا الجهاز"
                     }
                     return@withContext Result.failure(IllegalStateException(reason))
                 }
@@ -211,10 +211,10 @@ class SubscriptionRepositoryImpl @Inject constructor(
 
                 val sonixSnapshot = sonixControlRepository?.state?.value
                 if (sonixSnapshot?.isBlockedOrRevoked == true) {
-                    throw IllegalStateException("تم إيقاف هذا الجهاز من لوحة التحكم")
+                    throw IllegalStateException("تم إيقاف هذا الجهاز حالياً")
                 }
                 if (sonixSnapshot?.isPanelExpired == true) {
-                    throw IllegalStateException("انتهت صلاحية اشتراك الجهاز في لوحة التحكم")
+                    throw IllegalStateException("انتهت صلاحية اشتراك هذا الجهاز")
                 }
 
                 var activeServerUrl = sub.serverUrl
@@ -294,7 +294,7 @@ class SubscriptionRepositoryImpl @Inject constructor(
 
             client.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) {
-                    return@withContext Result.failure(IOException("EPG returned HTTP ${resp.code}"))
+                    return@withContext Result.failure(IOException("تعذّر تحميل دليل البرامج من السيرفر"))
                 }
                 val body = resp.body ?: return@withContext Result.failure(IOException("Empty EPG response"))
                 val programs = body.byteStream().use { stream ->
@@ -530,7 +530,23 @@ class SubscriptionRepositoryImpl @Inject constructor(
 
     private fun sanitizeError(e: Exception): String {
         val raw = e.message ?: "فشل الاتصال بالخادم"
-        return LogSanitizer.sanitizeUrl(raw)
+        val safe = LogSanitizer.sanitizeUrl(raw)
+        return when {
+            safe.contains("not a valid Xtream", ignoreCase = true) ||
+                safe.contains("missing account info", ignoreCase = true) ->
+                "استجابة غير صالحة من السيرفر، تأكد من صحة بيانات الاتصال."
+            safe.contains("Authentication rejected", ignoreCase = true) ||
+                safe.contains("Invalid username or password", ignoreCase = true) ->
+                "بيانات الدخول غير صحيحة، تأكد من اسم المستخدم وكلمة المرور."
+            safe.contains("This account is", ignoreCase = true) ->
+                "الحساب موقوف أو غير نشط لدى مزود الخدمة."
+            safe.contains("This subscription has expired", ignoreCase = true) ||
+                safe.contains("This subscription expired", ignoreCase = true) ->
+                "انتهت صلاحية هذا الاشتراك."
+            safe.contains("HTTP ", ignoreCase = true) ->
+                "تعذّر الاتصال بالسيرفر حالياً، يرجى التحقق من الرابط وحالة الخدمة."
+            else -> safe
+        }
     }
 
     private fun SubscriptionEntity.toDomain(): Subscription {

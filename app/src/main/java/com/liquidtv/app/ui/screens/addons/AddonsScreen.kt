@@ -130,12 +130,12 @@ fun AddonsScreen(
                     )
                     Column {
                         Text(
-                            text = "Addons – الإضافات",
+                            text = "الإضافات",
                             style = LiquidTypography.TitleLarge,
                             color = colors.text,
                         )
                         Text(
-                            text = "إدارة إضافات Stremio والترجمات والكتالوجات",
+                            text = "إدارة إضافات الترجمات والمحتوى",
                             style = LiquidTypography.BodySmall,
                             color = colors.textSecondary,
                         )
@@ -233,7 +233,7 @@ fun AddonsScreen(
                                 Icon(Icons.Filled.AddLink, contentDescription = null, tint = colors.accentText)
                             },
                             placeholder = {
-                                Text("https://.../manifest.json", color = colors.muted)
+                                Text("https://...", color = colors.muted)
                             },
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = colors.text,
@@ -264,7 +264,7 @@ fun AddonsScreen(
                                     strokeWidth = 2.dp,
                                 )
                             } else {
-                                Text("تثبيت Manifest", fontWeight = FontWeight.Bold)
+                                Text("تثبيت الإضافة", fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -347,7 +347,7 @@ fun AddonsScreen(
                         text = if (state.activeTab == AddonsTab.INSTALLED) {
                             "لا توجد إضافات مطابقة لبحثك"
                         } else {
-                            "لا توجد نتائج في هذا السوق حالياً. جرّب التحديث أو أدخل رابط Manifest يدوياً."
+                            "لا توجد نتائج في هذا المتجر حالياً. جرّب التحديث أو أدخل رابط الإضافة يدوياً."
                         },
                         style = LiquidTypography.BodyMedium,
                         color = colors.textSecondary,
@@ -498,7 +498,7 @@ private fun AddonCard(
                     }
 
                     Text(
-                        text = addon.description.ifBlank { "إضافة Stremio متوافقة مع البث والترجمة والكتالوج" },
+                        text = addon.description.ifBlank { "إضافة متوافقة مع البث والترجمة والمحتوى" },
                         style = LiquidTypography.BodySmall,
                         color = colors.textSecondary,
                         maxLines = 2,

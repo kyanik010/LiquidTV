@@ -409,7 +409,7 @@ class Media3ExternalAudioController @Inject constructor(
                     val httpErr = cause as? HttpDataSource.InvalidResponseCodeException
                     val permanent = PlayerMediaHelper.isPermanentError(error)
                     val message = if (httpErr != null) {
-                        "تعذّر تشغيل مصدر الصوت الخارجي (HTTP ${httpErr.responseCode}). تحقق من صلاحية الرابط وحالة مزود الصوت."
+                        "تعذّر تشغيل مصدر الصوت الخارجي. تحقق من صلاحية الرابط وحالة المزود."
                     } else {
                         PlayerMediaHelper.formatPlaybackError(error)
                     }

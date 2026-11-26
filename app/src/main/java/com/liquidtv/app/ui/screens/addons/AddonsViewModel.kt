@@ -137,7 +137,7 @@ class AddonsViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     pendingConfigureUrl = url,
-                    statusMessage = "تتطلب هذه الإضافة إعداداً مسبقاً؛ افتح رابط التهيئة ثم الصق رابط Manifest الناتج.",
+                    statusMessage = "تتطلب هذه الإضافة إعداداً مسبقاً؛ افتح رابط التهيئة ثم الصق الرابط الناتج.",
                 )
             }
             return
@@ -173,7 +173,7 @@ class AddonsViewModel @Inject constructor(
     fun installManualManifestUrl() {
         val raw = _uiState.value.manifestUrlInput.trim()
         if (!raw.startsWith("http://", true) && !raw.startsWith("https://", true)) {
-            _uiState.update { it.copy(errorMessage = "أدخل رابط Manifest صالحاً يبدأ بـ https:// أو http://") }
+            _uiState.update { it.copy(errorMessage = "أدخل رابط إضافة صالحاً يبدأ بـ https:// أو http://") }
             return
         }
         val normalizedUrl = StremioAddonClient.normalizeManifestUrl(raw)
@@ -195,14 +195,14 @@ class AddonsViewModel @Inject constructor(
                     it.copy(
                         isInstallingManualUrl = false,
                         manifestUrlInput = "",
-                        statusMessage = "تم تثبيت ${verified.name} عبر رابط Manifest",
+                        statusMessage = "تم تثبيت ${verified.name} عبر الرابط المباشر",
                     )
                 }
             }.onFailure { err ->
                 _uiState.update {
                     it.copy(
                         isInstallingManualUrl = false,
-                        errorMessage = err.message ?: "تعذر قراءة أو تثبيت رابط Manifest",
+                        errorMessage = err.message ?: "تعذر قراءة أو تثبيت رابط الإضافة",
                     )
                 }
             }

@@ -219,7 +219,7 @@ fun PlaylistSubscriptionCard(
                     // For PANEL_SERVER subscriptions, NEVER reveal raw Host URL — show only panel server name!
                     if (subscription.origin == SubscriptionOrigin.PANEL_SERVER) {
                         Text(
-                            text = "السيرفر: ${subscription.panelServerName?.takeIf { it.isNotBlank() } ?: "سيرفر لوحة التحكم"}",
+                            text = "السيرفر: ${subscription.panelServerName?.takeIf { it.isNotBlank() } ?: "سيرفر مخصص"}",
                             style = LiquidTypography.BodySmall,
                             color = colors.textSecondary,
                             maxLines = 1,

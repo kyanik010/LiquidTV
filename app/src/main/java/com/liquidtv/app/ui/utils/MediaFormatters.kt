@@ -102,12 +102,12 @@ fun localizedSubscriptionStatusAr(status: SubscriptionStatus): String = when (st
 }
 
 fun localizedSubscriptionTypeAr(type: SubscriptionType): String = when (type) {
-    SubscriptionType.XTREAM -> "خادم Xtream"
+    SubscriptionType.XTREAM -> "سيرفر بث"
 }
 
 fun localizedSubscriptionOriginAr(origin: SubscriptionOrigin): String = when (origin) {
     SubscriptionOrigin.NORMAL_URL -> "URL عادي"
-    SubscriptionOrigin.PANEL_SERVER -> "سيرفر لوحة التحكم"
+    SubscriptionOrigin.PANEL_SERVER -> "سيرفر مخصص"
 }
 
 fun localizedSonixAccessStatusAr(status: SonixAccessStatus): String = when (status) {

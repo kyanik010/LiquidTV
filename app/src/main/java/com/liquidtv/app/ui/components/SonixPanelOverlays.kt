@@ -61,11 +61,11 @@ fun SonixBlockedAccessOverlay(
     }
 
     val isRevoked = sonixState.deviceStatus == SonixDeviceStatus.REVOKED
-    val title = if (isRevoked) "تم إلغاء صلاحية هذا الجهاز" else "تم حظر هذا الجهاز من لوحة التحكم"
+    val title = if (isRevoked) "تم إلغاء صلاحية هذا الجهاز" else "تم إيقاف الوصول لهذا الجهاز"
     val subtitle = if (isRevoked) {
-        "تم سحب تصريح الوصول لهذا الجهاز من لوحة SONIX-CONTROL."
+        "تم سحب تصريح الوصول لهذا الجهاز من قبل مزود الخدمة."
     } else {
-        "تم إيقاف الوصول لهذا الجهاز مؤقتاً من لوحة SONIX-CONTROL."
+        "تم إيقاف الوصول لهذا الجهاز مؤقتاً من قبل مزود الخدمة."
     }
 
     AppBackground(modifier = modifier.fillMaxSize().testTag("sonix_blocked_overlay")) {
