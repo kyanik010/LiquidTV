@@ -291,27 +291,48 @@ class SonixControlRepositoryImpl @Inject constructor(
     private suspend fun executeWithTokenRecovery(
         action: String,
         payload: JsonObject,
-    ): SonixApiResult<JsonObject> = deviceAuthMutex.withLock {
-        // Keep token lookup, authenticated request, one-time recovery and token persistence
-        // atomic relative to every other protected SONIX action (sync, resolve, ack, update).
-        val token = identityStore.getDeviceToken()
-        val first = api.callAction(action, payload, token)
-        if (first is SonixApiResult.Unauthorized && !token.isNullOrBlank()) {
-            // A 401 may indicate an administrator reset. Retry without credentials only
-            // after this request exclusively owns the auth flow; never race another action.
-            identityStore.clearDeviceToken()
-            val retry = api.callAction(action, payload, null)
-            if (retry is SonixApiResult.Success) {
-                val issued = retry.data["device_token"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-                if (issued != null) identityStore.saveDeviceToken(issued)
+    ): SonixApiResult<JsonObject> {
+        // Do not hold the auth mutex during ordinary network I/O. In particular,
+        // audio.sources must not queue behind the app's foreground "sync" request.
+        val tokenUsed = identityStore.getDeviceToken()
+        val first = api.callAction(action, payload, tokenUsed)
+
+        if (first is SonixApiResult.Unauthorized && !tokenUsed.isNullOrBlank()) {
+            return deviceAuthMutex.withLock {
+                // Another concurrent request may already have recovered the token.
+                // Reuse that token instead of clearing/reissuing it a second time.
+                val currentToken = identityStore.getDeviceToken()
+                val retryToken = if (currentToken == tokenUsed) {
+                    identityStore.clearDeviceToken()
+                    null
+                } else {
+                    currentToken
+                }
+                val retry = api.callAction(action, payload, retryToken)
+                if (retry is SonixApiResult.Success) {
+                    val issued = retry.data["device_token"]?.jsonPrimitive?.content
+                        ?.takeIf { it.isNotBlank() }
+                    if (issued != null) identityStore.saveDeviceToken(issued)
+                }
+                retry
             }
-            return@withLock retry
         }
+
         if (first is SonixApiResult.Success) {
-            val issued = first.data["device_token"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-            if (issued != null) identityStore.saveDeviceToken(issued)
+            val issued = first.data["device_token"]?.jsonPrimitive?.content
+                ?.takeIf { it.isNotBlank() }
+            if (issued != null) {
+                deviceAuthMutex.withLock {
+                    // Never let a late response overwrite a token recovered by
+                    // another request while this request was in flight.
+                    val currentToken = identityStore.getDeviceToken()
+                    if (currentToken == tokenUsed || currentToken.isNullOrBlank()) {
+                        identityStore.saveDeviceToken(issued)
+                    }
+                }
+            }
         }
-        first
+        return first
     }
 
     private suspend fun applySyncPayload(uid: String, data: JsonObject): SonixSyncState {
