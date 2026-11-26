@@ -182,7 +182,7 @@ fun LoginScreen(
                             contentScale = ContentScale.Fit,
                         )
                         Text(
-                            text = if (state.editingSubscriptionId != null) "تعديل قائمة التشغيل" else "LIQUID TV",
+                            text = if (state.editingSubscriptionId != null) "تعديل قائمة التشغيل" else "SONIX IPTV",
                             style = LiquidTypography.TitleMedium.copy(
                                 brush = Brush.linearGradient(
                                     listOf(colors.text, colors.accentText),
