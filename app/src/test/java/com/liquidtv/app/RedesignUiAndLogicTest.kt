@@ -310,7 +310,7 @@ class RedesignUiAndLogicTest {
         assertTrue("Expected aligned top edges", kotlin.math.abs(serverCardBounds.top - playlistsCardBounds.top) <= 2f)
         assertTrue("Expected aligned bottom edges", kotlin.math.abs(serverCardBounds.bottom - playlistsCardBounds.bottom) <= 2f)
 
-        // 2. Expand «اختيار سيرفر» -> «افتراضي URL» and dynamic SONIX-CONTROL servers appear, all forms collapsed initially.
+        // 2. Expand «اختيار سيرفر» -> floating Popup opens with «افتراضي URL» and dynamic servers, while Card 1 & Card 2 keep EXACT same height/width.
         composeRule.onNodeWithTag("server_selector_toggle").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("server_selector_list").assertIsDisplayed()
@@ -322,14 +322,38 @@ class RedesignUiAndLogicTest {
         composeRule.onNodeWithTag("panel_server_form_srv-panel-1").assertDoesNotExist()
         composeRule.onNodeWithTag("panel_server_form_srv-panel-2").assertDoesNotExist()
 
-        // 3. Click «افتراضي URL» -> opens 4 fields in order (Name < Username < Password < Host URL) and validates blank input.
+        val serverCardPopupBounds = composeRule.onNodeWithTag("server_selection_main_card").fetchSemanticsNode().boundsInRoot
+        val playlistsCardPopupBounds = composeRule.onNodeWithTag("playlists_main_card").fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Expected Card 1 height NOT to expand when server popup opens (${serverCardBounds.height} vs ${serverCardPopupBounds.height})",
+            kotlin.math.abs(serverCardPopupBounds.height - serverCardBounds.height) <= 2f,
+        )
+        assertTrue(
+            "Expected Card 2 height NOT to expand when server popup opens (${playlistsCardBounds.height} vs ${playlistsCardPopupBounds.height})",
+            kotlin.math.abs(playlistsCardPopupBounds.height - playlistsCardBounds.height) <= 2f,
+        )
+
+        // 3. Click «افتراضي URL» -> closes dropdown and opens floating Form Dialog with 4 fields in order (Name < Username < Password < Host URL).
         composeRule.onNodeWithTag("tab_normal_url").performScrollTo().performClick()
         composeRule.waitForIdle()
+        composeRule.onNodeWithTag("server_selector_list").assertDoesNotExist()
+        composeRule.onNodeWithTag("server_login_form_dialog").assertIsDisplayed()
         composeRule.onNodeWithTag("default_url_form").assertIsDisplayed()
         composeRule.onNodeWithTag("input_subscription_name").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_username").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_password").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_url").performScrollTo().assertIsDisplayed()
+
+        val serverCardDialogBounds = composeRule.onNodeWithTag("server_selection_main_card").fetchSemanticsNode().boundsInRoot
+        val playlistsCardDialogBounds = composeRule.onNodeWithTag("playlists_main_card").fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Expected Card 1 height NOT to expand when login form dialog opens (${serverCardBounds.height} vs ${serverCardDialogBounds.height})",
+            kotlin.math.abs(serverCardDialogBounds.height - serverCardBounds.height) <= 2f,
+        )
+        assertTrue(
+            "Expected Card 2 height NOT to expand when login form dialog opens (${playlistsCardBounds.height} vs ${playlistsCardDialogBounds.height})",
+            kotlin.math.abs(playlistsCardDialogBounds.height - playlistsCardBounds.height) <= 2f,
+        )
 
         val nameTop = composeRule.onNodeWithTag("input_subscription_name").fetchSemanticsNode().boundsInRoot.top
         val userTop = composeRule.onNodeWithTag("input_xtream_username").fetchSemanticsNode().boundsInRoot.top
@@ -341,7 +365,10 @@ class RedesignUiAndLogicTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("login_error_banner").performScrollTo().assertIsDisplayed()
 
-        // 4. Click Server 1 -> collapses «افتراضي URL» and opens ONLY Server 1 form (3 fields, NO Host URL).
+        // 4. Switch server from Dialog -> reopens dropdown; click Server 1 -> opens ONLY Server 1 form (3 fields, NO Host URL).
+        composeRule.onNodeWithTag("dialog_switch_server_button").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("server_selector_list").assertIsDisplayed()
         composeRule.onNodeWithTag("panel_server_item_srv-panel-1").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("default_url_form").assertDoesNotExist()
@@ -351,12 +378,19 @@ class RedesignUiAndLogicTest {
         composeRule.onNodeWithTag("input_xtream_username").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_password").performScrollTo().assertIsDisplayed()
 
-        // 5. Click Server 2 -> auto-collapses Server 1 and opens ONLY Server 2 form.
+        // 5. Switch server again -> click Server 2 -> opens ONLY Server 2 form.
+        composeRule.onNodeWithTag("dialog_switch_server_button").performClick()
+        composeRule.waitForIdle()
         composeRule.onNodeWithTag("panel_server_item_srv-panel-2").performScrollTo().performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("panel_server_form_srv-panel-1").assertDoesNotExist()
         composeRule.onNodeWithTag("panel_server_form_srv-panel-2").assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_url").assertDoesNotExist()
+
+        // Dismiss dialog cleanly to check Card 2 independence.
+        composeRule.onNodeWithTag("close_server_form_dialog_button").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("server_login_form_dialog").assertDoesNotExist()
 
         // 6. Card 2 remains completely independent with Device ID & Copy button intact.
         composeRule.onNodeWithTag("login_playlists_section").assertIsDisplayed()
@@ -373,7 +407,7 @@ class RedesignUiAndLogicTest {
     }
 
     @Test
-    fun `LoginScreen reflects dynamic SONIX-CONTROL add, rename, delete, loading, empty, and error without disabling افتراضي URL`() {
+    fun `LoginScreen reflects dynamic catalog add, rename, delete, loading, empty, and error without disabling افتراضي URL`() {
         val fakeSubRepo = FakeSubscriptionRepository()
         val fakeSonix = FakeSonixControlRepository(
             SonixSyncState(
@@ -401,14 +435,14 @@ class RedesignUiAndLogicTest {
         composeRule.onNodeWithTag("server_selector_toggle").performClick()
         composeRule.waitForIdle()
 
-        // Loading state: loading indicator shown, افتراضي URL stays enabled
+        // Loading state: loading indicator shown inside floating dropdown, افتراضي URL stays enabled
         composeRule.onNodeWithTag("panel_servers_loading").assertIsDisplayed()
         composeRule.onNodeWithTag("tab_normal_url").assertIsDisplayed()
 
-        // Panel connection failure: error shown, افتراضي URL MUST still work seamlessly
+        // Catalog failure: error shown, افتراضي URL opens Dialog cleanly
         fakeSonix.mutableState.value = fakeSonix.mutableState.value.copy(
             isCatalogLoading = false,
-            catalogError = "تعذّر الاتصال بلوحة التحكم",
+            catalogError = "تعذّر تحديث قائمة السيرفرات",
         )
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("panel_servers_error").assertIsDisplayed()
@@ -416,7 +450,9 @@ class RedesignUiAndLogicTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("default_url_form").assertIsDisplayed()
 
-        // Panel empty state: empty notice shown cleanly
+        // Switch back to dropdown and verify empty catalog state
+        composeRule.onNodeWithTag("dialog_switch_server_button").performClick()
+        composeRule.waitForIdle()
         fakeSonix.mutableState.value = fakeSonix.mutableState.value.copy(
             catalogError = null,
             hasLoadedCatalog = true,
@@ -425,7 +461,7 @@ class RedesignUiAndLogicTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("panel_servers_empty").performScrollTo().assertIsDisplayed()
 
-        // Panel adds two dynamic servers -> appear live without rebuilding app
+        // Add two dynamic servers -> appear live in Popup without rebuilding app
         fakeSonix.mutableState.value = fakeSonix.mutableState.value.copy(
             hasLoadedCatalog = true,
             availableServers = listOf(
@@ -438,7 +474,7 @@ class RedesignUiAndLogicTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("panel_server_form_dyn-2").assertIsDisplayed()
 
-        // Panel renames dyn-1 and deletes dyn-2 -> UI updates dynamically and clears deleted selection
+        // Rename dyn-1 and delete dyn-2 -> Dialog closes for removed dyn-2 and updated catalog reflects dyn-1
         fakeSonix.mutableState.value = fakeSonix.mutableState.value.copy(
             hasLoadedCatalog = true,
             availableServers = listOf(
@@ -446,10 +482,13 @@ class RedesignUiAndLogicTest {
             ),
         )
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("سيرفر معدّل").assertIsDisplayed()
-        composeRule.onNodeWithTag("panel_server_item_dyn-2").assertDoesNotExist()
         composeRule.onNodeWithTag("panel_server_form_dyn-2").assertDoesNotExist()
         assertNull(vm.uiState.value.selectedPanelServerId)
+
+        composeRule.onNodeWithTag("server_selector_toggle").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("سيرفر معدّل").assertIsDisplayed()
+        composeRule.onNodeWithTag("panel_server_item_dyn-2").assertDoesNotExist()
     }
     @Test
     fun `Playlists tab displays saved playlists above Device ID card with connect, sync, edit, delete actions and copy works`() {
@@ -505,17 +544,24 @@ class RedesignUiAndLogicTest {
             deviceBounds.top >= listBounds.bottom - 4f,
         )
 
+        val sBaseline = composeRule.onNodeWithTag("server_selection_main_card").fetchSemanticsNode().boundsInRoot
+        val pBaseline = composeRule.onNodeWithTag("playlists_main_card").fetchSemanticsNode().boundsInRoot
+
         composeRule.onNodeWithTag("copy_device_id_button").performClick()
         composeRule.waitForIdle()
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         assertEquals("SNX8899001", clipboard.primaryClip?.getItemAt(0)?.text?.toString())
 
-        // Clicking Edit on a PANEL_SERVER playlist in Card 2 auto-expands ONLY its 3-field form in Card 1 without exposing Host URL.
+        // Clicking Edit on a PANEL_SERVER playlist in Card 2 opens ONLY its 3-field form in the floating Dialog without expanding Card 1 or exposing Host URL.
         composeRule.onNodeWithTag("playlist_edit_sub-saved-1").performScrollTo().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("server_selector_list").assertIsDisplayed()
+        composeRule.onNodeWithTag("server_login_form_dialog").assertIsDisplayed()
         composeRule.onNodeWithTag("panel_server_form_srv-panel-1").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("input_xtream_url").assertDoesNotExist()
+        val sAfterEdit = composeRule.onNodeWithTag("server_selection_main_card").fetchSemanticsNode().boundsInRoot
+        val pAfterEdit = composeRule.onNodeWithTag("playlists_main_card").fetchSemanticsNode().boundsInRoot
+        assertTrue("Expected Card 1 height unchanged during edit dialog", kotlin.math.abs(sAfterEdit.height - sBaseline.height) <= 2f)
+        assertTrue("Expected Card 2 height unchanged during edit dialog", kotlin.math.abs(pAfterEdit.height - pBaseline.height) <= 2f)
     }
 
     @Test
@@ -910,17 +956,42 @@ class RedesignUiAndLogicTest {
         assertTrue("Device ID clipped horizontally", deviceBounds.left >= pCollapsed.left - 1f && deviceBounds.right <= pCollapsed.right + 1f && deviceBounds.width > 0f)
         assertTrue("Copy button clipped horizontally", copyBounds.left >= pCollapsed.left - 1f && copyBounds.right <= pCollapsed.right + 1f && copyBounds.width > 0f)
 
-        // Expanded check with «افتراضي URL» open
+        // Open floating server selector Popup -> NEITHER Card 1 NOR Card 2 expands
         composeRule.onNodeWithTag("server_selector_toggle").performClick()
         composeRule.waitForIdle()
+        composeRule.onNodeWithTag("server_selector_list").assertIsDisplayed()
+        assertEqualAlignedCards("popup_open")
+        val sPopup = composeRule.onNodeWithTag("server_selection_main_card").fetchSemanticsNode().boundsInRoot
+        val pPopup = composeRule.onNodeWithTag("playlists_main_card").fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "[$widthDp x $heightDp] Card 1 expanded on Popup open (${sCollapsed.height} -> ${sPopup.height})",
+            kotlin.math.abs(sPopup.height - sCollapsed.height) <= 2f && kotlin.math.abs(sPopup.width - sCollapsed.width) <= 2f,
+        )
+        assertTrue(
+            "[$widthDp x $heightDp] Card 2 expanded on Popup open (${pCollapsed.height} -> ${pPopup.height})",
+            kotlin.math.abs(pPopup.height - pCollapsed.height) <= 2f && kotlin.math.abs(pPopup.width - pCollapsed.width) <= 2f,
+        )
+
+        // Select «افتراضي URL» -> opens floating Form Dialog while Card 1 & Card 2 remain completely unstretched
         composeRule.onNodeWithTag("tab_normal_url").performScrollTo().performClick()
         composeRule.waitForIdle()
+        composeRule.onNodeWithTag("server_login_form_dialog").assertIsDisplayed()
         composeRule.onNodeWithTag("connect_button").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("toggle_password_visibility").performScrollTo().assertIsDisplayed()
-        assertEqualAlignedCards("expanded")
+        assertEqualAlignedCards("dialog_open")
         val sExpanded = composeRule.onNodeWithTag("server_selection_main_card").fetchSemanticsNode().boundsInRoot
+        val pExpanded = composeRule.onNodeWithTag("playlists_main_card").fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "[$widthDp x $heightDp] Card 1 expanded on Dialog open (${sCollapsed.height} -> ${sExpanded.height})",
+            kotlin.math.abs(sExpanded.height - sCollapsed.height) <= 2f && kotlin.math.abs(sExpanded.width - sCollapsed.width) <= 2f,
+        )
+        assertTrue(
+            "[$widthDp x $heightDp] Card 2 expanded on Dialog open (${pCollapsed.height} -> ${pExpanded.height})",
+            kotlin.math.abs(pExpanded.height - pCollapsed.height) <= 2f && kotlin.math.abs(pExpanded.width - pCollapsed.width) <= 2f,
+        )
+        val dialogBounds = composeRule.onNodeWithTag("server_login_form_dialog").fetchSemanticsNode().boundsInRoot
         val ctaBounds = composeRule.onNodeWithTag("connect_button").fetchSemanticsNode().boundsInRoot
-        assertTrue("CTA clipped horizontally", ctaBounds.left >= sExpanded.left - 1f && ctaBounds.right <= sExpanded.right + 1f && ctaBounds.width > 0f)
+        assertTrue("CTA clipped inside dialog", ctaBounds.left >= dialogBounds.left - 1f && ctaBounds.right <= dialogBounds.right + 1f && ctaBounds.width > 0f)
     }
 
     @Test
@@ -937,9 +1008,65 @@ class RedesignUiAndLogicTest {
     fun `LoginScreen keeps two independent equal side-by-side cards without clipping on Android TV 1080p`() {
         assertEqualSideBySideCardsViewport(1920, 1080)
     }
+
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `LoginScreen supports Android TV D-pad focus and Back key collapse`() {
+    fun `LoginScreen maintains strictly constant card heights when 10 dynamic servers open in scrollable floating Popup`() {
+        val tenServers = (1..10).map { i ->
+            SonixAssignedServer(id = "srv-$i", name = "VIP NODE $i", region = "EU-$i", priority = i)
+        }
+        val vm = LoginViewModel(
+            FakeSubscriptionRepository(),
+            FakeSonixControlRepository(
+                SonixSyncState(
+                    isRegistered = true,
+                    deviceId = "dev-many",
+                    deviceUid = "uid-many",
+                    deviceCode = "SNXMANY10",
+                    deviceStatus = SonixDeviceStatus.ACTIVE,
+                    accessStatus = SonixAccessStatus.ACTIVE,
+                    accessAllowed = true,
+                    hasLoadedCatalog = true,
+                    availableServers = tenServers,
+                ),
+            ),
+        )
+
+        composeRule.setContent {
+            LiquidTVTheme {
+                Box(Modifier.width(1280.dp).height(720.dp)) {
+                    LoginScreen(onLoginSuccess = {}, viewModel = vm)
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        val card1Before = composeRule.onNodeWithTag("server_selection_main_card").fetchSemanticsNode().boundsInRoot
+        val card2Before = composeRule.onNodeWithTag("playlists_main_card").fetchSemanticsNode().boundsInRoot
+
+        composeRule.onNodeWithTag("server_selector_toggle").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("server_selector_list").assertIsDisplayed()
+        composeRule.onNodeWithTag("panel_server_item_srv-10").performScrollTo().assertIsDisplayed()
+
+        val card1During = composeRule.onNodeWithTag("server_selection_main_card").fetchSemanticsNode().boundsInRoot
+        val card2During = composeRule.onNodeWithTag("playlists_main_card").fetchSemanticsNode().boundsInRoot
+        assertTrue("Card 1 must not expand with 10 servers in Popup", kotlin.math.abs(card1During.height - card1Before.height) <= 2f)
+        assertTrue("Card 2 must not expand with 10 servers in Popup", kotlin.math.abs(card2During.height - card2Before.height) <= 2f)
+
+        composeRule.onNodeWithTag("panel_server_item_srv-10").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("panel_server_form_srv-10").assertIsDisplayed()
+        composeRule.onNodeWithTag("input_xtream_url").assertDoesNotExist()
+        val card1Dialog = composeRule.onNodeWithTag("server_selection_main_card").fetchSemanticsNode().boundsInRoot
+        val card2Dialog = composeRule.onNodeWithTag("playlists_main_card").fetchSemanticsNode().boundsInRoot
+        assertTrue("Card 1 must not expand when panel form dialog opens", kotlin.math.abs(card1Dialog.height - card1Before.height) <= 2f)
+        assertTrue("Card 2 must not expand when panel form dialog opens", kotlin.math.abs(card2Dialog.height - card2Before.height) <= 2f)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `LoginScreen supports Android TV D-pad focus, Back dismissal of Popup and Dialog, and focus restoration`() {
         val fakeSubRepo = FakeSubscriptionRepository()
         val fakeSonix = FakeSonixControlRepository(
             SonixSyncState(
@@ -982,10 +1109,23 @@ class RedesignUiAndLogicTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("panel_server_item_srv-tv-1").assertIsFocused()
 
-        // Back key collapses expanded server selector cleanly
+        // Back key dismisses floating server Popup cleanly and restores focus to toggle
         composeRule.runOnUiThread { backDispatcher?.onBackPressed() }
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("server_selector_list").assertDoesNotExist()
+        composeRule.onNodeWithTag("server_selector_toggle").assertIsFocused()
+
+        // Reopen Popup, select panel server to open Dialog, then Back key dismisses Dialog and restores focus
+        composeRule.onNodeWithTag("server_selector_toggle").performKeyInput { pressKey(Key.Enter) }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("panel_server_item_srv-tv-1").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("panel_server_form_srv-tv-1").assertIsDisplayed()
+
+        composeRule.runOnUiThread { backDispatcher?.onBackPressed() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("server_login_form_dialog").assertDoesNotExist()
+        composeRule.onNodeWithTag("server_selector_toggle").assertIsFocused()
     }
 
     @Test

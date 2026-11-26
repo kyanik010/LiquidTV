@@ -25,6 +25,7 @@ enum class LoginSection {
 data class LoginUiState(
     val activeSection: LoginSection = LoginSection.SERVER_SELECTION,
     val isServerSelectorExpanded: Boolean = false,
+    val isServerFormDialogOpen: Boolean = false,
     val editingSubscriptionId: String? = null,
     val editingOrigin: SubscriptionOrigin? = null,
     val serverMode: SubscriptionOrigin = SubscriptionOrigin.NORMAL_URL,
@@ -104,6 +105,7 @@ class LoginViewModel @Inject constructor(
                         serverMode = resolvedMode,
                         selectedPanelServerId = if (serverRemovedFromCatalog) null else (availableMatch?.id ?: current.selectedPanelServerId),
                         selectedPanelServerName = if (serverRemovedFromCatalog) null else (availableMatch?.name ?: current.selectedPanelServerName),
+                        isServerFormDialogOpen = if (serverRemovedFromCatalog && !current.isNormalUrlSelected) false else current.isServerFormDialogOpen,
                         progress = if (current.isConnecting) sync.loadingProgress else current.progress,
                         statusMessage = if (current.isConnecting) (sync.statusMessage ?: current.statusMessage) else current.statusMessage,
                     )
@@ -144,6 +146,41 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    fun dismissServerFormDialog() {
+        val current = _uiState.value
+        if (current.isConnecting) return
+        if (current.editingSubscriptionId != null) {
+            clearEditMode()
+            return
+        }
+        _uiState.update { state ->
+            state.copy(
+                isServerFormDialogOpen = false,
+                isNormalUrlSelected = false,
+                selectedPanelServerId = null,
+                selectedPanelServerName = null,
+                errorMessage = null,
+            )
+        }
+    }
+
+    fun switchServerFromDialog() {
+        val current = _uiState.value
+        if (current.isConnecting || current.editingOrigin == SubscriptionOrigin.PANEL_SERVER) return
+        _uiState.update { state ->
+            state.copy(
+                isServerFormDialogOpen = false,
+                isServerSelectorExpanded = true,
+                errorMessage = null,
+            )
+        }
+        if (!_uiState.value.sonixState.isCatalogLoading) {
+            viewModelScope.launch {
+                sonixControlRepository.refreshAvailableServers(forceSync = false)
+            }
+        }
+    }
+
     fun toggleNormalUrlSection() {
         val current = _uiState.value
         if (current.isConnecting) return
@@ -152,9 +189,11 @@ class LoginViewModel @Inject constructor(
             return
         }
         _uiState.update { state ->
-            val nextOpen = !state.isNormalUrlSelected
+            val shouldClose = state.isNormalUrlSelected && state.isServerFormDialogOpen
+            val nextOpen = !shouldClose
             state.copy(
-                isServerSelectorExpanded = true,
+                isServerSelectorExpanded = false,
+                isServerFormDialogOpen = nextOpen,
                 serverMode = if (nextOpen) SubscriptionOrigin.NORMAL_URL else state.serverMode,
                 isNormalUrlSelected = nextOpen,
                 selectedPanelServerId = if (nextOpen) null else state.selectedPanelServerId,
@@ -173,7 +212,8 @@ class LoginViewModel @Inject constructor(
         }
         _uiState.update { state ->
             state.copy(
-                isServerSelectorExpanded = true,
+                isServerSelectorExpanded = false,
+                isServerFormDialogOpen = mode == SubscriptionOrigin.NORMAL_URL,
                 serverMode = mode,
                 isNormalUrlSelected = mode == SubscriptionOrigin.NORMAL_URL,
                 selectedPanelServerId = if (mode == SubscriptionOrigin.NORMAL_URL) null else state.selectedPanelServerId,
@@ -186,11 +226,14 @@ class LoginViewModel @Inject constructor(
     fun selectPanelServer(serverId: String, serverName: String) {
         val current = _uiState.value
         if (current.isConnecting) return
-        val isSameServerSelected = !current.isNormalUrlSelected && current.selectedPanelServerId == serverId
-        if (isSameServerSelected && current.editingOrigin != SubscriptionOrigin.PANEL_SERVER) {
+        val isSameServerActive = !current.isNormalUrlSelected &&
+            current.selectedPanelServerId == serverId &&
+            current.isServerFormDialogOpen
+        if (isSameServerActive && current.editingOrigin != SubscriptionOrigin.PANEL_SERVER) {
             _uiState.update {
                 it.copy(
-                    isServerSelectorExpanded = true,
+                    isServerSelectorExpanded = false,
+                    isServerFormDialogOpen = false,
                     selectedPanelServerId = null,
                     selectedPanelServerName = null,
                     errorMessage = null,
@@ -200,7 +243,8 @@ class LoginViewModel @Inject constructor(
         }
         _uiState.update {
             it.copy(
-                isServerSelectorExpanded = true,
+                isServerSelectorExpanded = false,
+                isServerFormDialogOpen = true,
                 serverMode = SubscriptionOrigin.PANEL_SERVER,
                 isNormalUrlSelected = false,
                 selectedPanelServerId = serverId,
@@ -252,6 +296,7 @@ class LoginViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 isServerSelectorExpanded = false,
+                isServerFormDialogOpen = false,
                 editingSubscriptionId = null,
                 editingOrigin = null,
                 isNormalUrlSelected = false,
@@ -271,7 +316,8 @@ class LoginViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 activeSection = LoginSection.SERVER_SELECTION,
-                isServerSelectorExpanded = true,
+                isServerSelectorExpanded = false,
+                isServerFormDialogOpen = true,
                 editingSubscriptionId = sub.id,
                 editingOrigin = sub.origin,
                 serverMode = sub.origin,
@@ -436,6 +482,7 @@ class LoginViewModel @Inject constructor(
                         val resetEdit = current.editingSubscriptionId == subscriptionId
                         current.copy(
                             busyPlaylistId = null,
+                            isServerFormDialogOpen = if (resetEdit) false else current.isServerFormDialogOpen,
                             editingSubscriptionId = if (resetEdit) null else current.editingSubscriptionId,
                             editingOrigin = if (resetEdit) null else current.editingOrigin,
                             playlistMessage = "تم حذف قائمة التشغيل",
