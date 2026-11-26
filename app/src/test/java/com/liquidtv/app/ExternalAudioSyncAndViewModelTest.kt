@@ -395,7 +395,8 @@ class ExternalAudioSyncAndViewModelTest {
             viewModel.openExternalAudioSheet()
             assertTrue(viewModel.state.value.externalAudio.isSheetVisible)
             assertEquals(1, viewModel.state.value.externalAudio.channels.size)
-            assertTrue(viewModel.state.value.externalAudio.isLoadingCatalog)
+            // Cached channels are already visible, so background refresh stays quiet.
+            assertFalse(viewModel.state.value.externalAudio.isLoadingCatalog)
 
             // Re-opening before sync completes must deduplicate (syncCallCount stays 1)
             viewModel.openExternalAudioSheet()
