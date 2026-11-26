@@ -45,7 +45,7 @@ class ExternalAudioSheetUiTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun `ExternalAudioSheet renders channels, filters, sync, volume, and detach actions`() {
+    fun `ExternalAudioSheet renders reference layout sections, controls, and triggers all callbacks`() {
         val channels = listOf(
             ExternalAudioChannel("1", "beIN SPORTS 1 HD", "1", "http://ex/1.m3u8", AudioChannelBrand.BEIN_SPORTS, "beIN SPORTS", qualityLabel = "HD"),
             ExternalAudioChannel("2", "ALWAN 2 FHD", "2", "http://ex/2.m3u8", AudioChannelBrand.ALWAN, "ALWAN", qualityLabel = "FHD"),
@@ -53,6 +53,11 @@ class ExternalAudioSheetUiTest {
         var selectedFilter = AudioBrandFilter.ALL
         var detachedCalled = false
         var offsetDelta = 0L
+        var resetCalled = false
+        var boostToggled = false
+        var latestVolume = 80
+        var clickedChannelId: String? = null
+        var closedCalled = false
 
         composeRule.setContent {
             LiquidTVTheme {
@@ -64,32 +69,67 @@ class ExternalAudioSheetUiTest {
                         status = ExternalAudioStatus.ACTIVE,
                         statusMessage = "نشط: beIN SPORTS 1 HD",
                         selectedBrandFilter = selectedFilter,
+                        volumePercent = latestVolume,
                     ),
-                    onSelectChannel = {},
+                    onSelectChannel = { clickedChannelId = it.id },
                     onDetachAudio = { detachedCalled = true },
                     onRefreshCatalog = {},
                     onSearchQueryChange = {},
                     onSelectBrandFilter = { selectedFilter = it },
-                    onVolumeChange = {},
-                    onToggleLoudnessBoost = {},
+                    onVolumeChange = { latestVolume = it },
+                    onToggleLoudnessBoost = { boostToggled = true },
                     onAdjustSyncOffset = { offsetDelta += it },
-                    onResetSyncOffset = {},
-                    onClose = {},
+                    onResetSyncOffset = { resetCalled = true },
+                    onClose = { closedCalled = true },
                 )
             }
         }
 
         composeRule.waitForIdle()
+        // Top header bar
         composeRule.onNodeWithTag("external_audio_sheet").assertIsDisplayed()
+        composeRule.onNodeWithText("مصدر الصوت الخارجي").assertIsDisplayed()
+        composeRule.onNodeWithTag("external_audio_count_badge").assertIsDisplayed()
+        composeRule.onNodeWithTag("external_audio_connection_badge").assertIsDisplayed()
+        composeRule.onNodeWithTag("external_audio_sync_catalog_button").assertIsDisplayed()
+        composeRule.onNodeWithTag("external_audio_close_button").assertIsDisplayed()
+
+        // Control panel sections
+        composeRule.onNodeWithText("التحكم بالصوت").assertIsDisplayed()
+        composeRule.onNodeWithText("مستوى الصوت").assertIsDisplayed()
+        composeRule.onNodeWithText("تعزيز الصوت").assertIsDisplayed()
+        composeRule.onNodeWithText("مزامنة الصوت").assertIsDisplayed()
+        composeRule.onNodeWithText("التأخير الحالي").assertIsDisplayed()
+        composeRule.onNodeWithText("تصفير التأخير").assertIsDisplayed()
+
+        // Sources & active badge & footer
         composeRule.onNodeWithText("beIN SPORTS 1 HD").assertIsDisplayed()
         composeRule.onNodeWithText("ALWAN 2 FHD").assertIsDisplayed()
+        composeRule.onNodeWithText("نشط").assertIsDisplayed()
+        composeRule.onNodeWithTag("external_audio_footer_bar").assertIsDisplayed()
+        composeRule.onNodeWithTag("external_audio_selected_footer_text").assertIsDisplayed()
+
+        // Test interactive controls
+        composeRule.onNodeWithTag("external_audio_channel_2").performClick()
+        composeRule.onNodeWithTag("external_audio_vol_up").performClick()
+        composeRule.onNodeWithTag("external_audio_vol_down").performClick()
+        composeRule.onNodeWithTag("external_audio_boost_toggle").performClick()
         composeRule.onNodeWithTag("external_audio_sync_plus").performClick()
+        composeRule.onNodeWithTag("external_audio_sync_fine_plus").performClick()
+        composeRule.onNodeWithTag("external_audio_sync_fine_minus").performClick()
+        composeRule.onNodeWithTag("external_audio_sync_minus").performClick()
+        composeRule.onNodeWithTag("external_audio_sync_reset").performClick()
         composeRule.onNodeWithTag("external_audio_detach_button").performClick()
         composeRule.onNodeWithTag("external_audio_filter_alwan").performClick()
+        composeRule.onNodeWithTag("external_audio_close_button").performClick()
 
-        assertEquals(ExternalAudioSyncPolicy.STEP_MS, offsetDelta)
+        assertEquals("2", clickedChannelId)
+        assertTrue(boostToggled)
+        assertEquals(0L, offsetDelta)
+        assertTrue(resetCalled)
         assertTrue(detachedCalled)
         assertEquals(AudioBrandFilter.ALWAN, selectedFilter)
+        assertTrue(closedCalled)
     }
 
     @Test
@@ -108,6 +148,45 @@ class ExternalAudioSheetUiTest {
     @Config(sdk = [36], qualifiers = "w390dp-h800dp-xhdpi")
     fun `ExternalAudioSheet shows at least 6 full channels simultaneously on Phone Portrait`() {
         verifyAtLeastSixChannelsVisible()
+    }
+
+    @Test
+    fun `ExternalAudioSheet keeps side-by-side reference alignment in RTL on TV`() {
+        val channels = (1..6).map { idx ->
+            ExternalAudioChannel("$idx", "beIN SPORTS $idx SD", idx.toString(), "http://ex/$idx.m3u8", AudioChannelBrand.BEIN_SPORTS, "beIN SPORTS", qualityLabel = "SD")
+        }
+        composeRule.setContent {
+            LiquidTVTheme {
+                ExternalAudioSheet(
+                    state = ExternalAudioUiState(
+                        isSheetVisible = true,
+                        channels = channels,
+                        activeChannel = channels[0],
+                        status = ExternalAudioStatus.ACTIVE,
+                    ),
+                    onSelectChannel = {},
+                    onDetachAudio = {},
+                    onRefreshCatalog = {},
+                    onSearchQueryChange = {},
+                    onSelectBrandFilter = {},
+                    onVolumeChange = {},
+                    onToggleLoudnessBoost = {},
+                    onAdjustSyncOffset = {},
+                    onResetSyncOffset = {},
+                    onClose = {},
+                )
+            }
+        }
+        composeRule.waitForIdle()
+        val sheetBounds = composeRule.onNodeWithTag("external_audio_sheet").getUnclippedBoundsInRoot()
+        val listBounds = composeRule.onNodeWithTag("external_audio_channel_list").getUnclippedBoundsInRoot()
+        val controlTitleBounds = composeRule.onNodeWithText("التحكم بالصوت").getUnclippedBoundsInRoot()
+        val footerBounds = composeRule.onNodeWithTag("external_audio_footer_bar").getUnclippedBoundsInRoot()
+
+        // In RTL reference image: Channels list is on the left, Control panel is on the right, Footer is at bottom
+        assertTrue("Expected channels list left of control panel in RTL", listBounds.right.value <= controlTitleBounds.left.value + 16f)
+        assertTrue("Expected footer below channel list", footerBounds.top.value >= listBounds.bottom.value - 2f)
+        assertTrue("Expected sheet within 840dp ceiling", sheetBounds.width.value <= 840.5f)
     }
 
     @Test
@@ -180,7 +259,7 @@ class ExternalAudioSheetUiTest {
         val audioActiveBounds = composeRule.onNodeWithTag("external_audio_sheet").getUnclippedBoundsInRoot()
         assertTrue(abs(audioLoadingBounds.width.value - audioActiveBounds.width.value) < 0.5f)
         assertTrue(abs(audioLoadingBounds.height.value - audioActiveBounds.height.value) < 0.5f)
-        assertTrue(audioActiveBounds.width.value <= 760.5f)
+        assertTrue(audioActiveBounds.width.value <= 840.5f)
 
         showAudio = false
         composeRule.waitForIdle()
