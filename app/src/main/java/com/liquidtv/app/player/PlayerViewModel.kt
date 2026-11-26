@@ -1071,7 +1071,8 @@ class PlayerViewModel @Inject constructor(
                     val hasExistingChannels = current.externalAudio.channels.isNotEmpty()
                     current.copy(
                         externalAudio = current.externalAudio.copy(
-                            isLoadingCatalog = true,
+                            // Match SONIX: show the local catalog immediately and refresh it quietly.
+                            isLoadingCatalog = !hasExistingChannels,
                             catalogError = null,
                             catalogWarning = if (!forceRefresh && hasExistingChannels) {
                                 current.externalAudio.catalogWarning
