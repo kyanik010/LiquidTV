@@ -25,6 +25,7 @@ import com.liquidtv.app.player.ExternalAudioController
 import com.liquidtv.app.player.ExternalAudioEngineState
 import com.liquidtv.app.player.ExternalAudioSyncPolicy
 import com.liquidtv.app.player.PlayerViewModel
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -41,7 +42,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -296,4 +299,130 @@ class ExternalAudioSyncAndViewModelTest {
         }
     }
 
+
+
+    @Test
+    fun `openExternalAudioSheet shows cached channels immediately without waiting and resets isLoadingCatalog in all paths`() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val cachedChannels = listOf(
+            ExternalAudioChannel("ext-c1", "beIN SPORTS 1 HD", "1", "http://audio.example.org/1.m3u8", AudioChannelBrand.BEIN_SPORTS, "beIN SPORTS", qualityRank = 4, qualityLabel = "HD"),
+        )
+        val refreshedChannels = cachedChannels + ExternalAudioChannel(
+            "ext-c2", "ALWAN 1 FHD", "2", "http://audio.example.org/2.m3u8", AudioChannelBrand.ALWAN, "ALWAN", qualityRank = 3, qualityLabel = "FHD",
+        )
+        val syncGate = CompletableDeferred<ExternalAudioCatalogResult>()
+        val syncCallCount = AtomicInteger(0)
+        var mode = "gated"
+
+        val fakeCatalogRepo = object : ExternalAudioCatalogRepository {
+            override fun peekCached() = ExternalAudioCatalogResult(channels = cachedChannels, fromCache = true, updatedAt = "t1")
+            override suspend fun loadCached() = ExternalAudioCatalogResult(channels = cachedChannels, fromCache = true, updatedAt = "t1")
+            override suspend fun syncFromPanel(forceRefresh: Boolean): ExternalAudioCatalogResult {
+                syncCallCount.incrementAndGet()
+                return when (mode) {
+                    "gated" -> syncGate.await()
+                    "error" -> ExternalAudioCatalogResult(error = "فشل مؤقت")
+                    "throw" -> throw IllegalStateException("unexpected runtime crash")
+                    else -> ExternalAudioCatalogResult(channels = refreshedChannels, updatedAt = "t2")
+                }
+            }
+        }
+        val channelRepo = object : AddonTestChannelRepository() {
+            override fun getAllChannels(): Flow<List<Channel>> = flowOf(emptyList())
+        }
+        val prefsRepo = UserPreferencesDataStore(context)
+        val addonPrefsRepo = InMemoryAddonPreferencesRepository()
+        val addonClient = StremioAddonClient(OkHttpClient(), context)
+        val subRepo = object : SubscriptionRepository {
+            override val allSubscriptions: Flow<List<Subscription>> = flowOf(emptyList())
+            override val activeSubscription: Flow<Subscription?> = flowOf(null)
+            override val syncInfo: Flow<PlaylistInfo> = flowOf(PlaylistInfo())
+            override suspend fun getActiveSubscriptionOnce(): Subscription? = null
+            override suspend fun getSubscriptionById(id: String): Subscription? = null
+            override suspend fun hasAnySubscription(): Boolean = false
+            override suspend fun addOrUpdateXtreamSubscription(
+                existingId: String?, displayName: String, serverUrl: String, username: String, password: String,
+                origin: SubscriptionOrigin, panelServerId: String?, panelServerName: String?, activate: Boolean,
+            ): Result<Subscription> = Result.failure(UnsupportedOperationException())
+            override suspend fun activateSubscription(subscriptionId: String): Result<Unit> = Result.success(Unit)
+            override suspend fun syncSubscription(subscriptionId: String): Result<Unit> = Result.success(Unit)
+            override suspend fun syncActiveSubscription(): Result<Unit> = Result.success(Unit)
+            override suspend fun syncActiveEpg(): Result<Unit> = Result.success(Unit)
+            override suspend fun deleteSubscription(subscriptionId: String): Result<Unit> = Result.success(Unit)
+            override suspend fun getDecryptedXtreamPassword(subscriptionId: String): String? = null
+        }
+        val fakeAudioCtrl = object : ExternalAudioController {
+            override val engineState = MutableStateFlow(ExternalAudioEngineState()).asStateFlow()
+            override fun attach(
+                channel: ExternalAudioChannel, initialVideoPositionMs: Long, isVideoLive: Boolean,
+                initialOffsetMs: Long, volumePercent: Int, loudnessBoostEnabled: Boolean, startPaused: Boolean,
+            ) {}
+            override fun pause() {}
+            override fun resume() {}
+            override fun setVolumePercent(percent: Int) {}
+            override fun setLoudnessBoostEnabled(enabled: Boolean) {}
+            override fun applySyncOffset(offsetMs: Long, videoPositionMs: Long, isVideoLive: Boolean) {}
+            override fun syncWithVideoPosition(videoPositionMs: Long, isVideoLive: Boolean, videoLiveOffsetMs: Long, forceSeek: Boolean) {}
+            override fun detach() {}
+        }
+
+        val vmStore = ViewModelStore()
+        val viewModel = ViewModelProvider(
+            vmStore,
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                    return PlayerViewModel(
+                        channelRepository = channelRepo,
+                        userPreferencesRepository = prefsRepo,
+                        addonPreferencesRepository = addonPrefsRepo,
+                        stremioAddonClient = addonClient,
+                        subscriptionRepository = subRepo,
+                        externalAudioCatalogRepository = fakeCatalogRepo,
+                        externalAudioController = fakeAudioCtrl,
+                        context = context,
+                    ) as T
+                }
+            },
+        )[PlayerViewModel::class.java]
+
+        try {
+            // 1. Preload in init populates cached channels before sheet even opens
+            assertEquals(1, viewModel.state.value.externalAudio.channels.size)
+            assertEquals(0, syncCallCount.get())
+
+            // 2. Open sheet -> cached channels are immediately displayed WHILE gated background sync is still running
+            viewModel.openExternalAudioSheet()
+            assertTrue(viewModel.state.value.externalAudio.isSheetVisible)
+            assertEquals(1, viewModel.state.value.externalAudio.channels.size)
+            assertTrue(viewModel.state.value.externalAudio.isLoadingCatalog)
+
+            // Re-opening before sync completes must deduplicate (syncCallCount stays 1)
+            viewModel.openExternalAudioSheet()
+            assertEquals(1, syncCallCount.get())
+
+            // Complete background sync -> channels update and isLoadingCatalog resets to false
+            syncGate.complete(ExternalAudioCatalogResult(channels = refreshedChannels, updatedAt = "t2"))
+            delay(30)
+            assertFalse(viewModel.state.value.externalAudio.isLoadingCatalog)
+            assertEquals(2, viewModel.state.value.externalAudio.channels.size)
+
+            // 3. Failure result -> keeps cached channels and resets isLoadingCatalog = false
+            mode = "error"
+            viewModel.refreshExternalAudioCatalog()
+            delay(30)
+            assertFalse(viewModel.state.value.externalAudio.isLoadingCatalog)
+            assertEquals(2, viewModel.state.value.externalAudio.channels.size)
+            assertNull(viewModel.state.value.externalAudio.catalogError)
+
+            // 4. Uncaught runtime exception -> keeps cached channels and resets isLoadingCatalog = false
+            mode = "throw"
+            viewModel.refreshExternalAudioCatalog()
+            delay(30)
+            assertFalse(viewModel.state.value.externalAudio.isLoadingCatalog)
+            assertEquals(2, viewModel.state.value.externalAudio.channels.size)
+        } finally {
+            vmStore.clear()
+        }
+    }
 }

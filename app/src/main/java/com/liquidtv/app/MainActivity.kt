@@ -12,6 +12,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
+import com.liquidtv.app.data.audio.ExternalAudioCatalogRepository
 import com.liquidtv.app.domain.repository.SonixControlRepository
 import com.liquidtv.app.domain.repository.UserPreferencesRepository
 import com.liquidtv.app.ui.LiquidTVApp
@@ -32,6 +33,9 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var sonixControlRepository: SonixControlRepository
 
+    @Inject
+    lateinit var externalAudioCatalogRepository: ExternalAudioCatalogRepository
+
     private var hasStoppedInBackground = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,10 +54,17 @@ class MainActivity : ComponentActivity() {
             userPreferencesRepository.getAppTheme().first()
         }
 
-        // Sync once on initial launch (NOT a configuration change)
+        // Preload cached external audio + sync once on initial launch (NOT a configuration change)
         if (savedInstanceState == null) {
             lifecycleScope.launch {
+                externalAudioCatalogRepository.preload()
+            }
+            lifecycleScope.launch {
                 sonixControlRepository.onAppForeground()
+                val panelState = sonixControlRepository.state.value
+                if (panelState.accessAllowed && panelState.audioSource.configured) {
+                    externalAudioCatalogRepository.syncFromPanel(forceRefresh = false)
+                }
             }
         }
 
@@ -82,6 +93,10 @@ class MainActivity : ComponentActivity() {
             hasStoppedInBackground = false
             lifecycleScope.launch {
                 sonixControlRepository.onAppForeground()
+                val panelState = sonixControlRepository.state.value
+                if (panelState.accessAllowed && panelState.audioSource.configured) {
+                    externalAudioCatalogRepository.syncFromPanel(forceRefresh = false)
+                }
             }
         }
     }

@@ -48,6 +48,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -112,124 +113,113 @@ fun PlayerSubtitlesAndTracksSheet(
         }
     }
 
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
+    PlayerOverlaySheetCard(
+        testTag = "player_tracks_sheet",
+        onDismiss = onClose,
     ) {
-        Box(
+        Row(
             modifier = Modifier
-                .fillMaxSize()
-                .background(colors.dialogScrim)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onClose,
-                ),
-        )
-        LiquidGlassSurface(
-            modifier = Modifier
-                .padding(16.dp)
-                .widthIn(min = 320.dp, max = 660.dp)
-                .heightIn(max = 580.dp)
-                .testTag("player_tracks_sheet"),
-            cornerRadius = 24.dp,
-            glassAlpha = 0.95f,
-            glassColor = colors.panel,
-            borderAlpha = 0.78f,
-            borderColor = colors.border,
+                .fillMaxWidth()
+                .heightIn(min = 44.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "الصوت والترجمة والمظهر",
+                    style = LiquidTypography.TitleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = colors.text,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                uiState.activeExternalSubtitleLabel?.let { label ->
+                    Text(
+                        text = if (uiState.externalSubtitlesEnabled) {
+                            "✓ ترجمة خارجية مفعّلة: $label"
+                        } else {
+                            "ترجمة خارجية متوقفة مؤقتاً: $label"
+                        },
+                        style = LiquidTypography.LabelSmall,
+                        color = if (uiState.externalSubtitlesEnabled) colors.success else colors.muted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            IconButton(
+                onClick = onClose,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .minimumInteractiveComponentSize()
+                    .testTag("tracks_sheet_close"),
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("الصوت والترجمة والمظهر", style = LiquidTypography.TitleLarge, color = colors.text)
-                        uiState.activeExternalSubtitleLabel?.let { label ->
-                            Text(
-                                text = if (uiState.externalSubtitlesEnabled) {
-                                    "✓ ترجمة خارجية مفعّلة: $label"
-                                } else {
-                                    "ترجمة خارجية متوقفة مؤقتاً: $label"
-                                },
-                                style = LiquidTypography.LabelSmall,
-                                color = if (uiState.externalSubtitlesEnabled) colors.success else colors.muted,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
+                Icon(Icons.Filled.Close, contentDescription = "إغلاق", tint = colors.text, modifier = Modifier.size(20.dp))
+            }
+        }
+
+        // Tabs
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.testTag("player_subtitle_tabs"),
+        ) {
+            items(PlayerSheetTab.entries, key = { it.name }) { tab ->
+                SheetTabPill(
+                    label = tab.labelAr,
+                    icon = tab.icon,
+                    selected = activeTab == tab,
+                    onClick = { activeTab = tab },
+                    modifier = Modifier.testTag("player_tab_${tab.name.lowercase()}"),
+                )
+            }
+        }
+
+        when (activeTab) {
+            PlayerSheetTab.TRACKS -> {
+                TracksTabContent(
+                    uiState = uiState,
+                    externalSubUrl = externalSubUrl,
+                    onExternalSubUrlChange = { externalSubUrl = it },
+                    onSelectAudio = onSelectAudio,
+                    onSelectSubtitle = onSelectSubtitle,
+                    onToggleExternalSubtitles = onToggleExternalSubtitles,
+                    onLoadExternalSubtitleUrl = onLoadExternalSubtitleUrl,
+                    onLaunchFilePicker = {
+                        openSubtitleLauncher.launch(
+                            arrayOf(
+                                "text/*",
+                                "application/x-subrip",
+                                "application/ttml+xml",
+                                "application/zip",
+                                "application/gzip",
+                                "application/octet-stream",
                             )
-                        }
-                    }
-                    IconButton(onClick = onClose, modifier = Modifier.testTag("tracks_sheet_close")) {
-                        Icon(Icons.Filled.Close, contentDescription = "إغلاق", tint = colors.text)
-                    }
-                }
-
-                // Tabs
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.testTag("player_subtitle_tabs"),
-                ) {
-                    items(PlayerSheetTab.entries, key = { it.name }) { tab ->
-                        SheetTabPill(
-                            label = tab.labelAr,
-                            icon = tab.icon,
-                            selected = activeTab == tab,
-                            onClick = { activeTab = tab },
-                            modifier = Modifier.testTag("player_tab_${tab.name.lowercase()}"),
                         )
-                    }
-                }
-
-                when (activeTab) {
-                    PlayerSheetTab.TRACKS -> {
-                        TracksTabContent(
-                            uiState = uiState,
-                            externalSubUrl = externalSubUrl,
-                            onExternalSubUrlChange = { externalSubUrl = it },
-                            onSelectAudio = onSelectAudio,
-                            onSelectSubtitle = onSelectSubtitle,
-                            onToggleExternalSubtitles = onToggleExternalSubtitles,
-                            onLoadExternalSubtitleUrl = onLoadExternalSubtitleUrl,
-                            onLaunchFilePicker = {
-                                openSubtitleLauncher.launch(
-                                    arrayOf(
-                                        "text/*",
-                                        "application/x-subrip",
-                                        "application/ttml+xml",
-                                        "application/zip",
-                                        "application/gzip",
-                                        "application/octet-stream",
-                                    )
-                                )
-                            },
-                            modifier = Modifier.weight(1f, fill = false),
-                        )
-                    }
-                    PlayerSheetTab.ONLINE_SEARCH -> {
-                        OnlineSearchTabContent(
-                            uiState = uiState,
-                            onSelectSearchLanguage = onSelectSearchLanguage,
-                            onSearchOnlineSubtitles = onSearchOnlineSubtitles,
-                            onApplyOnlineSubtitle = onApplyOnlineSubtitle,
-                            modifier = Modifier.weight(1f, fill = false),
-                        )
-                    }
-                    PlayerSheetTab.APPEARANCE -> {
-                        AppearanceTabContent(
-                            style = uiState.subtitleStyle,
-                            onUpdateStyle = onUpdateStyle,
-                            onAdjustDelay = onAdjustDelay,
-                            onSetDelay = onSetDelay,
-                            modifier = Modifier.weight(1f, fill = false),
-                        )
-                    }
-                }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                )
+            }
+            PlayerSheetTab.ONLINE_SEARCH -> {
+                OnlineSearchTabContent(
+                    uiState = uiState,
+                    onSelectSearchLanguage = onSelectSearchLanguage,
+                    onSearchOnlineSubtitles = onSearchOnlineSubtitles,
+                    onApplyOnlineSubtitle = onApplyOnlineSubtitle,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                )
+            }
+            PlayerSheetTab.APPEARANCE -> {
+                AppearanceTabContent(
+                    style = uiState.subtitleStyle,
+                    onUpdateStyle = onUpdateStyle,
+                    onAdjustDelay = onAdjustDelay,
+                    onSetDelay = onSetDelay,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                )
             }
         }
     }
@@ -249,7 +239,7 @@ private fun TracksTabContent(
 ) {
     val colors = AppTheme.colors
     LazyColumn(
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier.testTag("tracks_tab_list"),
     ) {
         if (uiState.hasExternalSubtitleLoaded) {
@@ -403,7 +393,7 @@ private fun OnlineSearchTabContent(
     val meta = uiState.subtitleMetadata
 
     LazyColumn(
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier.testTag("online_subtitle_search_list"),
     ) {
         item {
@@ -720,62 +710,45 @@ private fun OnlineSubtitleResultCard(
     onClick: () -> Unit,
 ) {
     val colors = AppTheme.colors
-    val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 56.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(
-                when {
-                    isActive -> colors.selected
-                    isFocused -> colors.surface
-                    else -> colors.card.copy(alpha = 0.68f)
-                },
-            )
-            .border(
-                width = if (isFocused) 2.dp else 1.dp,
-                color = when {
-                    isFocused -> colors.focus
-                    isActive -> colors.accent
-                    else -> colors.border.copy(alpha = 0.5f)
-                },
-                shape = RoundedCornerShape(14.dp),
-            )
-            .clickable(interactionSource, null, enabled = !isApplying, onClick = onClick)
-            .focusable(interactionSource = interactionSource)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+    PlayerCompactOptionCard(
+        selected = isActive,
+        isActive = isActive,
+        enabled = !isApplying,
+        onClick = onClick,
+        modifier = Modifier.testTag("online_subtitle_result_card"),
     ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = result.label,
-                style = LiquidTypography.BodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                style = LiquidTypography.BodySmall.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                    lineHeight = 16.sp,
+                ),
                 color = colors.text,
-                maxLines = 2,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
                     text = result.language.uppercase(),
-                    style = LiquidTypography.LabelSmall,
+                    style = LiquidTypography.LabelSmall.copy(fontSize = 11.sp, lineHeight = 14.sp),
                     color = colors.accentText,
+                    maxLines = 1,
                 )
                 Text(
                     text = "• ${result.addonName}",
-                    style = LiquidTypography.LabelSmall,
+                    style = LiquidTypography.LabelSmall.copy(fontSize = 11.sp, lineHeight = 14.sp),
                     color = colors.muted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
-        Spacer(Modifier.width(8.dp))
         when {
-            isApplying -> CircularProgressIndicator(modifier = Modifier.size(20.dp), color = colors.accent, strokeWidth = 2.dp)
-            isActive -> Icon(Icons.Filled.Check, contentDescription = "مفعّلة", tint = colors.success)
-            else -> Icon(Icons.Filled.CloudDownload, contentDescription = "تحميل وتفعيل", tint = colors.accentText)
+            isApplying -> CircularProgressIndicator(modifier = Modifier.size(18.dp), color = colors.accent, strokeWidth = 2.dp)
+            isActive -> Icon(Icons.Filled.Check, contentDescription = "مفعّلة", tint = colors.success, modifier = Modifier.size(20.dp))
+            else -> Icon(Icons.Filled.CloudDownload, contentDescription = "تحميل وتفعيل", tint = colors.accentText, modifier = Modifier.size(20.dp))
         }
     }
 }
@@ -793,7 +766,7 @@ private fun SheetTabPill(
     val isFocused by interactionSource.collectIsFocusedAsState()
     Row(
         modifier = modifier
-            .heightIn(min = 48.dp)
+            .height(48.dp)
             .clip(RoundedCornerShape(24.dp))
             .background(if (selected) colors.selected else colors.surface.copy(alpha = 0.7f))
             .border(
@@ -803,7 +776,7 @@ private fun SheetTabPill(
             )
             .clickable(interactionSource, null, onClick = onClick)
             .focusable(interactionSource = interactionSource)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -868,38 +841,30 @@ private fun SheetOptionRow(
     modifier: Modifier = Modifier,
 ) {
     val colors = AppTheme.colors
-    val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                when {
-                    selected -> colors.selected
-                    isFocused -> colors.surface
-                    else -> colors.card.copy(alpha = 0.65f)
-                },
-            )
-            .border(
-                width = if (isFocused) 2.dp else 1.dp,
-                color = when {
-                    isFocused -> colors.focus
-                    selected -> colors.accent
-                    else -> colors.border.copy(alpha = 0.55f)
-                },
-                shape = RoundedCornerShape(12.dp),
-            )
-            .clickable(interactionSource, null, onClick = onClick)
-            .focusable(interactionSource = interactionSource)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+    PlayerCompactOptionCard(
+        selected = selected,
+        onClick = onClick,
+        modifier = modifier,
     ) {
-        Text(label, style = LiquidTypography.BodyMedium, color = colors.text, modifier = Modifier.weight(1f))
+        Text(
+            text = label,
+            style = LiquidTypography.BodySmall.copy(
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                fontSize = 13.sp,
+                lineHeight = 16.sp,
+            ),
+            color = colors.text,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
         if (selected) {
-            Icon(Icons.Filled.Check, contentDescription = "محدد", tint = colors.accentText)
+            Icon(
+                Icons.Filled.Check,
+                contentDescription = "محدد",
+                tint = colors.accentText,
+                modifier = Modifier.size(18.dp),
+            )
         }
     }
 }
