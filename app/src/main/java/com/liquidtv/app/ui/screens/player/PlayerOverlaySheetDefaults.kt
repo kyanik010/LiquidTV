@@ -31,8 +31,8 @@ import com.liquidtv.app.ui.components.LiquidGlassSurface
 import com.liquidtv.app.ui.theme.AppTheme
 
 object PlayerOverlaySheetDefaults {
-    val SheetMaxWidth = 440.dp
-    val SheetMaxHeight = 440.dp
+    val SheetMaxWidth = 460.dp
+    val SheetMaxHeight = 460.dp
     val SheetMinWidth = 280.dp
     val SheetMinHeight = 260.dp
     val SheetCornerRadius = 20.dp

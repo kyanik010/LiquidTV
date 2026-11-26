@@ -34,8 +34,8 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
@@ -69,10 +69,14 @@ import com.liquidtv.app.domain.model.AudioBrandFilter
 import com.liquidtv.app.domain.model.AudioChannelBrand
 import com.liquidtv.app.domain.model.ExternalAudioChannel
 import com.liquidtv.app.domain.model.ExternalAudioStatus
+import com.liquidtv.app.domain.model.ExternalAudioSyncStage
 import com.liquidtv.app.domain.model.ExternalAudioUiState
 import com.liquidtv.app.player.ExternalAudioSyncPolicy
 import com.liquidtv.app.ui.theme.AppTheme
 import com.liquidtv.app.ui.theme.LiquidTypography
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun ExternalAudioSheet(
@@ -179,30 +183,13 @@ fun ExternalAudioSheet(
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                IconButton(
+                SyncCatalogPillButton(
+                    isSyncing = state.isLoadingCatalog,
                     onClick = onRefreshCatalog,
-                    enabled = !state.isLoadingCatalog,
-                    modifier = Modifier
-                        .minimumInteractiveComponentSize()
-                        .testTag("external_audio_refresh_button"),
-                ) {
-                    if (state.isLoadingCatalog) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                            color = colors.accent,
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Filled.Refresh,
-                            contentDescription = "تحديث قائمة الصوت",
-                            tint = colors.text,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                }
+                    modifier = Modifier.testTag("external_audio_sync_catalog_button"),
+                )
                 IconButton(
                     onClick = onClose,
                     modifier = Modifier
@@ -219,14 +206,23 @@ fun ExternalAudioSheet(
             }
         }
 
-        // Compact Warnings / Errors
+        // Sync Stage Status & Last Synced Date/Time Bar
+        ExternalAudioSyncStatusBar(
+            state = state,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        // Compact Warnings / Errors (avoid duplicating FAILED sync reason already shown in SyncStatusBar)
         state.connectionLimitWarning?.let { warning ->
             StatusBanner(text = warning, accent = colors.warning)
         }
-        state.catalogWarning?.let { warning ->
-            StatusBanner(text = warning, accent = colors.warning)
+        if (state.syncStage != ExternalAudioSyncStage.FAILED) {
+            state.catalogWarning?.let { warning ->
+                StatusBanner(text = warning, accent = colors.warning)
+            }
         }
-        val activeError = state.errorMessage ?: state.catalogError
+        val activeError = state.errorMessage
+            ?: if (state.syncStage != ExternalAudioSyncStage.FAILED) state.catalogError else null
         if (activeError != null) {
             StatusBanner(text = activeError, accent = colors.danger)
         }
@@ -405,10 +401,11 @@ fun ExternalAudioSheet(
                         )
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            text = "جارٍ تحميل وتصنيف قنوات الصوت الخارجي...",
+                            text = state.syncStageMessage?.takeIf { it.isNotBlank() }
+                                ?: "جارٍ تحميل وتصنيف قنوات الصوت الخارجي...",
                             style = LiquidTypography.BodySmall,
                             color = colors.textSecondary,
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
@@ -428,7 +425,7 @@ fun ExternalAudioSheet(
                         Spacer(Modifier.height(6.dp))
                         Text(
                             text = if (state.channels.isEmpty()) {
-                                "لا توجد قنوات صوت متاحة حالياً."
+                                "لا توجد قنوات صوت محفوظة حالياً."
                             } else {
                                 "لا توجد نتائج مطابقة لبحثك."
                             },
@@ -441,11 +438,14 @@ fun ExternalAudioSheet(
                             Spacer(Modifier.height(6.dp))
                             OutlinedButton(
                                 onClick = onRefreshCatalog,
-                                modifier = Modifier.height(48.dp),
+                                enabled = !state.isLoadingCatalog,
+                                modifier = Modifier
+                                    .height(48.dp)
+                                    .testTag("external_audio_empty_sync_button"),
                             ) {
-                                Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Filled.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("تحديث المصادر", style = LiquidTypography.LabelMedium)
+                                Text("مزامنة الصوتيات", style = LiquidTypography.LabelMedium)
                             }
                         }
                     }
@@ -756,4 +756,187 @@ private fun ExternalAudioChannelRow(
             )
         }
     }
+}
+
+@Composable
+private fun SyncCatalogPillButton(
+    isSyncing: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = AppTheme.colors
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val bgColor = when {
+        isSyncing -> colors.accent.copy(alpha = 0.22f)
+        isFocused -> colors.accent.copy(alpha = 0.30f)
+        else -> colors.accent.copy(alpha = 0.16f)
+    }
+    val borderColor = when {
+        isFocused -> colors.focus
+        else -> colors.accent.copy(alpha = 0.72f)
+    }
+    Row(
+        modifier = modifier
+            .minimumInteractiveComponentSize()
+            .height(48.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .background(bgColor)
+            .border(
+                width = if (isFocused) 2.dp else 1.dp,
+                color = borderColor,
+                shape = RoundedCornerShape(24.dp),
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = !isSyncing,
+                onClick = onClick,
+            )
+            .focusable(interactionSource = interactionSource)
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        if (isSyncing) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(14.dp),
+                strokeWidth = 2.dp,
+                color = colors.accent,
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Filled.Sync,
+                contentDescription = null,
+                tint = colors.accent,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+        Text(
+            text = "مزامنة الصوتيات",
+            style = LiquidTypography.LabelSmall.copy(
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp,
+            ),
+            color = colors.text,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun ExternalAudioSyncStatusBar(
+    state: ExternalAudioUiState,
+    modifier: Modifier = Modifier,
+) {
+    val colors = AppTheme.colors
+    val accentColor = when (state.syncStage) {
+        ExternalAudioSyncStage.FAILED -> colors.danger
+        ExternalAudioSyncStage.SUCCEEDED -> colors.success
+        ExternalAudioSyncStage.CONNECTING_PANEL,
+        ExternalAudioSyncStage.DOWNLOADING_PLAYLIST,
+        ExternalAudioSyncStage.PARSING_CHANNELS,
+        ExternalAudioSyncStage.SAVING_LOCAL -> colors.accent
+        ExternalAudioSyncStage.IDLE -> colors.border
+    }
+    val bgColor = when (state.syncStage) {
+        ExternalAudioSyncStage.IDLE -> colors.surface.copy(alpha = 0.50f)
+        else -> accentColor.copy(alpha = 0.12f)
+    }
+    val stageText = when {
+        state.syncStage != ExternalAudioSyncStage.IDLE && !state.syncStageMessage.isNullOrBlank() ->
+            state.syncStageMessage
+        state.channels.isNotEmpty() ->
+            "محفوظ محلياً (${state.channels.size})"
+        else ->
+            "اضغط مزامنة الصوتيات للتحميل"
+    }
+    val textColor = when (state.syncStage) {
+        ExternalAudioSyncStage.FAILED -> colors.danger
+        ExternalAudioSyncStage.SUCCEEDED -> colors.success
+        ExternalAudioSyncStage.CONNECTING_PANEL,
+        ExternalAudioSyncStage.DOWNLOADING_PLAYLIST,
+        ExternalAudioSyncStage.PARSING_CHANNELS,
+        ExternalAudioSyncStage.SAVING_LOCAL -> colors.accent
+        ExternalAudioSyncStage.IDLE -> colors.textSecondary
+    }
+    val formattedLastSync = remember(state.lastSyncedAtMs, state.lastUpdatedAt) {
+        formatExternalAudioSyncTime(state.lastSyncedAtMs, state.lastUpdatedAt)
+    }
+
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(bgColor)
+            .border(1.dp, accentColor.copy(alpha = 0.45f), RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 5.dp)
+            .testTag("external_audio_sync_status_bar"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            when (state.syncStage) {
+                ExternalAudioSyncStage.CONNECTING_PANEL,
+                ExternalAudioSyncStage.DOWNLOADING_PLAYLIST,
+                ExternalAudioSyncStage.PARSING_CHANNELS,
+                ExternalAudioSyncStage.SAVING_LOCAL -> CircularProgressIndicator(
+                    modifier = Modifier.size(12.dp),
+                    strokeWidth = 1.8.dp,
+                    color = colors.accent,
+                )
+                ExternalAudioSyncStage.FAILED -> Icon(
+                    imageVector = Icons.Filled.Warning,
+                    contentDescription = null,
+                    tint = colors.danger,
+                    modifier = Modifier.size(13.dp),
+                )
+                ExternalAudioSyncStage.SUCCEEDED -> Icon(
+                    imageVector = Icons.Filled.CheckCircle,
+                    contentDescription = null,
+                    tint = colors.success,
+                    modifier = Modifier.size(13.dp),
+                )
+                ExternalAudioSyncStage.IDLE -> Icon(
+                    imageVector = Icons.Filled.GraphicEq,
+                    contentDescription = null,
+                    tint = colors.textSecondary,
+                    modifier = Modifier.size(13.dp),
+                )
+            }
+            Text(
+                text = stageText,
+                style = LiquidTypography.LabelSmall.copy(fontSize = 11.sp),
+                color = textColor,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Text(
+            text = formattedLastSync,
+            style = LiquidTypography.LabelSmall.copy(fontSize = 10.sp),
+            color = colors.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.testTag("external_audio_last_synced_text"),
+        )
+    }
+}
+
+private fun formatExternalAudioSyncTime(
+    lastSyncedAtMs: Long?,
+    fallbackUpdatedAt: String?,
+): String {
+    if (lastSyncedAtMs != null && lastSyncedAtMs > 0L) {
+        val formatter = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.US)
+        return "آخر مزامنة: ${formatter.format(Date(lastSyncedAtMs))}"
+    }
+    val updated = fallbackUpdatedAt?.trim().orEmpty()
+    if (updated.isNotBlank()) {
+        return "آخر تحديث: $updated"
+    }
+    return "لم تتم المزامنة بعد"
 }

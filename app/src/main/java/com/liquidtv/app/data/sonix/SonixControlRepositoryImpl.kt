@@ -238,7 +238,19 @@ class SonixControlRepositoryImpl @Inject constructor(
 
     override suspend fun fetchAudioSources(): Result<SonixAudioSourceConfig> {
         val uid = identityStore.getOrCreateDeviceUid()
-        return when (val res = executeWithTokenRecovery("audio.sources", buildMetadataPayload(uid))) {
+        val payload = buildMetadataPayload(uid)
+        val initialToken = identityStore.getDeviceToken()
+        val firstAttempt = api.callAction("audio.sources", payload, initialToken)
+        val res = if (firstAttempt is SonixApiResult.Unauthorized && !initialToken.isNullOrBlank()) {
+            executeWithTokenRecovery("audio.sources", payload)
+        } else {
+            if (firstAttempt is SonixApiResult.Success) {
+                val issued = firstAttempt.data["device_token"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+                if (issued != null) identityStore.saveDeviceToken(issued)
+            }
+            firstAttempt
+        }
+        return when (res) {
             is SonixApiResult.Success -> {
                 val config = runCatching {
                     json.decodeFromJsonElement<SonixAudioSourceConfig>(res.data)

@@ -24,6 +24,7 @@ import com.liquidtv.app.domain.model.AudioBrandFilter
 import com.liquidtv.app.domain.model.AudioChannelBrand
 import com.liquidtv.app.domain.model.ExternalAudioChannel
 import com.liquidtv.app.domain.model.ExternalAudioStatus
+import com.liquidtv.app.domain.model.ExternalAudioSyncStage
 import com.liquidtv.app.domain.model.ExternalAudioUiState
 import com.liquidtv.app.player.ExternalAudioSyncPolicy
 import com.liquidtv.app.ui.screens.player.ExternalAudioSheet
@@ -94,13 +95,13 @@ class ExternalAudioSheetUiTest {
 
     @Test
     fun `ExternalAudioSheet and PlayerSubtitlesAndTracksSheet share exact compact dimensions across all states on TV`() {
-        verifyUnifiedCompactDimensions(expectedMaxWidthDp = 440f, expectedMaxHeightDp = 440f)
+        verifyUnifiedCompactDimensions(expectedMaxWidthDp = 460f, expectedMaxHeightDp = 460f)
     }
 
     @Test
     @Config(sdk = [36], qualifiers = "w390dp-h800dp-xhdpi")
     fun `ExternalAudioSheet and PlayerSubtitlesAndTracksSheet share exact compact dimensions on Phone Portrait`() {
-        verifyUnifiedCompactDimensions(expectedMaxWidthDp = 390f, expectedMaxHeightDp = 440f)
+        verifyUnifiedCompactDimensions(expectedMaxWidthDp = 390f, expectedMaxHeightDp = 460f)
     }
 
     @Test
@@ -239,5 +240,71 @@ class ExternalAudioSheetUiTest {
         assertTrue(abs(audioRowBounds.height.value - expectedRowHeight) < 0.5f)
         assertTrue(abs(subOptionRowBounds.height.value - expectedRowHeight) < 0.5f)
         assertTrue(abs(onlineResultBounds.height.value - expectedRowHeight) < 0.5f)
+    }
+
+    @Test
+    fun `ExternalAudioSheet displays sync button, stage progress, last synced timestamp, and guards double taps`() {
+        val channels = listOf(
+            ExternalAudioChannel("1", "beIN SPORTS 1 HD", "1", "http://ex/1.m3u8", AudioChannelBrand.BEIN_SPORTS, "beIN SPORTS", qualityLabel = "HD"),
+            ExternalAudioChannel("2", "ALWAN 2 FHD", "2", "http://ex/2.m3u8", AudioChannelBrand.ALWAN, "ALWAN", qualityLabel = "FHD"),
+        )
+        var syncClicks = 0
+        var loadingState by mutableStateOf(false)
+        var stage by mutableStateOf(ExternalAudioSyncStage.SUCCEEDED)
+        var stageMsg by mutableStateOf("تمت المزامنة بنجاح")
+
+        composeRule.setContent {
+            LiquidTVTheme {
+                ExternalAudioSheet(
+                    state = ExternalAudioUiState(
+                        isSheetVisible = true,
+                        isLoadingCatalog = loadingState,
+                        syncStage = stage,
+                        syncStageMessage = stageMsg,
+                        lastSyncedAtMs = 1764070000000L,
+                        channels = channels,
+                    ),
+                    onSelectChannel = {},
+                    onDetachAudio = {},
+                    onRefreshCatalog = { syncClicks++ },
+                    onSearchQueryChange = {},
+                    onSelectBrandFilter = {},
+                    onVolumeChange = {},
+                    onToggleLoudnessBoost = {},
+                    onAdjustSyncOffset = {},
+                    onResetSyncOffset = {},
+                    onClose = {},
+                )
+            }
+        }
+
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("external_audio_sync_catalog_button").assertIsDisplayed()
+        composeRule.onNodeWithText("مزامنة الصوتيات").assertIsDisplayed()
+        composeRule.onNodeWithTag("external_audio_sync_status_bar").assertIsDisplayed()
+        composeRule.onNodeWithTag("external_audio_last_synced_text").assertIsDisplayed()
+        composeRule.onNodeWithText("تمت المزامنة بنجاح").assertIsDisplayed()
+
+        // Enabled click fires once
+        composeRule.onNodeWithTag("external_audio_sync_catalog_button").performClick()
+        assertEquals(1, syncClicks)
+
+        // While syncing, button disables repeated taps and shows downloading stage + keeps channels visible
+        loadingState = true
+        stage = ExternalAudioSyncStage.DOWNLOADING_PLAYLIST
+        stageMsg = ExternalAudioSyncStage.DOWNLOADING_PLAYLIST.defaultMessageAr
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("جارٍ تنزيل قوائم الصوتيات...").assertIsDisplayed()
+        composeRule.onNodeWithTag("external_audio_sync_catalog_button").performClick()
+        assertEquals(1, syncClicks)
+        composeRule.onNodeWithText("beIN SPORTS 1 HD").assertIsDisplayed()
+
+        // Failure keeps cached channels visible and shows failure reason
+        loadingState = false
+        stage = ExternalAudioSyncStage.FAILED
+        stageMsg = "فشلت المزامنة: انتهت مهلة القراءة أثناء تحميل قائمة الصوت"
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("فشلت المزامنة: انتهت مهلة القراءة أثناء تحميل قائمة الصوت").assertIsDisplayed()
+        composeRule.onNodeWithText("beIN SPORTS 1 HD").assertIsDisplayed()
     }
 }

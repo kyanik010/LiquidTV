@@ -23,6 +23,7 @@ import com.liquidtv.app.domain.model.Channel
 import com.liquidtv.app.domain.model.ChannelEpgSummary
 import com.liquidtv.app.domain.model.ExternalAudioChannel
 import com.liquidtv.app.domain.model.ExternalAudioStatus
+import com.liquidtv.app.domain.model.ExternalAudioSyncStage
 import com.liquidtv.app.domain.model.ExternalAudioUiState
 import com.liquidtv.app.domain.model.MediaType
 import com.liquidtv.app.domain.model.OnlineSubtitleResult
@@ -976,11 +977,12 @@ class PlayerViewModel @Inject constructor(
     private fun preloadExternalAudioCatalog() {
         externalAudioCatalogRepository.peekCached()?.let { preloaded ->
             if (preloaded.channels.isNotEmpty()) {
-                _state.update {
-                    it.copy(
-                        externalAudio = it.externalAudio.copy(
+                _state.update { current ->
+                    current.copy(
+                        externalAudio = current.externalAudio.copy(
                             channels = preloaded.channels,
-                            lastUpdatedAt = preloaded.updatedAt ?: it.externalAudio.lastUpdatedAt,
+                            lastUpdatedAt = preloaded.updatedAt ?: current.externalAudio.lastUpdatedAt,
+                            lastSyncedAtMs = preloaded.lastSyncedAtMs ?: current.externalAudio.lastSyncedAtMs,
                             catalogWarning = preloaded.warning,
                             catalogError = null,
                         ),
@@ -992,18 +994,16 @@ class PlayerViewModel @Inject constructor(
             val cached = externalAudioCatalogRepository.preload()
             if (cached.channels.isNotEmpty()) {
                 _state.update { current ->
-                    if (current.externalAudio.channels.isEmpty()) {
-                        current.copy(
-                            externalAudio = current.externalAudio.copy(
-                                channels = cached.channels,
-                                lastUpdatedAt = cached.updatedAt ?: current.externalAudio.lastUpdatedAt,
-                                catalogWarning = cached.warning,
-                                catalogError = null,
-                            ),
-                        )
-                    } else {
-                        current
-                    }
+                    val seeded = if (current.externalAudio.channels.isEmpty()) cached.channels else current.externalAudio.channels
+                    current.copy(
+                        externalAudio = current.externalAudio.copy(
+                            channels = seeded,
+                            lastUpdatedAt = cached.updatedAt ?: current.externalAudio.lastUpdatedAt,
+                            lastSyncedAtMs = cached.lastSyncedAtMs ?: current.externalAudio.lastSyncedAtMs,
+                            catalogWarning = current.externalAudio.catalogWarning ?: cached.warning,
+                            catalogError = null,
+                        ),
+                    )
                 }
             }
         }
@@ -1023,11 +1023,42 @@ class PlayerViewModel @Inject constructor(
                     isSheetVisible = true,
                     channels = seededChannels,
                     lastUpdatedAt = ramCached?.updatedAt ?: current.externalAudio.lastUpdatedAt,
+                    lastSyncedAtMs = current.externalAudio.lastSyncedAtMs ?: ramCached?.lastSyncedAtMs,
                     catalogError = null,
                 ),
             )
         }
-        loadExternalAudioCatalog(forceRefresh = false)
+
+        // Local catalog is decoupled from panel network sync:
+        // if channels already exist locally, display them immediately without triggering network I/O.
+        if (_state.value.externalAudio.channels.isNotEmpty()) {
+            return
+        }
+
+        viewModelScope.launch {
+            val diskCached = externalAudioCatalogRepository.preload()
+            if (diskCached.channels.isNotEmpty()) {
+                _state.update { current ->
+                    val seeded = if (current.externalAudio.channels.isEmpty()) {
+                        diskCached.channels
+                    } else {
+                        current.externalAudio.channels
+                    }
+                    current.copy(
+                        externalAudio = current.externalAudio.copy(
+                            channels = seeded,
+                            lastUpdatedAt = diskCached.updatedAt ?: current.externalAudio.lastUpdatedAt,
+                            lastSyncedAtMs = current.externalAudio.lastSyncedAtMs ?: diskCached.lastSyncedAtMs,
+                            catalogWarning = diskCached.warning,
+                            catalogError = null,
+                        ),
+                    )
+                }
+            } else if (_state.value.externalAudio.channels.isEmpty()) {
+                // First-time open with no saved local cache yet: perform initial sync automatically.
+                syncExternalAudioCatalog(forceRefresh = false)
+            }
+        }
     }
 
     fun closeExternalAudioSheet() {
@@ -1037,30 +1068,43 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun refreshExternalAudioCatalog() {
-        loadExternalAudioCatalog(forceRefresh = true)
+        syncExternalAudioCatalog(forceRefresh = true)
     }
 
-    private fun loadExternalAudioCatalog(forceRefresh: Boolean) {
-        if (!forceRefresh && externalAudioCatalogJob?.isActive == true) {
+    fun syncExternalAudioCatalog(forceRefresh: Boolean = true) {
+        // Prevent duplicate concurrent syncs on rapid double-taps.
+        if (externalAudioCatalogJob?.isActive == true) {
             return
-        }
-        if (forceRefresh) {
-            externalAudioCatalogJob?.cancel()
         }
         val generation = ++externalAudioCatalogGeneration
         externalAudioCatalogJob = viewModelScope.launch {
+            var lastEmittedStage: ExternalAudioSyncStage? = null
             try {
-                if (!forceRefresh && _state.value.externalAudio.channels.isEmpty()) {
-                    val cached = externalAudioCatalogRepository.peekCached()
-                        ?: externalAudioCatalogRepository.preload()
-                    if (cached.channels.isNotEmpty()) {
-                        _state.update {
-                            it.copy(
-                                externalAudio = it.externalAudio.copy(
-                                    channels = cached.channels,
-                                    lastUpdatedAt = cached.updatedAt ?: it.externalAudio.lastUpdatedAt,
-                                    catalogWarning = cached.warning,
-                                    catalogError = null,
+                _state.update { current ->
+                    current.copy(
+                        externalAudio = current.externalAudio.copy(
+                            isLoadingCatalog = true,
+                            syncStage = ExternalAudioSyncStage.CONNECTING_PANEL,
+                            syncStageMessage = ExternalAudioSyncStage.CONNECTING_PANEL.defaultMessageAr,
+                            catalogError = null,
+                            catalogWarning = null,
+                        ),
+                    )
+                }
+
+                val result = externalAudioCatalogRepository.syncFromPanelWithProgress(
+                    forceRefresh = forceRefresh,
+                ) { stage ->
+                    lastEmittedStage = stage
+                    if (externalAudioCatalogGeneration == generation &&
+                        stage != ExternalAudioSyncStage.SUCCEEDED &&
+                        stage != ExternalAudioSyncStage.FAILED
+                    ) {
+                        _state.update { current ->
+                            current.copy(
+                                externalAudio = current.externalAudio.copy(
+                                    syncStage = stage,
+                                    syncStageMessage = stage.defaultMessageAr,
                                 ),
                             )
                         }
@@ -1068,54 +1112,64 @@ class PlayerViewModel @Inject constructor(
                 }
 
                 _state.update { current ->
-                    val hasExistingChannels = current.externalAudio.channels.isNotEmpty()
-                    current.copy(
-                        externalAudio = current.externalAudio.copy(
-                            // Match SONIX: show the local catalog immediately and refresh it quietly.
-                            isLoadingCatalog = !hasExistingChannels,
-                            catalogError = null,
-                            catalogWarning = if (!forceRefresh && hasExistingChannels) {
-                                current.externalAudio.catalogWarning
-                            } else {
-                                null
-                            },
-                        ),
-                    )
-                }
-
-                val result = externalAudioCatalogRepository.syncFromPanel(forceRefresh = forceRefresh)
-                _state.update { current ->
+                    val failed = lastEmittedStage == ExternalAudioSyncStage.FAILED ||
+                        result.error != null ||
+                        result.channels.isEmpty()
                     val mergedChannels = if (result.channels.isNotEmpty()) {
                         result.channels
                     } else {
                         current.externalAudio.channels
                     }
-                    current.copy(
-                        externalAudio = current.externalAudio.copy(
-                            channels = mergedChannels,
-                            lastUpdatedAt = result.updatedAt ?: current.externalAudio.lastUpdatedAt,
-                            catalogWarning = result.warning,
-                            catalogError = if (mergedChannels.isEmpty()) result.error else null,
-                        ),
-                    )
+                    if (!failed) {
+                        current.copy(
+                            externalAudio = current.externalAudio.copy(
+                                channels = mergedChannels,
+                                lastUpdatedAt = result.updatedAt ?: current.externalAudio.lastUpdatedAt,
+                                lastSyncedAtMs = result.lastSyncedAtMs ?: current.externalAudio.lastSyncedAtMs,
+                                syncStage = ExternalAudioSyncStage.SUCCEEDED,
+                                syncStageMessage = ExternalAudioSyncStage.SUCCEEDED.defaultMessageAr,
+                                catalogWarning = result.warning,
+                                catalogError = null,
+                            ),
+                        )
+                    } else {
+                        val reason = result.error
+                            ?: result.warning
+                            ?: ExternalAudioSyncStage.FAILED.defaultMessageAr
+                        val failStageMsg = if (reason.startsWith(ExternalAudioSyncStage.FAILED.defaultMessageAr)) {
+                            reason
+                        } else {
+                            "${ExternalAudioSyncStage.FAILED.defaultMessageAr}: $reason"
+                        }
+                        current.copy(
+                            externalAudio = current.externalAudio.copy(
+                                channels = mergedChannels,
+                                lastUpdatedAt = result.updatedAt ?: current.externalAudio.lastUpdatedAt,
+                                lastSyncedAtMs = current.externalAudio.lastSyncedAtMs ?: result.lastSyncedAtMs,
+                                syncStage = ExternalAudioSyncStage.FAILED,
+                                syncStageMessage = failStageMsg,
+                                catalogWarning = result.warning,
+                                catalogError = if (mergedChannels.isEmpty()) reason else null,
+                            ),
+                        )
+                    }
                 }
             } catch (ce: kotlinx.coroutines.CancellationException) {
                 throw ce
             } catch (e: Exception) {
                 _state.update { current ->
                     val hasChannels = current.externalAudio.channels.isNotEmpty()
+                    val reason = e.message ?: "تعذّر تحميل قائمة الصوت الخارجي"
                     current.copy(
                         externalAudio = current.externalAudio.copy(
+                            syncStage = ExternalAudioSyncStage.FAILED,
+                            syncStageMessage = "${ExternalAudioSyncStage.FAILED.defaultMessageAr}: $reason",
                             catalogWarning = if (hasChannels) {
-                                "تعذّر تحديث قائمة الصوت؛ تم استخدام النسخة المحفوظة"
+                                "${ExternalAudioSyncStage.FAILED.defaultMessageAr}: $reason — تم الاحتفاظ بالنسخة المحلية"
                             } else {
                                 null
                             },
-                            catalogError = if (hasChannels) {
-                                null
-                            } else {
-                                e.message ?: "تعذّر تحميل قائمة الصوت الخارجي"
-                            },
+                            catalogError = if (hasChannels) null else reason,
                         ),
                     )
                 }

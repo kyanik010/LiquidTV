@@ -593,7 +593,7 @@ fun PlayerScreen(
                 state = uiState.externalAudio,
                 onSelectChannel = { viewModel.selectExternalAudioChannel(it) },
                 onDetachAudio = { viewModel.detachExternalAudio() },
-                onRefreshCatalog = { viewModel.refreshExternalAudioCatalog() },
+                onRefreshCatalog = { viewModel.syncExternalAudioCatalog() },
                 onSearchQueryChange = { viewModel.setExternalAudioSearchQuery(it) },
                 onSelectBrandFilter = { viewModel.setExternalAudioBrandFilter(it) },
                 onVolumeChange = { viewModel.setExternalAudioVolume(it) },

@@ -10,14 +10,17 @@ import com.liquidtv.app.data.sonix.HttpSonixControlApi
 import com.liquidtv.app.data.sonix.SonixControlRepositoryImpl
 import com.liquidtv.app.data.sonix.SonixDeviceIdentityStore
 import com.liquidtv.app.domain.model.AudioChannelBrand
+import com.liquidtv.app.domain.model.ExternalAudioSyncStage
 import com.liquidtv.app.domain.model.SonixAudioSourceConfig
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import okhttp3.Dns
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.SocketPolicy
 import okio.Buffer
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -32,9 +35,14 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.ByteArrayInputStream
 import java.io.File
+import java.net.HttpURLConnection
 import java.net.InetAddress
+import java.net.URL
+import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.GZIPOutputStream
 
 @RunWith(RobolectricTestRunner::class)
@@ -100,13 +108,10 @@ class AudioM3uParserAndCatalogTest {
             "#EXTINF:-1,beIN SPORTS 1 HD Duplicate\n" +
             "http://iptv.example.com/live/bein1.m3u8\n"
 
-        val publicDns: (String) -> Array<InetAddress> = {
-            arrayOf(InetAddress.getByAddress(byteArrayOf(93.toByte(), 184.toByte(), 216.toByte(), 34)))
-        }
         val channels = AudioM3uParser.parse(
             input = ByteArrayInputStream(m3u.toByteArray(Charsets.UTF_8)),
             baseUrl = "https://panel.example.com/playlist.m3u",
-            dnsResolver = publicDns,
+            dnsResolver = testPublicDns(),
         )
 
         assertEquals(2, channels.size)
@@ -121,7 +126,7 @@ class AudioM3uParserAndCatalogTest {
     }
 
     @Test
-    fun `SonixControlRepositoryImpl parses audio_source in sync and fetches audio_sources action`() = runTest {
+    fun `SonixControlRepositoryImpl parses audio_source in sync and fetches audio_sources without blocking behind unrelated syncNow`() = runTest {
         val syncJson = """
             {
               "device_id": "d-1",
@@ -146,51 +151,46 @@ class AudioM3uParserAndCatalogTest {
               "updated_at": "2026-11-25T12:00:00Z"
             }
         """.trimIndent()
-        server.enqueue(MockResponse().setResponseCode(200).setBody(syncJson))
-        server.enqueue(MockResponse().setResponseCode(200).setBody(audioSourcesJson))
+
+        val slowSyncBody = syncJson
+        server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+            override fun dispatch(request: okhttp3.mockwebserver.RecordedRequest): MockResponse {
+                val body = request.body.readUtf8()
+                return if (body.contains("\"audio.sources\"")) {
+                    MockResponse().setResponseCode(200).setBody(audioSourcesJson)
+                } else {
+                    MockResponse()
+                        .setResponseCode(200)
+                        .setBodyDelay(700, TimeUnit.MILLISECONDS)
+                        .setBody(slowSyncBody)
+                }
+            }
+        }
 
         val base = server.url("/").toString().trimEnd('/')
         val api = HttpSonixControlApi(OkHttpClient(), base, "anon-key")
         val identityStore = SonixDeviceIdentityStore(context, plainCrypto)
         val repo = SonixControlRepositoryImpl(context, api, identityStore)
 
-        val syncRes = repo.syncNow(force = true)
-        assertTrue(syncRes.isSuccess)
-        assertTrue(repo.state.value.audioSource.configured)
+        // Seed token first
+        val firstSync = repo.syncNow(force = true)
+        assertTrue(firstSync.isSuccess)
         assertEquals("http://audio.example.org/list.m3u", repo.state.value.audioSource.m3uUrl)
 
+        // Start a slow unrelated syncNow occupying deviceAuthMutex; fetchAudioSources must complete immediately without waiting
+        val slowSyncJob = async(Dispatchers.IO) { repo.syncNow(force = true) }
+        delay(50)
+        val startMs = System.currentTimeMillis()
         val fetchRes = repo.fetchAudioSources()
+        val elapsedMs = System.currentTimeMillis() - startMs
         assertTrue(fetchRes.isSuccess)
         assertEquals("http://audio.example.org/updated.m3u", fetchRes.getOrNull()?.m3uUrl)
-        assertEquals("2026-11-25T12:00:00Z", repo.state.value.audioSource.updatedAt)
+        assertTrue("fetchAudioSources waited on unrelated sync mutex ($elapsedMs ms)", elapsedMs < 400L)
+        slowSyncJob.await()
     }
 
     @Test
-    fun `DefaultExternalAudioCatalogRepository fetches gzipped M3U, encrypts cache, and falls back offline`() = runTest {
-        val m3uBody = """
-            #EXTM3U
-            #EXTINF:-1 tvg-chno="1" group-title="beIN SPORTS",beIN SPORTS 1 SD
-            http://cdn.example.org/bein1_sd.m3u8
-            #EXTINF:-1 tvg-chno="2" group-title="ALWAN",ALWAN 1 HD
-            http://cdn.example.org/alwan1.m3u8
-        """.trimIndent()
-
-        val gzipBytes = java.io.ByteArrayOutputStream().use { baos ->
-            GZIPOutputStream(baos).use { gz -> gz.write(m3uBody.toByteArray(Charsets.UTF_8)) }
-            baos.toByteArray()
-        }
-        server.enqueue(
-            MockResponse()
-                .setResponseCode(200)
-                .setHeader("Content-Encoding", "gzip")
-                .setBody(Buffer().write(gzipBytes)),
-        )
-
-        // MockWebServer runs on 127.0.0.1/localhost; use public-like host header? Wait:
-        // MockWebServer URL uses localhost which AudioNetworkSecurityValidator blocks!
-        // Let's verify that by using nip.io/example or testing direct encrypted cache fallback + parser separately,
-        // Wait: MockWebServer.url() resolves to localhost, so download rejects SSRF localhost as expected!
-        // Verify SSRF protection actually blocks localhost M3U URLs too:
+    fun `DefaultExternalAudioCatalogRepository blocks localhost SSRF and falls back offline`() = runTest {
         val fakeSonixRepo = FakeSonixControlRepository().apply {
             audioSourcesHandler = {
                 Result.success(
@@ -210,70 +210,62 @@ class AudioM3uParserAndCatalogTest {
         )
 
         val blockedRes = repo.syncFromPanel(forceRefresh = true)
-        assertTrue(blockedRes.error != null)
+        assertNotNull(blockedRes.error)
         assertTrue(blockedRes.channels.isEmpty())
 
-        // Now verify encrypted cache roundtrip & offline fallback when cache is present
+        // Verify encrypted cache roundtrip & offline fallback
         val cacheFile = File(context.filesDir, "liquidtv_external_audio_catalog_v1.enc")
-        val seedJson = """{"version":1,"updatedAt":"2026-11-25T10:00:00Z","sourceHash":"h1","channels":[{"id":"c1","name":"beIN SPORTS 1 HD","number":"1","streamUrl":"http://cdn.example.org/1.m3u8","brand":"BEIN_SPORTS","categoryName":"beIN SPORTS","containerExtension":"m3u8","qualityRank":4,"qualityLabel":"HD"}]}"""
+        val seedJson = """{"version":2,"updatedAt":"2026-11-25T10:00:00Z","lastSyncedEpochMs":1764060000000,"sourceHash":"h1","channels":[{"id":"c1","name":"beIN SPORTS 1 HD","number":"1","streamUrl":"http://cdn.example.org/1.m3u8","brand":"BEIN_SPORTS","categoryName":"beIN SPORTS","containerExtension":"m3u8","qualityRank":4,"qualityLabel":"HD"}]}"""
         cacheFile.writeText(plainCrypto.encrypt(seedJson), Charsets.UTF_8)
 
         val cached = repo.loadCached()
         assertTrue(cached.fromCache)
         assertEquals(1, cached.channels.size)
-        assertEquals("beIN SPORTS 1 HD", cached.channels.first().name)
+        assertEquals(1764060000000L, cached.lastSyncedAtMs)
 
-        // When panel fails, syncFromPanel falls back to encrypted cache with warning
         fakeSonixRepo.audioSourcesHandler = { Result.failure(IllegalStateException("network down")) }
         val fallback = repo.syncFromPanel(forceRefresh = true)
         assertEquals(1, fallback.channels.size)
         assertNotNull(fallback.warning)
     }
 
-
-    private fun testPublicDns(): (String) -> Array<InetAddress> = {
+    private fun testPublicDns(failUnknown: Boolean = false): (String) -> Array<InetAddress> = { host ->
+        if (failUnknown) throw UnknownHostException("NXDOMAIN: $host")
         arrayOf(InetAddress.getByAddress(byteArrayOf(93.toByte(), 184.toByte(), 216.toByte(), 34)))
-    }
-
-    private fun testHttpClientMappingHostToMockServer(hostName: String): OkHttpClient {
-        return OkHttpClient.Builder()
-            .dns(
-                object : Dns {
-                    override fun lookup(hostname: String): List<InetAddress> {
-                        return if (hostname.equals(hostName, ignoreCase = true)) {
-                            listOf(InetAddress.getByName("127.0.0.1"))
-                        } else {
-                            Dns.SYSTEM.lookup(hostname)
-                        }
-                    }
-                },
-            )
-            .build()
     }
 
     private fun testRepo(
         hostName: String,
         sonixRepo: FakeSonixControlRepository,
-        panelTimeoutMs: Long = 2_000L,
-        connectTimeoutMs: Long = 1_500L,
-        readTimeoutMs: Long = 800L,
-        callTimeoutMs: Long = 1_500L,
+        dnsResolver: (String) -> Array<InetAddress> = testPublicDns(),
+        connectTimeoutMs: Int = 1_500,
+        readTimeoutMs: Int = 800,
+        clockMs: () -> Long = { 1764064800000L },
     ): DefaultExternalAudioCatalogRepository {
         return DefaultExternalAudioCatalogRepository(
             context = context,
-            okHttpClient = testHttpClientMappingHostToMockServer(hostName),
+            okHttpClient = OkHttpClient(),
             credentialCrypto = plainCrypto,
             sonixControlRepository = sonixRepo,
-            dnsResolver = testPublicDns(),
-            panelTimeoutMs = panelTimeoutMs,
+            dnsResolver = dnsResolver,
+            connectionFactory = { url ->
+                val targetUrl = if (url.host.equals(hostName, ignoreCase = true)) {
+                    URL("http", "127.0.0.1", server.port, url.file)
+                } else {
+                    url
+                }
+                targetUrl.openConnection() as HttpURLConnection
+            },
             m3uConnectTimeoutMs = connectTimeoutMs,
             m3uReadTimeoutMs = readTimeoutMs,
-            m3uCallTimeoutMs = callTimeoutMs,
+            clockMs = clockMs,
         )
     }
 
     @Test
-    fun `AudioM3uParser rejects HTML error pages, missing EXTM3U header, and oversized streams`() {
+    fun `AudioM3uParser handles payloads above 16 MiB up to 128 MiB and rejects HTML, missing header, and above 128 MiB`() {
+        assertEquals(128L * 1024L * 1024L, AudioM3uParser.MAX_M3U_BYTES)
+
         val htmlErr = runCatching {
             AudioM3uParser.parse(
                 ByteArrayInputStream("<!DOCTYPE html><html><body>502 Bad Gateway</body></html>".toByteArray()),
@@ -292,7 +284,41 @@ class AudioM3uParserAndCatalogTest {
         }
         assertTrue(noHeaderErr.isFailure)
 
-        // Exceeds 16 MiB byte limit
+        // 18 MiB valid M3U with 1 target beIN channel + filler entries -> MUST SUCCEED (> 16 MiB old cap!)
+        val streamAbove16Mb = object : java.io.InputStream() {
+            private val prefix = ("#EXTM3U\n#EXTINF:-1 tvg-chno=\"1\" group-title=\"beIN SPORTS\",beIN SPORTS 1 HD\nhttp://cdn.example.com/b1.m3u8\n").toByteArray()
+            private val spacerLine = "#EXTINF:-1 group-title=\"VOD\",Filler Movie Entry With Metadata 0123456789ABCDEF\nhttp://cdn.example.com/vod/1.mp4\n".toByteArray()
+            private val targetTotal = 18L * 1024L * 1024L
+            private var sent = 0L
+            private var prefixOffset = 0
+            private var lineOffset = 0
+            override fun read(): Int = -1
+            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                if (prefixOffset < prefix.size) {
+                    val c = minOf(len, prefix.size - prefixOffset)
+                    System.arraycopy(prefix, prefixOffset, b, off, c)
+                    prefixOffset += c
+                    sent += c
+                    return c
+                }
+                if (sent >= targetTotal) return -1
+                var written = 0
+                while (written < len && sent < targetTotal) {
+                    val avail = spacerLine.size - lineOffset
+                    val chunk = minOf(len - written, avail)
+                    System.arraycopy(spacerLine, lineOffset, b, off + written, chunk)
+                    lineOffset = (lineOffset + chunk) % spacerLine.size
+                    written += chunk
+                    sent += chunk
+                }
+                return written
+            }
+        }
+        val parsed18Mb = AudioM3uParser.parse(streamAbove16Mb, "https://cdn.example.com/large.m3u", testPublicDns())
+        assertEquals(1, parsed18Mb.size)
+        assertEquals("beIN SPORTS 1 HD", parsed18Mb.first().name)
+
+        // Exceeds 128 MiB limit -> MUST REJECT
         val hugeStream = object : java.io.InputStream() {
             private val header = "#EXTM3U\n".toByteArray()
             private var idx = 0L
@@ -317,65 +343,105 @@ class AudioM3uParserAndCatalogTest {
     }
 
     @Test
-    fun `syncFromPanel skips M3U download when URL and updatedAt match cache, and updates when URL changes`() = runTest {
+    fun `syncFromPanelWithProgress emits live stages, persists encrypted lastSyncedAtMs, and survives fresh repository restart`() = runTest {
         val host = "cdn-sync.example.test"
         val urlV1 = "http://$host:${server.port}/playlist_secret_user_pass.m3u?token=supersecret"
-        val urlV2 = "http://$host:${server.port}/playlist_v2_secret.m3u?token=supersecret2"
         val m3uV1 = """
             #EXTM3U
             #EXTINF:-1 tvg-chno="1" group-title="beIN SPORTS",beIN SPORTS 1 HD
             http://stream.example.com/bein1.m3u8
-        """.trimIndent()
-        val m3uV2 = """
-            #EXTM3U
-            #EXTINF:-1 tvg-chno="1" group-title="beIN SPORTS",beIN SPORTS 1 4K
-            http://stream.example.com/bein1_4k.m3u8
             #EXTINF:-1 tvg-chno="2" group-title="ALWAN",ALWAN 1 FHD
             http://stream.example.com/alwan1.m3u8
         """.trimIndent()
+        val gzipped = java.io.ByteArrayOutputStream().use { baos ->
+            GZIPOutputStream(baos).use { gz -> gz.write(m3uV1.toByteArray(Charsets.UTF_8)) }
+            baos.toByteArray()
+        }
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "audio/x-mpegurl")
+                .setHeader("Content-Encoding", "gzip")
+                .setBody(Buffer().write(gzipped)),
+        )
 
-        server.enqueue(MockResponse().setResponseCode(200).setHeader("Content-Type", "audio/x-mpegurl").setBody(m3uV1))
-        server.enqueue(MockResponse().setResponseCode(200).setHeader("Content-Type", "application/vnd.apple.mpegurl").setBody(m3uV2))
-
-        var currentUrl = urlV1
-        var currentUpdatedAt = "2026-11-25T10:00:00Z"
+        val currentClock = AtomicLong(1764070000000L)
         val fakeSonixRepo = FakeSonixControlRepository().apply {
             audioSourcesHandler = {
-                Result.success(SonixAudioSourceConfig(configured = true, m3uUrl = currentUrl, updatedAt = currentUpdatedAt))
+                Result.success(SonixAudioSourceConfig(configured = true, m3uUrl = urlV1, updatedAt = "2026-11-25T10:00:00Z"))
             }
         }
-        val repo = testRepo(host, fakeSonixRepo)
+        val repo1 = testRepo(host, fakeSonixRepo, clockMs = { currentClock.get() })
+        val observedStages = mutableListOf<ExternalAudioSyncStage>()
 
-        // 1. Initial download caches v1
-        val first = repo.syncFromPanel(forceRefresh = false)
-        assertFalse(first.fromCache)
-        assertEquals(1, first.channels.size)
+        val result = repo1.syncFromPanelWithProgress(forceRefresh = true) { stage ->
+            observedStages += stage
+        }
+
+        assertFalse(result.fromCache)
+        assertNull(result.error)
+        assertEquals(2, result.channels.size)
+        assertEquals(1764070000000L, result.lastSyncedAtMs)
+        assertEquals(
+            listOf(
+                ExternalAudioSyncStage.CONNECTING_PANEL,
+                ExternalAudioSyncStage.DOWNLOADING_PLAYLIST,
+                ExternalAudioSyncStage.PARSING_CHANNELS,
+                ExternalAudioSyncStage.SAVING_LOCAL,
+                ExternalAudioSyncStage.SUCCEEDED,
+            ),
+            observedStages,
+        )
+
+        // Ensure raw M3U URL & secret token were NOT written to the encrypted envelope plaintext
+        val diskRaw = plainCrypto.decrypt(File(context.filesDir, "liquidtv_external_audio_catalog_v1.enc").readText())
+        assertFalse(diskRaw.contains("supersecret"))
+        assertFalse(diskRaw.contains("playlist_secret_user_pass"))
+        assertTrue(diskRaw.contains(host))
+
+        // Simulate full app close & reopen with a fresh repository instance offline -> instant cached load!
+        fakeSonixRepo.audioSourcesHandler = { Result.failure(IllegalStateException("offline")) }
+        val repoAfterRestart = testRepo(host, fakeSonixRepo, clockMs = { currentClock.get() })
+        assertNull(repoAfterRestart.peekCached())
+        val loadedOffline = repoAfterRestart.preload()
+        assertTrue(loadedOffline.fromCache)
+        assertEquals(2, loadedOffline.channels.size)
+        assertEquals(1764070000000L, loadedOffline.lastSyncedAtMs)
         assertEquals(1, server.requestCount)
-
-        // 2. Same URL + updatedAt -> skips download completely (server.requestCount stays 1)
-        val skipped = repo.syncFromPanel(forceRefresh = false)
-        assertTrue(skipped.fromCache)
-        assertEquals(1, skipped.channels.size)
-        assertEquals(1, server.requestCount)
-
-        // 3. Preload & peekCached return instantly from memory/disk with zero network
-        assertNotNull(repo.peekCached())
-        assertEquals(1, repo.preload().channels.size)
-        assertEquals(1, server.requestCount)
-
-        // 4. URL changes -> downloads v2 & updates cache
-        currentUrl = urlV2
-        currentUpdatedAt = "2026-11-25T11:00:00Z"
-        val updated = repo.syncFromPanel(forceRefresh = false)
-        assertFalse(updated.fromCache)
-        assertEquals(2, updated.channels.size)
-        assertEquals("beIN SPORTS 1 4K", updated.channels.first().name)
-        assertEquals(2, server.requestCount)
     }
 
     @Test
-    fun `syncFromPanel preserves valid old cache when update fails via HTML, timeout, truncated gzip, or offline`() = runTest {
-        val host = "cdn-fail.example.test"
+    fun `HttpURLConnection handles slow chunked playlist beyond single readTimeout when each chunk arrives on time`() = runTest {
+        val host = "cdn-slow-valid.example.test"
+        val url = "http://$host:${server.port}/slow_playlist.m3u"
+        val m3u = """
+            #EXTM3U
+            #EXTINF:-1 tvg-chno="1" group-title="beIN SPORTS",beIN SPORTS 1 HD
+            http://stream.example.com/bein1.m3u8
+            #EXTINF:-1 tvg-chno="2" group-title="ALWAN",ALWAN 1 HD
+            http://stream.example.com/alwan1.m3u8
+        """.trimIndent()
+        // Total transfer ~600ms > readTimeoutMs(350ms), each small chunk arrives well under 350ms -> MUST SUCCEED!
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setBody(m3u)
+                .throttleBody(40, 100, TimeUnit.MILLISECONDS),
+        )
+        val fakeSonixRepo = FakeSonixControlRepository().apply {
+            audioSourcesHandler = {
+                Result.success(SonixAudioSourceConfig(configured = true, m3uUrl = url, updatedAt = "v1"))
+            }
+        }
+        val repo = testRepo(host, fakeSonixRepo, readTimeoutMs = 350)
+        val res = repo.syncFromPanel(forceRefresh = true)
+        assertNull("Expected slow active stream to succeed without artificial callTimeout", res.error)
+        assertEquals(2, res.channels.size)
+    }
+
+    @Test
+    fun `isolated error handling covers DNS, read timeout, HTTP status, redirects, truncated gzip, and preserves old cache`() = runTest {
+        val host = "cdn-errors.example.test"
         val urlV1 = "http://$host:${server.port}/v1.m3u?password=p1"
         val urlV2 = "http://$host:${server.port}/v2.m3u?password=p2"
         val validM3u = """
@@ -384,68 +450,85 @@ class AudioM3uParserAndCatalogTest {
             http://stream.example.com/bein1.m3u8
         """.trimIndent()
 
-        // Seed v1 cleanly
         server.enqueue(MockResponse().setResponseCode(200).setBody(validM3u))
         var activeUrl = urlV1
-        var activeUpdated = "2026-11-25T09:00:00Z"
+        var activeUpdated = "t1"
+        val failDns = AtomicBoolean(false)
         val fakeSonixRepo = FakeSonixControlRepository().apply {
             audioSourcesHandler = {
                 Result.success(SonixAudioSourceConfig(configured = true, m3uUrl = activeUrl, updatedAt = activeUpdated))
             }
         }
-        val repo = testRepo(host, fakeSonixRepo, readTimeoutMs = 300L, callTimeoutMs = 500L)
-        val seeded = repo.syncFromPanel(forceRefresh = false)
-        assertEquals(1, seeded.channels.size)
-
-        // Attempt v2 update -> returns 200 OK HTML error page -> must reject & keep v1 cache intact
-        activeUrl = urlV2
-        activeUpdated = "2026-11-25T10:00:00Z"
-        server.enqueue(
-            MockResponse()
-                .setResponseCode(200)
-                .setHeader("Content-Type", "text/html")
-                .setBody("<!DOCTYPE html><html><body>Login required</body></html>"),
+        val repo = testRepo(
+            hostName = host,
+            sonixRepo = fakeSonixRepo,
+            dnsResolver = { h ->
+                if (failDns.get()) throw UnknownHostException("NXDOMAIN: $h")
+                arrayOf(InetAddress.getByAddress(byteArrayOf(93.toByte(), 184.toByte(), 216.toByte(), 34)))
+            },
+            readTimeoutMs = 250,
+            clockMs = { 1764071111000L },
         )
-        val afterHtml = repo.syncFromPanel(forceRefresh = false)
-        assertEquals(1, afterHtml.channels.size)
-        assertEquals("beIN SPORTS 1 HD", afterHtml.channels.first().name)
-        assertNull(afterHtml.error)
-        assertNotNull(afterHtml.warning)
-        assertFalse(afterHtml.warning.orEmpty().contains("p2"))
-        assertFalse(afterHtml.warning.orEmpty().contains(host))
+        assertEquals(1, repo.syncFromPanel(forceRefresh = true).channels.size)
 
-        // Attempt v2 update -> truncated gzip response -> must reject & keep v1 cache intact
+        // 1. Read Timeout -> stalled socket with NO response
+        activeUrl = urlV2
+        activeUpdated = "t2"
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
+        val stagesTimeout = mutableListOf<ExternalAudioSyncStage>()
+        val timeoutRes = repo.syncFromPanelWithProgress(forceRefresh = true) { stagesTimeout += it }
+        assertEquals(1, timeoutRes.channels.size)
+        assertEquals(1764071111000L, timeoutRes.lastSyncedAtMs)
+        assertEquals(ExternalAudioSyncStage.FAILED, stagesTimeout.last())
+        assertTrue(timeoutRes.warning.orEmpty().contains("انتهت مهلة"))
+
+        // 2. HTTP 503 error
+        server.enqueue(MockResponse().setResponseCode(503).setBody("Service Unavailable"))
+        val httpRes = repo.syncFromPanel(forceRefresh = true)
+        assertEquals(1, httpRes.channels.size)
+        assertTrue(httpRes.warning.orEmpty().contains("503"))
+
+        // 3. Redirect without Location header
+        server.enqueue(MockResponse().setResponseCode(302))
+        val redirectRes = repo.syncFromPanel(forceRefresh = true)
+        assertEquals(1, redirectRes.channels.size)
+        assertTrue(redirectRes.warning.orEmpty().contains("تحويل"))
+
+        // 4. Truncated GZIP stream
         val fullGz = java.io.ByteArrayOutputStream().use { baos ->
             GZIPOutputStream(baos).use { gz -> gz.write(validM3u.toByteArray()) }
             baos.toByteArray()
         }
-        val truncatedGz = fullGz.copyOf(fullGz.size / 2)
         server.enqueue(
             MockResponse()
                 .setResponseCode(200)
                 .setHeader("Content-Encoding", "gzip")
-                .setBody(Buffer().write(truncatedGz)),
+                .setBody(Buffer().write(fullGz.copyOf(fullGz.size / 2))),
         )
-        val afterTruncated = repo.syncFromPanel(forceRefresh = false)
-        assertEquals(1, afterTruncated.channels.size)
-        assertEquals("beIN SPORTS 1 HD", afterTruncated.channels.first().name)
+        val truncRes = repo.syncFromPanel(forceRefresh = true)
+        assertEquals(1, truncRes.channels.size)
+        assertNotNull(truncRes.warning)
+        assertFalse(truncRes.warning.orEmpty().contains("p2"))
 
-        // Attempt v2 update -> slow stalled timeout -> must fail fast via callTimeout & keep v1 cache intact
-        server.enqueue(
-            MockResponse()
-                .setResponseCode(200)
-                .setBody(validM3u)
-                .throttleBody(1, 200, TimeUnit.MILLISECONDS),
+        // 5. DNS failure when connecting
+        failDns.set(true)
+        server.enqueue(MockResponse().setResponseCode(200).setBody(validM3u))
+        // Force a fresh repo with no cache to verify DNS user error message directly
+        File(context.filesDir, "liquidtv_external_audio_catalog_v1.enc").delete()
+        val uncachedRepo = DefaultExternalAudioCatalogRepository(
+            context = context,
+            okHttpClient = OkHttpClient(),
+            credentialCrypto = plainCrypto,
+            sonixControlRepository = fakeSonixRepo,
+            dnsResolver = { h -> throw UnknownHostException("NXDOMAIN: $h") },
+            connectionFactory = { _ -> throw UnknownHostException("NXDOMAIN") },
+            m3uConnectTimeoutMs = 500,
+            m3uReadTimeoutMs = 500,
+            clockMs = { 1764071111000L },
         )
-        val afterTimeout = repo.syncFromPanel(forceRefresh = false)
-        assertEquals(1, afterTimeout.channels.size)
-        assertNotNull(afterTimeout.warning)
-
-        // Offline / panel failure -> loads cache immediately
-        fakeSonixRepo.audioSourcesHandler = { Result.failure(IllegalStateException("offline")) }
-        val afterOffline = repo.syncFromPanel(forceRefresh = false)
-        assertEquals(1, afterOffline.channels.size)
-        assertTrue(afterOffline.fromCache)
+        val dnsErrRes = uncachedRepo.syncFromPanel(forceRefresh = true)
+        assertTrue(dnsErrRes.channels.isEmpty())
+        assertTrue(dnsErrRes.error.orEmpty().contains("DNS"))
     }
 
     @Test

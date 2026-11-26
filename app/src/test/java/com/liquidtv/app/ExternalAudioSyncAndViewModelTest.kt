@@ -15,6 +15,7 @@ import com.liquidtv.app.domain.model.Channel
 import com.liquidtv.app.domain.model.ExternalAudioCatalogResult
 import com.liquidtv.app.domain.model.ExternalAudioChannel
 import com.liquidtv.app.domain.model.ExternalAudioStatus
+import com.liquidtv.app.domain.model.ExternalAudioSyncStage
 import com.liquidtv.app.domain.model.ExternalAudioUiState
 import com.liquidtv.app.domain.model.MediaType
 import com.liquidtv.app.domain.model.PlaylistInfo
@@ -41,7 +42,6 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import java.util.concurrent.atomic.AtomicInteger
@@ -302,7 +302,7 @@ class ExternalAudioSyncAndViewModelTest {
 
 
     @Test
-    fun `openExternalAudioSheet shows cached channels immediately without waiting and resets isLoadingCatalog in all paths`() = runBlocking {
+    fun `openExternalAudioSheet displays local cache offline with zero network, and syncExternalAudioCatalog handles stages, double-taps, and failures`() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val cachedChannels = listOf(
             ExternalAudioChannel("ext-c1", "beIN SPORTS 1 HD", "1", "http://audio.example.org/1.m3u8", AudioChannelBrand.BEIN_SPORTS, "beIN SPORTS", qualityRank = 4, qualityLabel = "HD"),
@@ -315,18 +315,176 @@ class ExternalAudioSyncAndViewModelTest {
         var mode = "gated"
 
         val fakeCatalogRepo = object : ExternalAudioCatalogRepository {
-            override fun peekCached() = ExternalAudioCatalogResult(channels = cachedChannels, fromCache = true, updatedAt = "t1")
-            override suspend fun loadCached() = ExternalAudioCatalogResult(channels = cachedChannels, fromCache = true, updatedAt = "t1")
-            override suspend fun syncFromPanel(forceRefresh: Boolean): ExternalAudioCatalogResult {
+            override fun peekCached() = ExternalAudioCatalogResult(
+                channels = cachedChannels,
+                fromCache = true,
+                updatedAt = "t1",
+                lastSyncedAtMs = 1764060000000L,
+            )
+
+            override suspend fun loadCached() = peekCached()
+
+            override suspend fun syncFromPanel(forceRefresh: Boolean): ExternalAudioCatalogResult =
+                syncFromPanelWithProgress(forceRefresh) {}
+
+            override suspend fun syncFromPanelWithProgress(
+                forceRefresh: Boolean,
+                onProgress: (ExternalAudioSyncStage) -> Unit,
+            ): ExternalAudioCatalogResult {
                 syncCallCount.incrementAndGet()
                 return when (mode) {
-                    "gated" -> syncGate.await()
-                    "error" -> ExternalAudioCatalogResult(error = "فشل مؤقت")
+                    "gated" -> {
+                        onProgress(ExternalAudioSyncStage.CONNECTING_PANEL)
+                        onProgress(ExternalAudioSyncStage.DOWNLOADING_PLAYLIST)
+                        val res = syncGate.await()
+                        onProgress(ExternalAudioSyncStage.PARSING_CHANNELS)
+                        onProgress(ExternalAudioSyncStage.SAVING_LOCAL)
+                        onProgress(ExternalAudioSyncStage.SUCCEEDED)
+                        res
+                    }
+                    "error" -> {
+                        onProgress(ExternalAudioSyncStage.CONNECTING_PANEL)
+                        onProgress(ExternalAudioSyncStage.DOWNLOADING_PLAYLIST)
+                        onProgress(ExternalAudioSyncStage.FAILED)
+                        ExternalAudioCatalogResult(
+                            channels = refreshedChannels,
+                            lastSyncedAtMs = 1764070000000L,
+                            fromCache = true,
+                            warning = "فشلت المزامنة: انتهت مهلة قراءة قائمة الصوت — تم الاحتفاظ بالنسخة المحلية",
+                        )
+                    }
                     "throw" -> throw IllegalStateException("unexpected runtime crash")
-                    else -> ExternalAudioCatalogResult(channels = refreshedChannels, updatedAt = "t2")
+                    else -> ExternalAudioCatalogResult(
+                        channels = refreshedChannels,
+                        updatedAt = "t2",
+                        lastSyncedAtMs = 1764070000000L,
+                    )
                 }
             }
         }
+
+        val viewModel = buildViewModelForTest(context, fakeCatalogRepo)
+        val vmStore = ViewModelStore()
+        try {
+            // 1. Preload in init populates cached channels + lastSyncedAtMs with zero network sync
+            assertEquals(1, viewModel.state.value.externalAudio.channels.size)
+            assertEquals(1764060000000L, viewModel.state.value.externalAudio.lastSyncedAtMs)
+            assertEquals(0, syncCallCount.get())
+
+            // 2. Open sheet -> cached channels appear immediately offline with ZERO network calls
+            viewModel.openExternalAudioSheet()
+            assertTrue(viewModel.state.value.externalAudio.isSheetVisible)
+            assertFalse(viewModel.state.value.externalAudio.isLoadingCatalog)
+            assertEquals(1, viewModel.state.value.externalAudio.channels.size)
+            assertEquals(0, syncCallCount.get())
+
+            // 3. Click "مزامنة الصوتيات" -> launches sync, emits stages live, and blocks rapid duplicate taps
+            viewModel.syncExternalAudioCatalog()
+            assertTrue(viewModel.state.value.externalAudio.isLoadingCatalog)
+            assertEquals(ExternalAudioSyncStage.DOWNLOADING_PLAYLIST, viewModel.state.value.externalAudio.syncStage)
+            viewModel.syncExternalAudioCatalog()
+            viewModel.syncExternalAudioCatalog()
+            assertEquals(1, syncCallCount.get())
+
+            // Complete background sync -> updates channels, lastSyncedAtMs, SUCCEEDED, resets isLoadingCatalog
+            syncGate.complete(
+                ExternalAudioCatalogResult(
+                    channels = refreshedChannels,
+                    updatedAt = "t2",
+                    lastSyncedAtMs = 1764070000000L,
+                ),
+            )
+            delay(30)
+            assertFalse(viewModel.state.value.externalAudio.isLoadingCatalog)
+            assertEquals(2, viewModel.state.value.externalAudio.channels.size)
+            assertEquals(1764070000000L, viewModel.state.value.externalAudio.lastSyncedAtMs)
+            assertEquals(ExternalAudioSyncStage.SUCCEEDED, viewModel.state.value.externalAudio.syncStage)
+
+            // 4. Failure result -> preserves previous channels + lastSyncedAtMs, sets FAILED + failure message, resets isLoadingCatalog
+            mode = "error"
+            viewModel.syncExternalAudioCatalog()
+            delay(30)
+            assertFalse(viewModel.state.value.externalAudio.isLoadingCatalog)
+            assertEquals(2, viewModel.state.value.externalAudio.channels.size)
+            assertEquals(1764070000000L, viewModel.state.value.externalAudio.lastSyncedAtMs)
+            assertEquals(ExternalAudioSyncStage.FAILED, viewModel.state.value.externalAudio.syncStage)
+            assertTrue(viewModel.state.value.externalAudio.syncStageMessage.orEmpty().contains("فشلت المزامنة"))
+
+            // 5. Uncaught runtime exception -> keeps cached channels, sets FAILED, resets isLoadingCatalog = false
+            mode = "throw"
+            viewModel.syncExternalAudioCatalog()
+            delay(30)
+            assertFalse(viewModel.state.value.externalAudio.isLoadingCatalog)
+            assertEquals(2, viewModel.state.value.externalAudio.channels.size)
+            assertEquals(ExternalAudioSyncStage.FAILED, viewModel.state.value.externalAudio.syncStage)
+        } finally {
+            vmStore.clear()
+        }
+    }
+
+    @Test
+    fun `empty first-time open triggers initial sync, while reopened sheet after preload stays offline-ready`() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val syncedChannels = listOf(
+            ExternalAudioChannel("ext-1", "beIN SPORTS 1 4K", "1", "http://audio.example.org/1.m3u8", AudioChannelBrand.BEIN_SPORTS, "beIN SPORTS", qualityRank = 1, qualityLabel = "4K"),
+        )
+        var savedDiskChannels: List<ExternalAudioChannel> = emptyList()
+        var savedAtMs: Long? = null
+        val syncCalls = AtomicInteger(0)
+
+        val fakeCatalogRepo = object : ExternalAudioCatalogRepository {
+            override fun peekCached(): ExternalAudioCatalogResult? =
+                if (savedDiskChannels.isEmpty()) null else ExternalAudioCatalogResult(
+                    channels = savedDiskChannels,
+                    lastSyncedAtMs = savedAtMs,
+                    fromCache = true,
+                )
+
+            override suspend fun loadCached(): ExternalAudioCatalogResult =
+                peekCached() ?: ExternalAudioCatalogResult(channels = emptyList())
+
+            override suspend fun syncFromPanel(forceRefresh: Boolean): ExternalAudioCatalogResult =
+                syncFromPanelWithProgress(forceRefresh) {}
+
+            override suspend fun syncFromPanelWithProgress(
+                forceRefresh: Boolean,
+                onProgress: (ExternalAudioSyncStage) -> Unit,
+            ): ExternalAudioCatalogResult {
+                syncCalls.incrementAndGet()
+                onProgress(ExternalAudioSyncStage.CONNECTING_PANEL)
+                onProgress(ExternalAudioSyncStage.SAVING_LOCAL)
+                savedDiskChannels = syncedChannels
+                savedAtMs = 1764075555000L
+                onProgress(ExternalAudioSyncStage.SUCCEEDED)
+                return ExternalAudioCatalogResult(
+                    channels = savedDiskChannels,
+                    lastSyncedAtMs = savedAtMs,
+                )
+            }
+        }
+
+        // First session (empty local disk) -> opening sheet automatically runs 1 initial sync
+        val vm1 = buildViewModelForTest(context, fakeCatalogRepo)
+        vm1.openExternalAudioSheet()
+        delay(30)
+        assertEquals(1, syncCalls.get())
+        assertEquals(1, vm1.state.value.externalAudio.channels.size)
+        assertEquals(1764075555000L, vm1.state.value.externalAudio.lastSyncedAtMs)
+
+        // Second session ("after app close and reopen") -> loads local disk immediately, open sheet makes 0 sync calls
+        val vm2 = buildViewModelForTest(context, fakeCatalogRepo)
+        vm2.openExternalAudioSheet()
+        delay(30)
+        assertEquals(1, syncCalls.get())
+        assertEquals(1, vm2.state.value.externalAudio.channels.size)
+        assertEquals("beIN SPORTS 1 4K", vm2.state.value.externalAudio.channels.first().name)
+        assertEquals(1764075555000L, vm2.state.value.externalAudio.lastSyncedAtMs)
+    }
+
+    private fun buildViewModelForTest(
+        context: Context,
+        fakeCatalogRepo: ExternalAudioCatalogRepository,
+    ): PlayerViewModel {
         val channelRepo = object : AddonTestChannelRepository() {
             override fun getAllChannels(): Flow<List<Channel>> = flowOf(emptyList())
         }
@@ -365,10 +523,8 @@ class ExternalAudioSyncAndViewModelTest {
             override fun syncWithVideoPosition(videoPositionMs: Long, isVideoLive: Boolean, videoLiveOffsetMs: Long, forceSeek: Boolean) {}
             override fun detach() {}
         }
-
-        val vmStore = ViewModelStore()
-        val viewModel = ViewModelProvider(
-            vmStore,
+        return ViewModelProvider(
+            ViewModelStore(),
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
@@ -385,45 +541,5 @@ class ExternalAudioSyncAndViewModelTest {
                 }
             },
         )[PlayerViewModel::class.java]
-
-        try {
-            // 1. Preload in init populates cached channels before sheet even opens
-            assertEquals(1, viewModel.state.value.externalAudio.channels.size)
-            assertEquals(0, syncCallCount.get())
-
-            // 2. Open sheet -> cached channels are immediately displayed WHILE gated background sync is still running
-            viewModel.openExternalAudioSheet()
-            assertTrue(viewModel.state.value.externalAudio.isSheetVisible)
-            assertEquals(1, viewModel.state.value.externalAudio.channels.size)
-            // Cached channels are already visible, so background refresh stays quiet.
-            assertFalse(viewModel.state.value.externalAudio.isLoadingCatalog)
-
-            // Re-opening before sync completes must deduplicate (syncCallCount stays 1)
-            viewModel.openExternalAudioSheet()
-            assertEquals(1, syncCallCount.get())
-
-            // Complete background sync -> channels update and isLoadingCatalog resets to false
-            syncGate.complete(ExternalAudioCatalogResult(channels = refreshedChannels, updatedAt = "t2"))
-            delay(30)
-            assertFalse(viewModel.state.value.externalAudio.isLoadingCatalog)
-            assertEquals(2, viewModel.state.value.externalAudio.channels.size)
-
-            // 3. Failure result -> keeps cached channels and resets isLoadingCatalog = false
-            mode = "error"
-            viewModel.refreshExternalAudioCatalog()
-            delay(30)
-            assertFalse(viewModel.state.value.externalAudio.isLoadingCatalog)
-            assertEquals(2, viewModel.state.value.externalAudio.channels.size)
-            assertNull(viewModel.state.value.externalAudio.catalogError)
-
-            // 4. Uncaught runtime exception -> keeps cached channels and resets isLoadingCatalog = false
-            mode = "throw"
-            viewModel.refreshExternalAudioCatalog()
-            delay(30)
-            assertFalse(viewModel.state.value.externalAudio.isLoadingCatalog)
-            assertEquals(2, viewModel.state.value.externalAudio.channels.size)
-        } finally {
-            vmStore.clear()
-        }
     }
 }

@@ -10,8 +10,8 @@ import java.net.InetAddress
 import java.net.URL
 
 object AudioM3uParser {
-    const val MAX_M3U_BYTES: Long = 16L * 1024L * 1024L
-    const val MAX_M3U_CHARS: Int = 16 * 1024 * 1024
+    const val MAX_M3U_BYTES: Long = 128L * 1024L * 1024L
+    const val MAX_M3U_CHARS: Int = 128 * 1024 * 1024
     private val ATTRIBUTE_REGEX_CACHE = HashMap<String, Regex>()
 
     fun parse(
@@ -37,14 +37,14 @@ object AudioM3uParser {
                 val rawLine = reader.readLine() ?: break
                 totalChars += rawLine.length
                 if (totalChars > MAX_M3U_CHARS) {
-                    throw IllegalStateException("حجم قائمة M3U تجاوز الحد الآمن (16 ميغابايت)")
+                    throw IllegalStateException("حجم قائمة M3U تجاوز الحد الآمن (128 ميغابايت)")
                 }
                 val line = rawLine.removePrefix("\uFEFF").trim()
                 if (line.isEmpty()) continue
 
                 if (!sawFirstContentLine) {
                     sawFirstContentLine = true
-                    if (looksLikeMarkupOrJson(line)) {
+                    if (looksLikeMarkupOrJson(line, checkSubstring = true)) {
                         throw IllegalStateException("أعاد المصدر صفحة HTML أو بيانات غير صالحة بدلاً من ملف M3U")
                     }
                     if (!line.startsWith("#EXTM3U", ignoreCase = true)) {
@@ -54,25 +54,40 @@ object AudioM3uParser {
                     continue
                 }
 
-                if (looksLikeMarkupOrJson(line)) {
+                val firstChar = line[0]
+                if ((firstChar == '<' || firstChar == '{' || firstChar == '[') &&
+                    looksLikeMarkupOrJson(line, checkSubstring = false)
+                ) {
                     throw IllegalStateException("أعاد المصدر محتوى HTML/JSON غير صالح أثناء قراءة M3U")
                 }
 
                 when {
                     line.startsWith("#EXTINF", ignoreCase = true) -> {
                         pendingInfo = line
-                        val attrGroup = extractAttribute(line, "group-title")
-                        if (attrGroup.isNotBlank()) pendingGroup = attrGroup
+                        if (line.contains("group-title", ignoreCase = true)) {
+                            val attrGroup = extractAttribute(line, "group-title")
+                            if (attrGroup.isNotBlank()) pendingGroup = attrGroup
+                        }
                     }
                     line.startsWith("#EXTGRP:", ignoreCase = true) -> {
                         pendingGroup = line.substringAfter(':').trim()
                     }
-                    line.startsWith("#") -> Unit
+                    firstChar == '#' -> Unit
                     pendingInfo != null -> {
                         val info = pendingInfo.orEmpty()
                         val displayName = info.substringAfterLast(',', "").trim()
-                        val name = extractAttribute(info, "tvg-name").ifBlank { displayName }
-                        val group = pendingGroup.ifBlank { extractAttribute(info, "group-title") }
+                        val name = if (info.contains("tvg-name", ignoreCase = true)) {
+                            extractAttribute(info, "tvg-name").ifBlank { displayName }
+                        } else {
+                            displayName
+                        }
+                        val group = pendingGroup.ifBlank {
+                            if (info.contains("group-title", ignoreCase = true)) {
+                                extractAttribute(info, "group-title")
+                            } else {
+                                ""
+                            }
+                        }
                         val brand = AudioSourceClassifier.classify(name, group)
 
                         if (brand != AudioChannelBrand.OTHER) {
@@ -94,7 +109,11 @@ object AudioM3uParser {
                                 }
                                 if (hostSafe && seenUrls.add(resolved)) {
                                     channelNumber++
-                                    val chNo = extractAttribute(info, "tvg-chno").ifBlank { channelNumber.toString() }
+                                    val chNo = if (info.contains("tvg-chno", ignoreCase = true)) {
+                                        extractAttribute(info, "tvg-chno").ifBlank { channelNumber.toString() }
+                                    } else {
+                                        channelNumber.toString()
+                                    }
                                     val cleanName = name.ifBlank { "قناة صوتية $channelNumber" }
                                     val qRank = AudioSourceClassifier.qualityRank(cleanName, group)
                                     val extension = uri.path.substringAfterLast('.', "").lowercase()
@@ -127,7 +146,7 @@ object AudioM3uParser {
         return AudioSourceClassifier.sortChannels(rawChannels)
     }
 
-    private fun looksLikeMarkupOrJson(line: String): Boolean {
+    private fun looksLikeMarkupOrJson(line: String, checkSubstring: Boolean): Boolean {
         val lower = line.lowercase()
         return lower.startsWith("<!doctype") ||
             lower.startsWith("<html") ||
@@ -139,8 +158,7 @@ object AudioM3uParser {
             lower.startsWith("<error") ||
             lower.startsWith("{") ||
             lower.startsWith("[") ||
-            lower.contains("<!doctype html") ||
-            lower.contains("<html")
+            (checkSubstring && (lower.contains("<!doctype html") || lower.contains("<html")))
     }
 
     private fun resolveUrl(base: URL?, baseUrl: String, line: String): String? {
@@ -172,7 +190,7 @@ internal class BoundedInputStream(
         if (b != -1) {
             bytesRead++
             if (bytesRead > maxBytes) {
-                throw IllegalStateException("حجم قائمة M3U تجاوز الحد الآمن (16 ميغابايت)")
+                throw IllegalStateException("حجم قائمة M3U تجاوز الحد الآمن (128 ميغابايت)")
             }
         }
         return b
@@ -183,7 +201,7 @@ internal class BoundedInputStream(
         if (count > 0) {
             bytesRead += count
             if (bytesRead > maxBytes) {
-                throw IllegalStateException("حجم قائمة M3U تجاوز الحد الآمن (16 ميغابايت)")
+                throw IllegalStateException("حجم قائمة M3U تجاوز الحد الآمن (128 ميغابايت)")
             }
         }
         return count

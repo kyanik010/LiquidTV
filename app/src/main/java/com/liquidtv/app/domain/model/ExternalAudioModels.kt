@@ -46,9 +46,20 @@ enum class ExternalAudioStatus {
     ERROR,
 }
 
+enum class ExternalAudioSyncStage(val defaultMessageAr: String) {
+    IDLE(""),
+    CONNECTING_PANEL("جارٍ الاتصال بلوحة التحكم..."),
+    DOWNLOADING_PLAYLIST("جارٍ تنزيل قوائم الصوتيات..."),
+    PARSING_CHANNELS("جارٍ تحليل وتصنيف القنوات..."),
+    SAVING_LOCAL("جارٍ حفظ الصوتيات على الجهاز..."),
+    SUCCEEDED("تمت المزامنة بنجاح"),
+    FAILED("فشلت المزامنة"),
+}
+
 data class ExternalAudioCatalogResult(
     val channels: List<ExternalAudioChannel> = emptyList(),
     val updatedAt: String? = null,
+    val lastSyncedAtMs: Long? = null,
     val fromCache: Boolean = false,
     val warning: String? = null,
     val error: String? = null,
@@ -59,9 +70,12 @@ data class ExternalAudioCatalogResult(
 data class ExternalAudioUiState(
     val isSheetVisible: Boolean = false,
     val isLoadingCatalog: Boolean = false,
+    val syncStage: ExternalAudioSyncStage = ExternalAudioSyncStage.IDLE,
+    val syncStageMessage: String? = null,
     val catalogError: String? = null,
     val catalogWarning: String? = null,
     val lastUpdatedAt: String? = null,
+    val lastSyncedAtMs: Long? = null,
     val channels: List<ExternalAudioChannel> = emptyList(),
     val searchQuery: String = "",
     val selectedBrandFilter: AudioBrandFilter = AudioBrandFilter.ALL,
