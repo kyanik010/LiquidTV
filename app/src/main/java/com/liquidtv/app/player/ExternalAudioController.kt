@@ -407,11 +407,9 @@ class Media3ExternalAudioController @Inject constructor(
                     )
                     val cause = error.cause
                     val httpErr = cause as? HttpDataSource.InvalidResponseCodeException
-                    val isConnConflict = httpErr != null &&
-                        (httpErr.responseCode == 403 || httpErr.responseCode == 429 || httpErr.responseCode == 503)
                     val permanent = PlayerMediaHelper.isPermanentError(error)
-                    val message = if (isConnConflict) {
-                        "رفض الخادم الاتصال الثاني (HTTP ${httpErr.responseCode}). قد يكون الحد الأقصى للاتصالات في اشتراكك مشغولاً."
+                    val message = if (httpErr != null) {
+                        "تعذّر تشغيل مصدر الصوت الخارجي (HTTP ${httpErr.responseCode}). تحقق من صلاحية الرابط وحالة مزود الصوت."
                     } else {
                         PlayerMediaHelper.formatPlaybackError(error)
                     }

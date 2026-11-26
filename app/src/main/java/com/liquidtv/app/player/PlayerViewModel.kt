@@ -35,7 +35,6 @@ import com.liquidtv.app.domain.repository.AddonPreferencesRepository
 import com.liquidtv.app.domain.repository.ChannelRepository
 import com.liquidtv.app.domain.repository.SubscriptionRepository
 import com.liquidtv.app.domain.repository.UserPreferencesRepository
-import java.net.URI
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
@@ -1293,21 +1292,16 @@ class PlayerViewModel @Inject constructor(
         )
     }
 
-    private suspend fun checkConcurrentConnectionWarning(audioChannel: ExternalAudioChannel): String? {
-        val activeSub = runCatching { subscriptionRepository.getActiveSubscriptionOnce() }.getOrNull() ?: return null
-        if ((activeSub.maxConnections ?: 0) != 1) return null
-        val audioHost = runCatching { URI(audioChannel.streamUrl).host?.lowercase() }.getOrNull() ?: return null
-        val subHost = runCatching { URI(activeSub.serverUrl).host?.lowercase() }.getOrNull()
-        val videoHost = _state.value.channel?.streamUrl?.let { url ->
-            runCatching { URI(url).host?.lowercase() }.getOrNull()
-        }
-        val sameServer = audioHost == subHost || audioHost == videoHost
-        return if (sameServer) {
-            "تنبيه: اشتراكك الحالي يسمح باتصال واحد فقط. تشغيل الصوت الخارجي من نفس الخادم قد يؤدي إلى قطع البث الأساسي."
-        } else {
-            null
-        }
-    }
+    /**
+     * External-audio channels are imported from the separately configured panel M3U.
+     * Hostname equality cannot prove that the audio and video streams share an IPTV
+     * account: providers commonly use shared domains/CDNs for independent accounts.
+     * Do not warn or block playback based on hostname or the primary subscription's
+     * max-connections setting. Let the external provider's actual response determine
+     * whether its own account limit has been reached.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    private suspend fun checkConcurrentConnectionWarning(audioChannel: ExternalAudioChannel): String? = null
 
     fun openTrackSheet() = _state.update {
         it.copy(

@@ -117,7 +117,7 @@ class ExternalAudioSyncAndViewModelTest {
     }
 
     @Test
-    fun `PlayerViewModel mutes primary ONLY after PCM verification, keeps A un-reloaded, warns on maxConn=1, and unmutes on detach or channel switch`() = runBlocking {
+    fun `PlayerViewModel does not infer shared IPTV account from matching hosts, mutes only after PCM, and unmutes on detach or channel switch`() = runBlocking {
         var primaryVolume = 1.0f
         val primaryCommands = mutableListOf<String>()
         val playerProxy = Proxy.newProxyInstance(
@@ -261,14 +261,14 @@ class ExternalAudioSyncAndViewModelTest {
             delay(50)
             primaryCommands.clear()
 
-            // Open sheet and select same-host channel -> triggers maxConnections=1 warning & CONNECTING (A still unmuted!)
+            // Separate panel M3U: matching hostname alone must NOT trigger a shared-account warning.
             viewModel.openExternalAudioSheet()
             delay(50)
             assertEquals(2, viewModel.state.value.externalAudio.channels.size)
 
             viewModel.selectExternalAudioChannel(extChannels[0])
             delay(50)
-            assertNotNull(viewModel.state.value.externalAudio.connectionLimitWarning)
+            assertNull(viewModel.state.value.externalAudio.connectionLimitWarning)
             assertEquals(1.0f, primaryVolume, 0.001f)
             assertTrue("Primary player must NEVER reload during external audio activation", primaryCommands.isEmpty())
 
