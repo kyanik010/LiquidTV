@@ -1215,7 +1215,7 @@ class RedesignUiAndLogicTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("settings_section_about").assertIsDisplayed().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithText("حول LIQUID TV").assertIsDisplayed()
+        composeRule.onNodeWithText("حول SONIX IPTV").assertIsDisplayed()
     }
 }
 
